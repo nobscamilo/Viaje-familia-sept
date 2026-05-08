@@ -23,6 +23,9 @@ jobs:
       - name: Generate site
         run: node generar_alojamiento.js
 
+      - name: Patch map CSS
+        run: node .github/scripts/patch-leaflet-css.js
+
       - name: Prepare static site
         run: |
           rm -rf public
