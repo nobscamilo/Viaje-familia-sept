@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Comparativa familiar de alojamientos en Madrid para el viaje al Gran Premio de España de F1 2026.">
+<title>Alojamiento Madrid F1 2026 — Comparativa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         margin: 0; padding: 0; background: #f5f5f7; color: #1d1d1f; line-height: 1.5; }
+  .container { max-width: 1500px; margin: 0 auto; padding: 32px 24px; }
+  header.top { text-align: center; margin-bottom: 32px; padding: 24px 0;
+               border-bottom: 2px solid #e0e0e5; }
+  header.top h1 { color: #1F3864; margin: 0 0 6px; font-size: 30px; font-weight: 700; }
+  header.top .subtitle { color: #555; margin: 0; font-size: 15px; }
+  section.intro { background: white; border-radius: 14px; padding: 28px;
+                  box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 32px; }
+  section.intro h2 { color: #1F3864; margin: 0 0 20px; font-size: 22px; }
+  .intro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px; }
+  .intro-grid .full { grid-column: 1 / -1; }
+  .intro-grid h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px;
+                   color: #2E75B6; margin: 0 0 6px; }
+  .intro-grid p, .intro-grid ul { margin: 0; font-size: 14px; }
+  .intro-grid ul { padding-left: 20px; }
+  .intro-grid ul.criteria li { margin-bottom: 4px; }
+  h2.section-title { color: #1F3864; font-size: 22px; margin: 32px 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 22px; }
+  .card { background: white; border-radius: 14px; overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; }
+  .card-header { padding: 18px 22px 14px; border-bottom: 1px solid #eee; }
+  .card-id { display: inline-block; background: #1F3864; color: white; font-size: 11.5px;
+             padding: 3px 11px; border-radius: 12px; font-weight: 600; margin-bottom: 10px;
+             letter-spacing: 0.3px; }
+  .card-header h2 { margin: 0 0 10px; font-size: 19px; line-height: 1.3; color: #1d1d1f; }
+  .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .price { font-size: 21px; font-weight: 700; color: #1d1d1f; }
+  .price small { font-weight: 400; color: #666; font-size: 13px; }
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 600;
+           letter-spacing: 0.3px; }
+  .badge.ok { background: #d4edda; color: #155724; }
+  .badge.warn { background: #fff3cd; color: #856404; }
+  .score-chip { font-size: 11px; padding: 3px 10px; border-radius: 10px;
+                background: #e9eef7; color: #1F3864; font-weight: 700; }
+  .gallery { background: #f0f0f3; }
+  .gallery .photo-main { display: block; width: 100%; height: 280px; overflow: hidden; }
+  .gallery .photo-main img { width: 100%; height: 100%; object-fit: cover; display: block;
+                              transition: transform 0.3s; }
+  .gallery .photo-main:hover img { transform: scale(1.03); }
+  .gallery .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+                     padding: 2px; background: #e8e8ed; }
+  .gallery .photo-thumb { display: block; aspect-ratio: 1.4 / 1; overflow: hidden;
+                          background: #ddd; }
+  .gallery .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block;
+                               transition: transform 0.2s; }
+  .gallery .photo-thumb:hover img { transform: scale(1.08); }
+  .gallery .no-photo { display: flex; align-items: center; justify-content: center;
+                       height: 240px; color: #888; font-style: italic;
+                       text-align: center; padding: 20px; }
+  dl.data { padding: 16px 22px; margin: 0;
+            display: grid; grid-template-columns: 110px 1fr; row-gap: 6px; column-gap: 10px;
+            font-size: 13.5px; border-bottom: 1px solid #eee; }
+  dl.data dt { font-weight: 600; color: #555; }
+  dl.data dd { margin: 0; color: #1d1d1f; }
+  .proscons { padding: 16px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+              border-bottom: 1px solid #eee; }
+  .proscons h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .pros h3 { color: #155724; }
+  .cons h3 { color: #721c24; }
+  .proscons ul { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; }
+  .proscons li { margin-bottom: 4px; }
+  .critica { padding: 16px 22px; font-size: 13px; line-height: 1.55;
+             background: #fff8e6; border-bottom: 1px solid #eee; margin: 0; }
+  .btn { display: block; padding: 14px 22px; text-align: center; background: #2E75B6;
+         color: white; text-decoration: none; font-weight: 600; font-size: 13.5px;
+         transition: background 0.2s; }
+  .btn:hover { background: #1F3864; }
+  .btn.secondary { background: #eef4fb; color: #1F3864; border-top: 1px solid #d8e6f5; }
+  .btn.secondary:hover { background: #dceaf8; }
+  .btn.danger { background: #fff2f0; color: #9f1d1d; border-top: 1px solid #f0c9c5; }
+  .btn.danger:hover { background: #f8ded9; }
+  .card-actions { display: grid; grid-template-columns: 1fr 0.55fr 0.55fr; margin-top: auto; }
+  .trip-tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px;
+               align-items: center; overflow-x: auto; padding: 10px 0 18px;
+               background: #f5f5f7; }
+  .trip-tabs a { flex: 0 0 auto; color: #1F3864; background: white; border: 1px solid #d8e0eb;
+                 padding: 9px 13px; border-radius: 8px; font-size: 13px; font-weight: 650;
+                 text-decoration: none; }
+  .trip-tabs a.active { color: white; background: #1F3864; border-color: #1F3864; }
+  .collab-bar { background: #ffffff; border: 1px solid #d8e0eb; border-radius: 12px;
+                padding: 16px 18px; margin-bottom: 24px; display: flex; gap: 14px;
+                align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .collab-bar h2 { margin: 0 0 4px; color: #1F3864; font-size: 18px; }
+  .collab-bar p { margin: 0; color: #555; font-size: 13.5px; }
+  .collab-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .suggestion-link { display: inline-block; color: white; background: #2E75B6;
+                     padding: 10px 14px; border-radius: 8px; text-decoration: none;
+                     font-size: 13px; font-weight: 650; white-space: nowrap; }
+  .suggestion-link.secondary { color: #1F3864; background: #eef4fb; border: 1px solid #d8e6f5; }
+  .category-panel { background: white; border: 1px solid #e1e5eb; border-radius: 12px;
+                    padding: 22px; margin-top: 22px; display: flex; gap: 16px;
+                    align-items: center; justify-content: space-between; }
+  .category-panel h2 { margin: 4px 0 6px; color: #1F3864; font-size: 20px; }
+  .category-panel p { margin: 0; color: #555; font-size: 14px; }
+  .panel-kicker { color: #2E75B6; font-size: 11px; font-weight: 750;
+                  letter-spacing: 0.5px; text-transform: uppercase; }
+  .analysis-panel { background: #ffffff; border: 1px solid #d8e0eb; border-radius: 14px;
+                    padding: 24px; margin: 0 0 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .analysis-copy { max-width: 900px; margin-bottom: 18px; }
+  .analysis-copy h2 { color: #1F3864; margin: 4px 0 8px; font-size: 22px; }
+  .analysis-copy p { margin: 0; color: #555; font-size: 14px; line-height: 1.6; }
+  .ranking-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .rank-card { border: 1px solid #e1e5eb; border-radius: 10px; padding: 16px;
+               background: #f8fafc; }
+  .rank-number { display: inline-block; color: white; background: #1F3864;
+                 border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 750; }
+  .rank-card h3 { margin: 10px 0 8px; font-size: 16px; color: #1d1d1f; line-height: 1.3; }
+  .rank-card p { margin: 0; color: #555; font-size: 13px; line-height: 1.45; }
+  .analysis-notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 12px; margin-top: 16px; }
+  .analysis-notes p { margin: 0; padding: 12px; border-radius: 8px; background: #f0f7fc;
+                      color: #263241; font-size: 13px; line-height: 1.45; }
+  .analysis-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  section.conclusiones { background: white; border-radius: 14px; padding: 28px;
+                          box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-top: 32px; }
+  section.conclusiones h2 { color: #1F3864; margin: 0 0 20px; font-size: 22px; }
+  .recomendacion-principal { background: linear-gradient(135deg, #d4edda, #e8f5ee);
+                              padding: 20px; border-radius: 10px; margin-bottom: 18px;
+                              border-left: 4px solid #155724; }
+  .recomendacion-principal .tag { font-size: 11px; color: #155724; font-weight: 700;
+                                   text-transform: uppercase; letter-spacing: 0.6px; }
+  .recomendacion-principal h3 { margin: 6px 0 10px; font-size: 19px; color: #155724; }
+  .recomendacion-principal p { margin: 0; font-size: 14px; line-height: 1.6; }
+  .bloque-alt { padding: 18px 20px; border-radius: 10px; background: #f0f7fc;
+                margin-bottom: 14px; border-left: 4px solid #2E75B6; }
+  .bloque-alt h3 { margin: 0 0 8px; font-size: 16px; color: #1F3864; }
+  .bloque-alt p { margin: 0; font-size: 14px; line-height: 1.6; }
+  .bloque-riesgo { padding: 18px 20px; border-radius: 10px; background: #fff3cd;
+                   border-left: 4px solid #856404; }
+  .bloque-riesgo h3 { margin: 0 0 8px; font-size: 16px; color: #856404; }
+  .bloque-riesgo p { margin: 0; font-size: 14px; line-height: 1.6; }
+  footer { text-align: center; color: #888; font-size: 12px; margin-top: 32px;
+           padding: 20px 0; border-top: 1px solid #e0e0e5; }
+  /* ========== FILTROS ========== */
+  .filters { background: white; border-radius: 14px; padding: 16px 20px;
+             box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 22px;
+             display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .filter-label { font-size: 12px; font-weight: 700; color: #555;
+                  text-transform: uppercase; letter-spacing: 0.6px; }
+  .filter-label.spaced { margin-left: 16px; }
+  .filters button { background: #f0f0f3; border: 1px solid #d0d0d5; color: #1d1d1f;
+                    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+                    font-weight: 500; transition: all 0.15s; }
+  .filters button:hover { background: #e0e0e5; border-color: #b0b0b5; }
+  .filters button.active { background: #2E75B6; color: white; border-color: #1F3864; }
+  .filters .filter-budget.active { background: #2e7d32; border-color: #155724; }
+  .filters .filter-reset { background: #fff; }
+  .card.hidden { display: none; }
+
+  /* ========== MAPA ========== */
+  section.map-section { background: white; border-radius: 14px; padding: 28px;
+                         box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 32px; }
+  section.map-section h2 { color: #1F3864; margin: 0 0 12px; font-size: 22px; }
+  .map-legend { margin: 0 0 16px; font-size: 13px; color: #555; }
+  .map-sync-note { margin: -6px 0 16px; color: #667085; font-size: 12.5px; }
+  /* Leaflet critical layout fallback: keeps tiles clipped even if CDN CSS is delayed. */
+  .leaflet-container { overflow: hidden; position: relative; touch-action: pan-x pan-y; }
+  .leaflet-pane,
+  .leaflet-tile,
+  .leaflet-marker-icon,
+  .leaflet-marker-shadow,
+  .leaflet-tile-container,
+  .leaflet-pane > svg,
+  .leaflet-pane > canvas,
+  .leaflet-zoom-box,
+  .leaflet-image-layer,
+  .leaflet-layer { position: absolute; left: 0; top: 0; }
+  .leaflet-container img.leaflet-tile { max-width: none !important; max-height: none !important; }
+  .leaflet-tile { width: 256px; height: 256px; user-select: none; visibility: hidden; border: 0; }
+  .leaflet-tile-loaded { visibility: inherit; }
+  .leaflet-marker-icon,
+  .leaflet-marker-shadow { display: block; }
+  .leaflet-control { position: relative; z-index: 800; pointer-events: auto; }
+  .leaflet-top,
+  .leaflet-bottom { position: absolute; z-index: 1000; pointer-events: none; }
+  .leaflet-top { top: 0; }
+  .leaflet-right { right: 0; }
+  .leaflet-bottom { bottom: 0; }
+  .leaflet-left { left: 0; }
+  .leg-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+             vertical-align: middle; margin-right: 4px; border: 2px solid white;
+             box-shadow: 0 0 0 1px #888; }
+  .leg-dot.ifema { background: #d32f2f; }
+  .leg-dot.ok { background: #2e7d32; }
+  .leg-dot.warn { background: #f9a825; }
+  #map { height: 480px; border-radius: 10px; border: 1px solid #ddd; z-index: 1; }
+  .map-marker { width: 30px; height: 30px; border-radius: 50%; border: 3px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center;
+                justify-content: center; color: white; font-weight: 700; font-size: 12px; }
+  .map-marker.ifema { background: #d32f2f; font-size: 11px; }
+  .map-marker.ok { background: #2e7d32; }
+  .map-marker.warn { background: #f9a825; }
+  .map-popup { font-size: 13px; min-width: 200px; }
+  .map-popup b { display: block; margin-bottom: 4px; font-size: 14px; color: #1F3864; }
+  .map-popup .pop-price { font-weight: 700; font-size: 14px; }
+  .map-popup .pop-muted { font-size: 12px; color: #666; }
+  .map-popup .pop-muted.first { margin-top: 4px; }
+  .map-popup .pop-link { display: block; margin-top: 6px; color: #2E75B6; text-decoration: none; }
+  .map-popup .pop-link:hover { text-decoration: underline; }
+
+  @media print {
+    body { background: white; }
+    .card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+    .btn { display: none; }
+    section.map-section { display: none; }
+  }
+
+  @media (max-width: 700px) {
+    .container { padding: 20px 14px; }
+    header.top { margin-bottom: 22px; padding: 18px 0; }
+    header.top h1 { font-size: 24px; line-height: 1.25; }
+    header.top .subtitle { font-size: 13.5px; }
+    section.intro,
+    section.map-section,
+    .analysis-panel,
+    section.conclusiones { padding: 20px; border-radius: 10px; }
+    .intro-grid,
+    .proscons,
+    .ranking-grid,
+    .analysis-notes { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .card { border-radius: 10px; }
+    .card-header h2 { font-size: 17px; overflow-wrap: anywhere; }
+    .gallery .photo-main { height: 220px; }
+    dl.data { grid-template-columns: 92px minmax(0, 1fr); padding: 14px 18px; }
+    .proscons,
+    .critica { padding: 14px 18px; }
+    .filters { align-items: stretch; padding: 14px; }
+    .trip-tabs { padding-bottom: 12px; }
+    .collab-bar,
+    .category-panel { align-items: stretch; flex-direction: column; border-radius: 10px; }
+    .collab-actions { justify-content: stretch; }
+    .suggestion-link { text-align: center; white-space: normal; }
+    .card-actions { grid-template-columns: 1fr; }
+    .filter-label { flex: 1 0 100%; }
+    .filter-label.spaced { margin-left: 0; }
+    .filters button { flex: 1 1 100%; text-align: left; }
+    #map { height: 360px; }
+  }
+/* Leaflet critical layout fallback */
+.leaflet-container{overflow:hidden;position:relative;touch-action:pan-x pan-y;}
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0;}
+.leaflet-container img.leaflet-tile{max-width:none!important;max-height:none!important;}
+.leaflet-tile{width:256px;height:256px;user-select:none;visibility:hidden;border:0;}
+.leaflet-tile-loaded{visibility:inherit;}
+.leaflet-marker-icon,.leaflet-marker-shadow{display:block;}
+.leaflet-control{position:relative;z-index:800;pointer-events:auto;}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none;}
+.leaflet-top{top:0;}.leaflet-right{right:0;}.leaflet-bottom{bottom:0;}.leaflet-left{left:0;}
+.leaflet-control-container .leaflet-control{clear:both;}
+
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="top">
+    <h1>Alojamiento Madrid — F1 Spanish Grand Prix 2026</h1>
+    <p class="subtitle">Comparativa visual · Familia 9 personas · 10 de septiembre de 2026 al 14 de septiembre de 2026 · Documento generado el 8/5/2026</p>
+  </header>
+
+  <nav class="trip-tabs" aria-label="Categorías del viaje">
+    <a class="active" href="#hospedaje">Hospedaje</a>
+    <a href="#comida">Comida</a>
+    <a href="#sitios">Sitios a conocer</a>
+    <a href="#ideas">Ideas familiares</a>
+  </nav>
+
+
+  <section class="intro">
+    <h2>Resumen del viaje</h2>
+    <div class="intro-grid">
+      <div>
+        <h3>Fechas</h3>
+        <p><strong>10 de septiembre de 2026</strong> al <strong>14 de septiembre de 2026</strong> · 4 noches</p>
+      </div>
+      <div>
+        <h3>Grupo (9 personas)</h3>
+        <ul><li>Camilo y Juliana</li><li>Padres de Camilo (2 personas)</li><li>Hermana, su esposo y 3 hijos (18, 8 y 4 años)</li></ul>
+      </div>
+      <div class="full">
+        <h3>Contexto</h3>
+        <p>El alojamiento corresponde al fin de semana del Gran Premio de España de Fórmula 1 en el circuito MADRING (IFEMA), del 11 al 13 de septiembre 2026, con la carrera el domingo 13.</p>
+      </div>
+      <div class="full">
+        <h3>Criterios de selección</h3>
+        <ul class="criteria"><li>Trayecto máximo a IFEMA: 30 a 40 minutos</li><li>Sin desplazamientos en coche por la ciudad: prioridad metro o cercanías</li><li>Capacidad real para 9 personas, idealmente con espacios comunes</li><li>Presupuesto orientativo inicial: 300–600 €/noche total</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="collab-bar" aria-labelledby="colaborar-title">
+    <div>
+      <h2 id="colaborar-title">Colaboración familiar</h2>
+      <p>Las sugerencias y votos se guardan como entradas en GitHub para revisarlas y sumarlas al tablero.</p>
+    </div>
+    <div class="collab-actions">
+      <a class="suggestion-link" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Nueva%20opci%C3%B3n%20de%20hospedaje&amp;body=Link%20del%20alojamiento%3A%0A%0APrecio%20total%20%2F%20precio%20por%20noche%3A%0A%0ACapacidad%2C%20habitaciones%2C%20camas%20y%20ba%C3%B1os%3A%0A%0AUbicaci%C3%B3n%20o%20barrio%3A%0A%0APor%20qu%C3%A9%20la%20sugieres%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Agregar hospedaje</a>
+      <a class="suggestion-link secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20opci%C3%B3n%20de%20hospedaje&amp;body=Opci%C3%B3n%20a%20quitar%3A%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar hospedaje</a>
+      <a class="suggestion-link secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Pedir%20an%C3%A1lisis%20IA%20de%20hospedajes&amp;body=Qu%C3%A9%20quieres%20que%20compare%20o%20revise%20la%20IA%3A%0A%0AOpciones%20involucradas%20(si%20aplica)%3A%0A%0ARestricciones%20nuevas%20de%20la%20familia%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Pedir análisis IA</a>
+      <a class="suggestion-link secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues" target="_blank" rel="noopener noreferrer">Ver sugerencias</a>
+    </div>
+  </section>
+
+
+  <section class="analysis-panel" aria-labelledby="analysis-title">
+    <div class="analysis-copy">
+      <span class="panel-kicker">Análisis IA</span>
+      <h2 id="analysis-title">Mejores opciones por equilibrio familiar</h2>
+      <p>Este ranking se recalcula cada vez que se actualiza la página: combina precio, presupuesto, calificación, tiempo a IFEMA, formato para 9 personas y disponibilidad de fotos.</p>
+    </div>
+    <div class="ranking-grid">
+
+      <article class="rank-card">
+        <span class="rank-number">#1</span>
+        <h3>M — ALFALFA A Apartments</h3>
+        <p><strong>88/100</strong> · entra en presupuesto, trayecto favorable a IFEMA, divide al grupo en unidades o habitaciones</p>
+      </article>
+      <article class="rank-card">
+        <span class="rank-number">#2</span>
+        <h3>B — Estilo y amplitud para 9 en San Vicente Ferrer E2</h3>
+        <p><strong>86/100</strong> · entra en presupuesto, calificación floja, trayecto favorable a IFEMA</p>
+      </article>
+      <article class="rank-card">
+        <span class="rank-number">#3</span>
+        <h3>D — Apartamento Central Madrid - Sol</h3>
+        <p><strong>71/100</strong> · excede 9% el presupuesto, mantiene al grupo en un solo alojamiento</p>
+      </article>
+    </div>
+    <div class="analysis-notes">
+      <p><strong>Más barata:</strong> M — ALFALFA A Apartments (445 €/noche).</p>
+      <p><strong>Premium razonable:</strong> D — Apartamento Central Madrid - Sol (653 €/noche).</p>
+      <p><strong>Flujo:</strong> cuando alguien agrega o pide quitar una opción, queda como sugerencia en GitHub; luego se revisa, se completa con fotos/coordenadas y se publica una nueva versión con el análisis recalculado.</p>
+    </div>
+    <div class="analysis-actions">
+      <a class="suggestion-link" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Pedir%20an%C3%A1lisis%20IA%20de%20hospedajes&amp;body=Qu%C3%A9%20quieres%20que%20compare%20o%20revise%20la%20IA%3A%0A%0AOpciones%20involucradas%20(si%20aplica)%3A%0A%0ARestricciones%20nuevas%20de%20la%20familia%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Pedir análisis IA</a>
+      <a class="suggestion-link secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20opci%C3%B3n%20de%20hospedaje&amp;body=Opci%C3%B3n%20a%20quitar%3A%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar una opción</a>
+    </div>
+  </section>
+
+  <section id="hospedaje">
+  <section class="map-section">
+    <h2>📍 Mapa de ubicaciones</h2>
+    <p class="map-legend">
+      <span class="leg-dot ifema"></span> IFEMA / Circuito MADRING ·
+      <span class="leg-dot ok"></span> En presupuesto ·
+      <span class="leg-dot warn"></span> Excede presupuesto
+    </p>
+    <p class="map-sync-note">El mapa se genera desde las opciones publicadas: si una opción nueva queda aprobada y tiene coordenadas, aparece automáticamente en la siguiente actualización.</p>
+    <div id="map"></div>
+  </section>
+
+  <h2 class="section-title">Opciones de alojamiento (<span id="card-count">13</span>)</h2>
+
+  <div class="filters">
+    <span class="filter-label">Ordenar:</span>
+    <button type="button" data-action="sort-price-asc">💰 Precio ↑ (más barato)</button>
+    <button type="button" data-action="sort-price-desc">💰 Precio ↓ (más caro)</button>
+    <button type="button" data-action="sort-rating">⭐ Calificación (mejor)</button>
+    <button type="button" data-action="sort-score">IA (mejor encaje)</button>
+    <span class="filter-label spaced">Filtrar:</span>
+    <button type="button" data-action="budget" class="filter-budget">✓ Solo en presupuesto</button>
+    <button type="button" data-action="reset" class="filter-reset">↻ Mostrar todas</button>
+  </div>
+
+  <main class="grid" id="cards-grid">
+
+    <article class="card" data-id="A" data-price="693" data-rating="8.86" data-score="67" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción A</span>
+        <h2>Chic12 Gran Vía Madrid (Airbnb)</h2>
+        <div class="meta">
+          <span class="price">2.774 € <small>(693 €/noche)</small></span>
+          <span class="score-chip">IA 67/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c&amp;viralityEntryPoint=1&amp;s=76&amp;source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2&amp;check_in=2026-09-10&amp;guests=9&amp;adults=7&amp;check_out=2026-09-14&amp;children=2" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://a0.muscache.com/im/pictures/hosting/Hosting-756567161759468410/original/073a1980-2004-4597-9dab-d966a90cddb2.jpeg?im_w=720" alt="Chic12 Gran Vía Madrid (Airbnb)" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c&amp;viralityEntryPoint=1&amp;s=76&amp;source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2&amp;check_in=2026-09-10&amp;guests=9&amp;adults=7&amp;check_out=2026-09-14&amp;children=2" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://a0.muscache.com/im/pictures/hosting/Hosting-756567161759468410/original/dbaabb46-e3a0-41b3-9a7e-44b06cec7d97.jpeg?im_w=720" alt="Chic12 Gran Vía Madrid (Airbnb)" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c&amp;viralityEntryPoint=1&amp;s=76&amp;source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2&amp;check_in=2026-09-10&amp;guests=9&amp;adults=7&amp;check_out=2026-09-14&amp;children=2" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://a0.muscache.com/im/pictures/hosting/Hosting-756567161759468410/original/10cddeb3-bf7a-4d77-b891-1810c24cd18f.jpeg?im_w=720" alt="Chic12 Gran Vía Madrid (Airbnb)" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c&amp;viralityEntryPoint=1&amp;s=76&amp;source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2&amp;check_in=2026-09-10&amp;guests=9&amp;adults=7&amp;check_out=2026-09-14&amp;children=2" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://a0.muscache.com/im/pictures/hosting/Hosting-756567161759468410/original/4d761599-e9ca-493d-bacd-f9244ad425af.jpeg?im_w=720" alt="Chic12 Gran Vía Madrid (Airbnb)" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c&amp;viralityEntryPoint=1&amp;s=76&amp;source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2&amp;check_in=2026-09-10&amp;guests=9&amp;adults=7&amp;check_out=2026-09-14&amp;children=2" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://a0.muscache.com/im/pictures/fbdcf2c0-beee-449f-a8b8-ba477ec83288.jpg?im_w=720" alt="Chic12 Gran Vía Madrid (Airbnb)" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Gran Vía, Madrid centro</dd>
+        <dt>A IFEMA</dt><dd>30-35 min en metro (Línea 1 + Línea 8)</dd>
+        <dt>Capacidad</dt><dd>12 huéspedes (loft entero)</dd>
+        <dt>Habitaciones</dt><dd>3 hab. · 7 camas · 2 baños</dd>
+        <dt>Calificación</dt><dd>4,43/5 (7 reseñas)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Ubicación inmejorable en Gran Vía (turismo, restaurantes, metro a pasos)</li><li>Loft entero — toda la familia junta</li><li>Anfitrión con 10 años en Airbnb</li><li>Cumple criterio de tiempo a IFEMA</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>693 €/noche supera presupuesto (+15%)</li><li>Solo 7 camas para 9 personas: alguien comparte</li><li>Solo 2 baños para 9: turnos en mañanas</li><li>Solo 7 reseñas: muestra pequeña</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Recomendación principal por ubicación y comodidad familiar. Verifica antes de pagar la distribución exacta de las 7 camas para 9 personas.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c&amp;viralityEntryPoint=1&amp;s=76&amp;source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2&amp;check_in=2026-09-10&amp;guests=9&amp;adults=7&amp;check_out=2026-09-14&amp;children=2" target="_blank" rel="noopener noreferrer">Ver listado original (Airbnb) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20A&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20A%20%E2%80%94%20Chic12%20Gran%20V%C3%ADa%20Madrid%20(Airbnb)%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20A&amp;body=Propongo%20quitar%3A%20A%20%E2%80%94%20Chic12%20Gran%20V%C3%ADa%20Madrid%20(Airbnb)%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="B" data-price="510" data-rating="6.2" data-score="86" data-budget="1">
+      <header class="card-header">
+        <span class="card-id">Opción B</span>
+        <h2>Estilo y amplitud para 9 en San Vicente Ferrer E2</h2>
+        <div class="meta">
+          <span class="price">2.041 € <small>(510 €/noche)</small></span>
+          <span class="score-chip">IA 86/100</span>
+          <span class="badge ok">En presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/new-cool-apt-en-el-centro-de-madrid-para-9pax.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F714647177.jpg&amp;w=720" alt="Estilo y amplitud para 9 en San Vicente Ferrer E2" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/new-cool-apt-en-el-centro-de-madrid-para-9pax.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F714647154.jpg&amp;w=720" alt="Estilo y amplitud para 9 en San Vicente Ferrer E2" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/new-cool-apt-en-el-centro-de-madrid-para-9pax.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F714647171.jpg&amp;w=720" alt="Estilo y amplitud para 9 en San Vicente Ferrer E2" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/new-cool-apt-en-el-centro-de-madrid-para-9pax.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F714647201.jpg&amp;w=720" alt="Estilo y amplitud para 9 en San Vicente Ferrer E2" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Centro Madrid (Malasaña-Chueca)</dd>
+        <dt>A IFEMA</dt><dd>~30 min en metro hasta Feria de Madrid</dd>
+        <dt>Capacidad</dt><dd>9 personas (apartamento entero)</dd>
+        <dt>Habitaciones</dt><dd>Apartamento entero · 3★ Genius</dd>
+        <dt>Calificación</dt><dd>6,2/10 Agradable (134 comentarios) · Ubicación 8,5/10</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>La opción más barata que cumple criterios</li><li>Apartamento entero — toda la familia junta</li><li>134 reseñas (más histórico que el Airbnb)</li><li>Cancelación flexible disponible en Booking</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>Calificación 6,2/10 — la más baja del comparativo</li><li>Apartamento 3★ suele ser check-in remoto sin servicios</li><li>Calle Vicente Ferrer (Malasaña) puede ser ruidosa fines de semana</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Mejor relación precio/idoneidad si la prioridad es contener gasto. Lee las reseñas más recientes antes de reservar.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/new-cool-apt-en-el-centro-de-madrid-para-9pax.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20B&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20B%20%E2%80%94%20Estilo%20y%20amplitud%20para%209%20en%20San%20Vicente%20Ferrer%20E2%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20B&amp;body=Propongo%20quitar%3A%20B%20%E2%80%94%20Estilo%20y%20amplitud%20para%209%20en%20San%20Vicente%20Ferrer%20E2%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="D" data-price="653" data-rating="8.2" data-score="71" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción D</span>
+        <h2>Apartamento Central Madrid - Sol</h2>
+        <div class="meta">
+          <span class="price">2.613 € <small>(653 €/noche)</small></span>
+          <span class="score-chip">IA 71/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F768544224.jpg&amp;w=720" alt="Apartamento Central Madrid - Sol" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F768544198.jpg&amp;w=720" alt="Apartamento Central Madrid - Sol" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F768543961.jpg&amp;w=720" alt="Apartamento Central Madrid - Sol" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F768544078.jpg&amp;w=720" alt="Apartamento Central Madrid - Sol" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F768544105.jpg&amp;w=720" alt="Apartamento Central Madrid - Sol" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Centro Madrid, zona Sol</dd>
+        <dt>A IFEMA</dt><dd>~30-35 min en metro hasta Feria de Madrid</dd>
+        <dt>Capacidad</dt><dd>9 personas (apartamento entero, multi-unidad)</dd>
+        <dt>Habitaciones</dt><dd>Apartamento entero</dd>
+        <dt>Calificación</dt><dd>8,2/10 Muy bien (29 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Ubicación premium en Sol, corazón turístico</li><li>Apartamento entero con capacidad para 9</li><li>Servicios de Booking (cancelación, soporte)</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>653 €/noche supera el presupuesto</li><li>Calificación pendiente de verificar</li><li>Multi-unidad: habitaciones pueden estar repartidas</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Alternativa similar al Airbnb (Sol/Gran Vía) pero algo más cara y con menos reseñas históricas.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20D&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20D%20%E2%80%94%20Apartamento%20Central%20Madrid%20-%20Sol%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20D&amp;body=Propongo%20quitar%3A%20D%20%E2%80%94%20Apartamento%20Central%20Madrid%20-%20Sol%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="E" data-price="904" data-rating="8" data-score="44" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción E</span>
+        <h2>Veracruz Boutique Puerta del Sol</h2>
+        <div class="meta">
+          <span class="price">3.618 € <small>(904 €/noche)</small></span>
+          <span class="score-chip">IA 44/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/hostal-veracruz.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F833087671.jpg&amp;w=720" alt="Veracruz Boutique Puerta del Sol" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/hostal-veracruz.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F399300647.jpg&amp;w=720" alt="Veracruz Boutique Puerta del Sol" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/hostal-veracruz.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F833087644.jpg&amp;w=720" alt="Veracruz Boutique Puerta del Sol" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/hostal-veracruz.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F399300330.jpg&amp;w=720" alt="Veracruz Boutique Puerta del Sol" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/hostal-veracruz.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F833087716.jpg&amp;w=720" alt="Veracruz Boutique Puerta del Sol" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Puerta del Sol, centro Madrid</dd>
+        <dt>A IFEMA</dt><dd>~30-35 min en metro hasta Feria de Madrid</dd>
+        <dt>Capacidad</dt><dd>9 personas en 4 habitaciones (3 hab × parejas + niños)</dd>
+        <dt>Habitaciones</dt><dd>4 habitaciones boutique</dd>
+        <dt>Calificación</dt><dd>8,0/10 Muy bien (1.448 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Ubicación premium en Puerta del Sol</li><li>Hotel boutique (vs apartamento)</li><li>Habitaciones individuales por subgrupo familiar</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>904 €/noche — supera presupuesto &gt;50%</li><li>Sin espacio común familiar (cada uno en su habitación)</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Cerca del corazón turístico pero precio elevado. Mejor opción si prefieren hotel sobre apartamento y aceptan el sobrecoste.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/hostal-veracruz.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20E&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20E%20%E2%80%94%20Veracruz%20Boutique%20Puerta%20del%20Sol%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20E&amp;body=Propongo%20quitar%3A%20E%20%E2%80%94%20Veracruz%20Boutique%20Puerta%20del%20Sol%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="F" data-price="837" data-rating="8.3" data-score="48" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción F</span>
+        <h2>Hispano Boutique Gran Vía</h2>
+        <div class="meta">
+          <span class="price">3.350 € <small>(837 €/noche)</small></span>
+          <span class="score-chip">IA 48/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/hostal-hispano.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F782950816.jpg&amp;w=720" alt="Hispano Boutique Gran Vía" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/hostal-hispano.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F782950820.jpg&amp;w=720" alt="Hispano Boutique Gran Vía" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/hostal-hispano.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F782950811.jpg&amp;w=720" alt="Hispano Boutique Gran Vía" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/hostal-hispano.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F13716624.jpg&amp;w=720" alt="Hispano Boutique Gran Vía" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/hostal-hispano.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F782950827.jpg&amp;w=720" alt="Hispano Boutique Gran Vía" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Gran Vía, centro Madrid</dd>
+        <dt>A IFEMA</dt><dd>~30-35 min en metro hasta Feria de Madrid</dd>
+        <dt>Capacidad</dt><dd>9 personas en 4 habitaciones</dd>
+        <dt>Habitaciones</dt><dd>4 habitaciones hostal-boutique</dd>
+        <dt>Calificación</dt><dd>8,3/10 Muy bien (1.442 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Gran Vía: ubicación inmejorable</li><li>Hostal-boutique con habitaciones renovadas</li><li>Mismo formato familiar que Veracruz pero ~70€/noche menos</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>837 €/noche — supera presupuesto +40%</li><li>Como hostal boutique, servicios limitados vs hotel completo</li><li>Sin espacio común familiar</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Mejor relación calidad/precio entre los hostales boutique de centro. Mismo formato que Veracruz pero un escalón más barato.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/hostal-hispano.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20F&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20F%20%E2%80%94%20Hispano%20Boutique%20Gran%20V%C3%ADa%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20F&amp;body=Propongo%20quitar%3A%20F%20%E2%80%94%20Hispano%20Boutique%20Gran%20V%C3%ADa%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="G" data-price="858" data-rating="7.5" data-score="45" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción G</span>
+        <h2>CH La Bañezana</h2>
+        <div class="meta">
+          <span class="price">3.433 € <small>(858 €/noche)</small></span>
+          <span class="score-chip">IA 45/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/la-banezana.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F143563156.jpg&amp;w=720" alt="CH La Bañezana" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/la-banezana.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F143563854.jpg&amp;w=720" alt="CH La Bañezana" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/la-banezana.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F143563891.jpg&amp;w=720" alt="CH La Bañezana" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/la-banezana.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F143563794.jpg&amp;w=720" alt="CH La Bañezana" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/la-banezana.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F143563789.jpg&amp;w=720" alt="CH La Bañezana" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Centro Madrid</dd>
+        <dt>A IFEMA</dt><dd>~30-35 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas en 4 habitaciones</dd>
+        <dt>Habitaciones</dt><dd>4 habitaciones</dd>
+        <dt>Calificación</dt><dd>7,5/10 Bien (1.028 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Ubicación céntrica</li><li>4 habitaciones permite distribución privada</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>858 €/noche — supera presupuesto +40%</li><li>Sin información clara de calificación</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Otra opción de hostal boutique en centro. Verifica reseñas antes de decidir — el precio no la diferencia claramente de Veracruz/Hispano.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/la-banezana.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20G&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20G%20%E2%80%94%20CH%20La%20Ba%C3%B1ezana%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20G&amp;body=Propongo%20quitar%3A%20G%20%E2%80%94%20CH%20La%20Ba%C3%B1ezana%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="H" data-price="692" data-rating="7.9" data-score="62" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción H</span>
+        <h2>Apartamentos Recoletos</h2>
+        <div class="meta">
+          <span class="price">2.771 € <small>(692 €/noche)</small></span>
+          <span class="score-chip">IA 62/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/apartamentos-recoletos.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F178969113.jpg&amp;w=720" alt="Apartamentos Recoletos" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/apartamentos-recoletos.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F178997800.jpg&amp;w=720" alt="Apartamentos Recoletos" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/apartamentos-recoletos.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F110252176.jpg&amp;w=720" alt="Apartamentos Recoletos" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/apartamentos-recoletos.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F644611848.jpg&amp;w=720" alt="Apartamentos Recoletos" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/apartamentos-recoletos.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F178969075.jpg&amp;w=720" alt="Apartamentos Recoletos" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Recoletos, centro Madrid (cerca del Retiro)</dd>
+        <dt>A IFEMA</dt><dd>~30 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 apartamentos)</dd>
+        <dt>Habitaciones</dt><dd>2 apartamentos enteros</dd>
+        <dt>Calificación</dt><dd>7,9/10 Bien (6.887 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Zona Recoletos / Retiro: tranquila y elegante</li><li>Apartamentos enteros con cocina</li><li>Comparable en precio al Airbnb pero con servicios Booking</li><li>Cerca del parque del Retiro (excelente con niños)</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>692 €/noche supera presupuesto</li><li>2 unidades separan al grupo en dos apartamentos</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Buena alternativa al Airbnb si prefieres Booking. Recoletos es zona más tranquila que Gran Vía, mejor para familia con niños pequeños.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/apartamentos-recoletos.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20H&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20H%20%E2%80%94%20Apartamentos%20Recoletos%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20H&amp;body=Propongo%20quitar%3A%20H%20%E2%80%94%20Apartamentos%20Recoletos%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="I" data-price="924" data-rating="8.6" data-score="48" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción I</span>
+        <h2>Slow Suites Luchana</h2>
+        <div class="meta">
+          <span class="price">3.695 € <small>(924 €/noche)</small></span>
+          <span class="score-chip">IA 48/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/luchana-suites.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F347938715.jpg&amp;w=720" alt="Slow Suites Luchana" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/luchana-suites.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F60334658.jpg&amp;w=720" alt="Slow Suites Luchana" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/luchana-suites.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F60334670.jpg&amp;w=720" alt="Slow Suites Luchana" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/luchana-suites.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F61752415.jpg&amp;w=720" alt="Slow Suites Luchana" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/luchana-suites.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F60334597.jpg&amp;w=720" alt="Slow Suites Luchana" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Luchana / Chamberí, Madrid</dd>
+        <dt>A IFEMA</dt><dd>~25-30 min en metro (favorable)</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 suites)</dd>
+        <dt>Habitaciones</dt><dd>2 suites</dd>
+        <dt>Calificación</dt><dd>8,6/10 Fabuloso (1.972 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Chamberí: zona elegante, residencial, segura</li><li>Más cerca de IFEMA que las otras opciones de centro</li><li>Suites con servicios de hotel</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>924 €/noche — la más cara del comparativo (+50% sobre presupuesto)</li><li>Solo 2 unidades para 9 personas</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> La opción más cara. Solo justificable si valoras mucho el barrio (Chamberí) y los servicios de hotel-boutique.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/luchana-suites.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20I&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20I%20%E2%80%94%20Slow%20Suites%20Luchana%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20I&amp;body=Propongo%20quitar%3A%20I%20%E2%80%94%20Slow%20Suites%20Luchana%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="J" data-price="800" data-rating="8.4" data-score="52" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción J</span>
+        <h2>Limehome Madrid San Lorenzo</h2>
+        <div class="meta">
+          <span class="price">3.202 € <small>(800 €/noche)</small></span>
+          <span class="score-chip">IA 52/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F405515654.jpg&amp;w=720" alt="Limehome Madrid San Lorenzo" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F749302912.jpg&amp;w=720" alt="Limehome Madrid San Lorenzo" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F405514458.jpg&amp;w=720" alt="Limehome Madrid San Lorenzo" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F405513966.jpg&amp;w=720" alt="Limehome Madrid San Lorenzo" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F405513968.jpg&amp;w=720" alt="Limehome Madrid San Lorenzo" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Calle San Lorenzo, Malasaña-Chueca centro</dd>
+        <dt>A IFEMA</dt><dd>~30 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 apartamentos)</dd>
+        <dt>Habitaciones</dt><dd>2 apartamentos</dd>
+        <dt>Calificación</dt><dd>8,4/10 Muy bien (885 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Marca Limehome: estandarización y diseño consistentes</li><li>Centro de Madrid, zona Malasaña vibrante</li><li>Apartamentos modernos con cocina</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>800 €/noche — supera presupuesto +33%</li><li>Limehome usa check-in 100% remoto (sin recepción humana)</li><li>Malasaña ruidosa los fines de semana</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Diseño moderno y estandarizado pero precio alto y sin recepción presencial. Útil si valoras decoración consistente.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20J&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20J%20%E2%80%94%20Limehome%20Madrid%20San%20Lorenzo%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20J&amp;body=Propongo%20quitar%3A%20J%20%E2%80%94%20Limehome%20Madrid%20San%20Lorenzo%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="K" data-price="651" data-rating="7.9" data-score="67" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción K</span>
+        <h2>ALFALFA B Apartments</h2>
+        <div class="meta">
+          <span class="price">2.603 € <small>(651 €/noche)</small></span>
+          <span class="score-chip">IA 67/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F492740812.jpg&amp;w=720" alt="ALFALFA B Apartments" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F492740873.jpg&amp;w=720" alt="ALFALFA B Apartments" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F492740826.jpg&amp;w=720" alt="ALFALFA B Apartments" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F492740818.jpg&amp;w=720" alt="ALFALFA B Apartments" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F492740814.jpg&amp;w=720" alt="ALFALFA B Apartments" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Centro Madrid</dd>
+        <dt>A IFEMA</dt><dd>~30 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 apartamentos)</dd>
+        <dt>Habitaciones</dt><dd>2 apartamentos</dd>
+        <dt>Calificación</dt><dd>7,9/10 Bien (276 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>651 €/noche — apenas supera presupuesto (+8%)</li><li>Apartamentos enteros con cocina</li><li>Buen precio relativo entre las opciones de centro</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>Ligeramente sobre presupuesto</li><li>Calificación pendiente de verificar</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Una de las opciones más asequibles entre los apartamentos de centro. Verificar reseñas y servicios antes de descartar B (que es 140€/noche más barato).</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20K&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20K%20%E2%80%94%20ALFALFA%20B%20Apartments%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20K&amp;body=Propongo%20quitar%3A%20K%20%E2%80%94%20ALFALFA%20B%20Apartments%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="L" data-price="956" data-rating="9" data-score="47" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción L</span>
+        <h2>Tu Casa Bonita en Carolinas</h2>
+        <div class="meta">
+          <span class="price">3.825 € <small>(956 €/noche)</small></span>
+          <span class="score-chip">IA 47/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F833058848.jpg&amp;w=720" alt="Tu Casa Bonita en Carolinas" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F833058666.jpg&amp;w=720" alt="Tu Casa Bonita en Carolinas" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F833058878.jpg&amp;w=720" alt="Tu Casa Bonita en Carolinas" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F833058405.jpg&amp;w=720" alt="Tu Casa Bonita en Carolinas" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F833058841.jpg&amp;w=720" alt="Tu Casa Bonita en Carolinas" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Las Carolinas, Madrid (norte)</dd>
+        <dt>A IFEMA</dt><dd>Verificar — probablemente ~25-30 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 unidades)</dd>
+        <dt>Habitaciones</dt><dd>2 unidades</dd>
+        <dt>Calificación</dt><dd>9,0/10 Fantástico (26 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Las Carolinas: zona residencial cerca de IFEMA</li><li>Probablemente el trayecto al circuito sea corto</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>956 €/noche — la segunda más cara del comparativo</li><li>Las Carolinas es zona residencial sin atractivo turístico</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Solo justificable si confirmas trayecto muy corto a IFEMA. Para turismo en Madrid centro, queda lejos. No la recomiendo a este precio.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20L&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20L%20%E2%80%94%20Tu%20Casa%20Bonita%20en%20Carolinas%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20L&amp;body=Propongo%20quitar%3A%20L%20%E2%80%94%20Tu%20Casa%20Bonita%20en%20Carolinas%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="M" data-price="445" data-rating="7.7" data-score="88" data-budget="1">
+      <header class="card-header">
+        <span class="card-id">Opción M</span>
+        <h2>ALFALFA A Apartments</h2>
+        <div class="meta">
+          <span class="price">1.781 € <small>(445 €/noche)</small></span>
+          <span class="score-chip">IA 88/100</span>
+          <span class="badge ok">En presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F492740789.jpg&amp;w=720" alt="ALFALFA A Apartments" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F492740967.jpg&amp;w=720" alt="ALFALFA A Apartments" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F653275596.jpg&amp;w=720" alt="ALFALFA A Apartments" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F492740807.jpg&amp;w=720" alt="ALFALFA A Apartments" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F492740951.jpg&amp;w=720" alt="ALFALFA A Apartments" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Centro Madrid</dd>
+        <dt>A IFEMA</dt><dd>~30 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 apartamentos)</dd>
+        <dt>Habitaciones</dt><dd>2 apartamentos</dd>
+        <dt>Calificación</dt><dd>7,7/10 Bien (234 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>445 €/noche — DENTRO de presupuesto y la más barata del comparativo nuevo</li><li>Apartamentos enteros con cocina</li><li>Misma marca que K (Alfalfa B) — calidad consistente</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>Calificación pendiente de verificar</li><li>2 unidades separan al grupo</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> 🏆 La OPCIÓN MÁS BARATA que cumple criterios y entra en presupuesto. Junto con B (Estilo y amplitud), las dos finalistas en relación precio/idoneidad. Verificar reseñas urgente.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20M&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20M%20%E2%80%94%20ALFALFA%20A%20Apartments%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20M&amp;body=Propongo%20quitar%3A%20M%20%E2%80%94%20ALFALFA%20A%20Apartments%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+
+    <article class="card" data-id="N" data-price="724" data-rating="8.4" data-score="59" data-budget="0">
+      <header class="card-header">
+        <span class="card-id">Opción N</span>
+        <h2>Paseo Suites Hotel</h2>
+        <div class="meta">
+          <span class="price">2.894 € <small>(724 €/noche)</small></span>
+          <span class="score-chip">IA 59/100</span>
+          <span class="badge warn">Excede presupuesto</span>
+        </div>
+      </header>
+      <div class="gallery"><a href="https://www.booking.com/hotel/es/paseo-suites-boutique.es.html" target="_blank" rel="noopener noreferrer" class="photo-main"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax1024x768%2F443029536.jpg&amp;w=720" alt="Paseo Suites Hotel" loading="lazy" referrerpolicy="no-referrer"></a><div class="thumbs"><a href="https://www.booking.com/hotel/es/paseo-suites-boutique.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F442666355.jpg&amp;w=720" alt="Paseo Suites Hotel" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/paseo-suites-boutique.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax500%2F442666362.jpg&amp;w=720" alt="Paseo Suites Hotel" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/paseo-suites-boutique.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F442651022.jpg&amp;w=720" alt="Paseo Suites Hotel" loading="lazy" referrerpolicy="no-referrer"></a><a href="https://www.booking.com/hotel/es/paseo-suites-boutique.es.html" target="_blank" rel="noopener noreferrer" class="photo-thumb"><img src="https://wsrv.nl/?url=https%3A%2F%2Fcf.bstatic.com%2Fxdata%2Fimages%2Fhotel%2Fmax300%2F442682307.jpg&amp;w=720" alt="Paseo Suites Hotel" loading="lazy" referrerpolicy="no-referrer"></a></div></div>
+      <dl class="data">
+        <dt>Ubicación</dt><dd>Paseo (centro Madrid)</dd>
+        <dt>A IFEMA</dt><dd>~30 min en metro</dd>
+        <dt>Capacidad</dt><dd>9 personas (2 suites)</dd>
+        <dt>Habitaciones</dt><dd>2 suites</dd>
+        <dt>Calificación</dt><dd>8,4/10 Muy bien (975 comentarios)</dd>
+      </dl>
+      <div class="proscons">
+        <div class="pros">
+          <h3>Pros</h3>
+          <ul><li>Hotel boutique (vs apartamento) — recepción, servicios</li><li>2 suites con espacio amplio</li></ul>
+        </div>
+        <div class="cons">
+          <h3>Contras</h3>
+          <ul><li>724 €/noche — supera presupuesto +20%</li><li>Solo 2 unidades para 9 personas</li></ul>
+        </div>
+      </div>
+      <p class="critica"><strong>Crítica honesta:</strong> Hotel-suite opción media-alta. Si prefieres servicios de hotel completos sobre apartamento, es menos caro que Veracruz/Hispano pero más caro que B/M.</p>
+      <div class="card-actions">
+        <a class="btn" href="https://www.booking.com/hotel/es/paseo-suites-boutique.es.html" target="_blank" rel="noopener noreferrer">Ver listado original (Booking) →</a>
+        <a class="btn secondary" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Favorito%20hospedaje%3A%20opci%C3%B3n%20N&amp;body=Mi%20opci%C3%B3n%20favorita%20es%3A%20N%20%E2%80%94%20Paseo%20Suites%20Hotel%0A%0APor%20qu%C3%A9%20la%20prefiero%3A%0A%0ADudas%20o%20condiciones%20antes%20de%20reservar%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Votar favorito</a>
+        <a class="btn danger" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Quitar%20hospedaje%3A%20opci%C3%B3n%20N&amp;body=Propongo%20quitar%3A%20N%20%E2%80%94%20Paseo%20Suites%20Hotel%0A%0AMotivo%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Quitar opción</a>
+      </div>
+    </article>
+  </main>
+  </section>
+
+
+  <section class="conclusiones">
+    <h2>Conclusiones y recomendación</h2>
+    <div class="recomendacion-principal">
+      <span class="tag">Recomendación principal</span>
+      <h3>M — ALFALFA A Apartments (más barata) o B — Estilo y amplitud para 9 en San Vicente Ferrer E2 (alojamiento entero)</h3>
+      <p>Tras revisar 13 opciones, las 2 dentro del presupuesto inicial son M (ALFALFA A Apartments — 445 €/noche), B (Estilo y amplitud para 9 en San Vicente Ferrer E2 — 510 €/noche). El resto excede aproximadamente entre 9% y 59% el techo de 600 €/noche. Si la prioridad es contención de gasto, M es la finalista clara; si la prioridad es tener la familia en un alojamiento entero único, B mantiene esa ventaja.</p>
+    </div>
+    <div class="bloque-alt">
+      <h3>Alternativa premium</h3>
+      <p>Si aceptas pagar más por ubicación premium (Gran Vía, Sol), la opción A (Airbnb Chic12) sigue siendo la más equilibrada en experiencia/comodidad para 9 personas a 693 €/noche. H (Apartamentos Recoletos) a 692 €/noche también es competitiva con la ventaja de la zona Retiro tranquila.</p>
+    </div>
+    <div class="bloque-riesgo">
+      <h3>⚠ Riesgo de inacción</h3>
+      <p>Las opciones que más han subido de precio son las hoteleras de centro (Veracruz, Hispano, Bañezana, Slow Suites). Esto es típico del fin de semana del GP. Las cancelaciones gratuitas y las tarifas más bajas son siempre las primeras en agotarse — decidir en los próximos 7-10 días.</p>
+    </div>
+  </section>
+
+
+  <section class="category-panel upcoming" id="comida">
+    <div>
+      <span class="panel-kicker">Próxima categoría</span>
+      <h2>Sitios de comida</h2>
+      <p>Restaurantes, mercados, desayunos cerca del alojamiento y lugares fáciles con niños.</p>
+    </div>
+    <a class="suggestion-link" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Sugerencia%20de%20comida&amp;body=Nombre%20del%20sitio%3A%0A%0ALink%3A%0A%0AZona%3A%0A%0APor%20qu%C3%A9%20vale%20la%20pena%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Proponer comida</a>
+  </section>
+
+  <section class="category-panel upcoming" id="sitios">
+    <div>
+      <span class="panel-kicker">Próxima categoría</span>
+      <h2>Sitios a conocer</h2>
+      <p>Planes turísticos, parques, museos, zonas para caminar y visitas que encajen con los tiempos del GP.</p>
+    </div>
+    <a class="suggestion-link" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Sitio%20a%20conocer&amp;body=Nombre%20del%20sitio%3A%0A%0ALink%20o%20ubicaci%C3%B3n%3A%0A%0AIdeal%20para%3A%0A%0ATiempo%20aproximado%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Proponer sitio</a>
+  </section>
+
+  <section class="category-panel upcoming" id="ideas">
+    <div>
+      <span class="panel-kicker">Buzón familiar</span>
+      <h2>Ideas y preferencias</h2>
+      <p>Espacio para preferencias, restricciones, dudas, horarios y cualquier idea que ayude a ordenar el viaje.</p>
+    </div>
+    <a class="suggestion-link" href="https://github.com/nobscamilo/Viaje-familia-sept/issues/new?title=Idea%20para%20el%20viaje&amp;body=Idea%3A%0A%0ACategor%C3%ADa%3A%0A%0APor%20qu%C3%A9%20te%20gusta%3A%0A%0ATu%20nombre%3A" target="_blank" rel="noopener noreferrer">Dejar idea</a>
+  </section>
+
+  <footer>
+    Las fotos provienen directamente de los CDN de Airbnb y Booking.<br>
+    Si no cargan, abre la página original con el botón "Ver listado original".<br>
+    Para imprimir o guardar como PDF: Cmd/Ctrl + P → Guardar como PDF.
+  </footer>
+</div>
+
+<script>
+// ========== FILTROS Y ORDEN DINÁMICO ==========
+(function(){
+  const grid = document.getElementById('cards-grid');
+  const countEl = document.getElementById('card-count');
+  const buttons = document.querySelectorAll('.filters button');
+  const allCards = Array.from(grid.querySelectorAll('.card'));
+  const totalCards = allCards.length;
+  let onlyBudget = false;
+
+  function applyFilter() {
+    let visible = 0;
+    allCards.forEach(c => {
+      const inBudget = c.dataset.budget === '1';
+      const show = !onlyBudget || inBudget;
+      c.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+    countEl.textContent = visible + (visible !== totalCards ? ' de ' + totalCards : '');
+  }
+
+  function sortBy(key, dir) {
+    const sorted = allCards.slice().sort((a, b) => {
+      const va = parseFloat(a.dataset[key]) || 0;
+      const vb = parseFloat(b.dataset[key]) || 0;
+      return dir === 'asc' ? va - vb : vb - va;
+    });
+    sorted.forEach(c => grid.appendChild(c));
+  }
+
+  function clearActive() {
+    buttons.forEach(b => b.classList.remove('active'));
+  }
+
+  buttons.forEach(btn => btn.addEventListener('click', () => {
+    const action = btn.dataset.action;
+    if (action === 'sort-price-asc') { clearActive(); btn.classList.add('active'); sortBy('price','asc'); }
+    else if (action === 'sort-price-desc') { clearActive(); btn.classList.add('active'); sortBy('price','desc'); }
+    else if (action === 'sort-rating') { clearActive(); btn.classList.add('active'); sortBy('rating','desc'); }
+    else if (action === 'sort-score') { clearActive(); btn.classList.add('active'); sortBy('score','desc'); }
+    else if (action === 'budget') {
+      onlyBudget = !onlyBudget;
+      btn.classList.toggle('active', onlyBudget);
+      applyFilter();
+    }
+    else if (action === 'reset') {
+      onlyBudget = false;
+      clearActive();
+      // restaurar orden original
+      OPCIONES_ORDER.forEach(id => {
+        const c = grid.querySelector('[data-id="' + id + '"]');
+        if (c) grid.appendChild(c);
+      });
+      applyFilter();
+    }
+  }));
+
+  // Guardar orden original
+  const OPCIONES_ORDER = allCards.map(c => c.dataset.id);
+})();
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin></script>
+<script>
+(function(){
+  const COORDS = {"IFEMA":[40.4625,-3.6155],"A":[40.4205,-3.7058],"B":[40.4252,-3.7028],"D":[40.417,-3.7038],"E":[40.4178,-3.7032],"F":[40.4208,-3.705],"G":[40.4172,-3.705],"H":[40.424,-3.692],"I":[40.4365,-3.7045],"J":[40.4255,-3.7045],"K":[40.4185,-3.705],"L":[40.454,-3.7045],"M":[40.418,-3.7045],"N":[40.4205,-3.7005]};
+  const OPCIONES = [{"id":"A","nombre":"Chic12 Gran Vía Madrid (Airbnb)","precioTotal":"2.774 €","precioNoche":"693 €","enPresupuesto":false,"enlace":"https://es-l.airbnb.com/rooms/756567161759468410?unique_share_id=9f7c9e92-3ecc-42b9-b894-7fd4fe3ce89c\u0026viralityEntryPoint=1\u0026s=76\u0026source_impression_id=p3_1778186636_P3gwOP7DfT3KA_i2\u0026check_in=2026-09-10\u0026guests=9\u0026adults=7\u0026check_out=2026-09-14\u0026children=2","ubicacion":"Gran Vía, Madrid centro","distanciaIfema":"30-35 min en metro (Línea 1 + Línea 8)","plataforma":"Airbnb","scoreIa":67},{"id":"B","nombre":"Estilo y amplitud para 9 en San Vicente Ferrer E2","precioTotal":"2.041 €","precioNoche":"510 €","enPresupuesto":true,"enlace":"https://www.booking.com/hotel/es/new-cool-apt-en-el-centro-de-madrid-para-9pax.es.html","ubicacion":"Centro Madrid (Malasaña-Chueca)","distanciaIfema":"~30 min en metro hasta Feria de Madrid","plataforma":"Booking","scoreIa":86},{"id":"D","nombre":"Apartamento Central Madrid - Sol","precioTotal":"2.613 €","precioNoche":"653 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/apartamento-central-en-madrid-sol.es.html","ubicacion":"Centro Madrid, zona Sol","distanciaIfema":"~30-35 min en metro hasta Feria de Madrid","plataforma":"Booking","scoreIa":71},{"id":"E","nombre":"Veracruz Boutique Puerta del Sol","precioTotal":"3.618 €","precioNoche":"904 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/hostal-veracruz.es.html","ubicacion":"Puerta del Sol, centro Madrid","distanciaIfema":"~30-35 min en metro hasta Feria de Madrid","plataforma":"Booking","scoreIa":44},{"id":"F","nombre":"Hispano Boutique Gran Vía","precioTotal":"3.350 €","precioNoche":"837 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/hostal-hispano.es.html","ubicacion":"Gran Vía, centro Madrid","distanciaIfema":"~30-35 min en metro hasta Feria de Madrid","plataforma":"Booking","scoreIa":48},{"id":"G","nombre":"CH La Bañezana","precioTotal":"3.433 €","precioNoche":"858 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/la-banezana.es.html","ubicacion":"Centro Madrid","distanciaIfema":"~30-35 min en metro","plataforma":"Booking","scoreIa":45},{"id":"H","nombre":"Apartamentos Recoletos","precioTotal":"2.771 €","precioNoche":"692 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/apartamentos-recoletos.es.html","ubicacion":"Recoletos, centro Madrid (cerca del Retiro)","distanciaIfema":"~30 min en metro","plataforma":"Booking","scoreIa":62},{"id":"I","nombre":"Slow Suites Luchana","precioTotal":"3.695 €","precioNoche":"924 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/luchana-suites.es.html","ubicacion":"Luchana / Chamberí, Madrid","distanciaIfema":"~25-30 min en metro (favorable)","plataforma":"Booking","scoreIa":48},{"id":"J","nombre":"Limehome Madrid San Lorenzo","precioTotal":"3.202 €","precioNoche":"800 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/limehome-madrid-san-lorenzo.es.html","ubicacion":"Calle San Lorenzo, Malasaña-Chueca centro","distanciaIfema":"~30 min en metro","plataforma":"Booking","scoreIa":52},{"id":"K","nombre":"ALFALFA B Apartments","precioTotal":"2.603 €","precioNoche":"651 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/alfalfa-b-apartments.es.html","ubicacion":"Centro Madrid","distanciaIfema":"~30 min en metro","plataforma":"Booking","scoreIa":67},{"id":"L","nombre":"Tu Casa Bonita en Carolinas","precioTotal":"3.825 €","precioNoche":"956 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/tu-casa-bonita-en-carolinas.es.html","ubicacion":"Las Carolinas, Madrid (norte)","distanciaIfema":"Verificar — probablemente ~25-30 min en metro","plataforma":"Booking","scoreIa":47},{"id":"M","nombre":"ALFALFA A Apartments","precioTotal":"1.781 €","precioNoche":"445 €","enPresupuesto":true,"enlace":"https://www.booking.com/hotel/es/alfalfa-a-apartments.es.html","ubicacion":"Centro Madrid","distanciaIfema":"~30 min en metro","plataforma":"Booking","scoreIa":88},{"id":"N","nombre":"Paseo Suites Hotel","precioTotal":"2.894 €","precioNoche":"724 €","enPresupuesto":false,"enlace":"https://www.booking.com/hotel/es/paseo-suites-boutique.es.html","ubicacion":"Paseo (centro Madrid)","distanciaIfema":"~30 min en metro","plataforma":"Booking","scoreIa":59}];
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value);
+  }
+
+  const map = L.map('map').setView([40.4350, -3.6800], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(map);
+
+  function makeIcon(cls, label) {
+    return L.divIcon({
+      className: '',
+      html: '<div class="map-marker ' + escapeAttr(cls) + '">' + escapeHtml(label) + '</div>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -16]
+    });
+  }
+
+  // Marcador IFEMA
+  L.marker(COORDS.IFEMA, { icon: makeIcon('ifema', 'F1') })
+    .addTo(map)
+    .bindPopup('<div class="map-popup"><b>🏁 IFEMA / Circuito MADRING</b>Sede del GP de España F1 · 11-13 sept 2026</div>');
+
+  // Marcadores de cada opción
+  const bounds = [COORDS.IFEMA];
+  OPCIONES.forEach(function(o){
+    const c = COORDS[o.id];
+    if (!c) return;
+    bounds.push(c);
+    const cls = o.enPresupuesto ? 'ok' : 'warn';
+    const popupHtml = '<div class="map-popup">' +
+      '<b>' + escapeHtml(o.id + ' — ' + o.nombre) + '</b>' +
+      '<span class="pop-price">' + escapeHtml(o.precioTotal + ' (' + o.precioNoche + '/noche)') + '</span>' +
+      '<div class="pop-muted first">IA: ' + escapeHtml(o.scoreIa + '/100') + '</div>' +
+      '<div class="pop-muted first">' + escapeHtml(o.ubicacion) + '</div>' +
+      '<div class="pop-muted">A IFEMA: ' + escapeHtml(o.distanciaIfema) + '</div>' +
+      '<a class="pop-link" href="' + escapeAttr(o.enlace) + '" target="_blank" rel="noopener noreferrer">Ver en ' + escapeHtml(o.plataforma) + ' →</a>' +
+      '</div>';
+    L.marker(c, { icon: makeIcon(cls, o.id) })
+      .addTo(map)
+      .bindPopup(popupHtml);
+  });
+
+  // Ajustar vista para que entren todos los marcadores
+  map.fitBounds(bounds, { padding: [40, 40] });
+})();
+</script>
+</body>
+</html>
