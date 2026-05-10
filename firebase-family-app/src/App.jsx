@@ -46,6 +46,7 @@ import { hasMapsKey, loadGoogleMaps } from './services/googleMaps'
 import {
   analyzeOptionWithAI,
   generateItineraryWithAI,
+  suggestTransferWithAI,
   suggestFoodWithAI,
   suggestLodgingWithAI,
 } from './services/aiFunctions'
@@ -71,7 +72,9 @@ const tabs = [
   { id: 'lodging', icon: Home },
   { id: 'activities', icon: Landmark },
   { id: 'food', icon: Utensils },
+  { id: 'transport', icon: TrainFront },
   { id: 'itinerary', icon: Route },
+  { id: 'budget', icon: CircleDollarSign },
 ]
 
 const targetLabels = {
@@ -165,8 +168,8 @@ function buildDraftOption(draft, status = 'pending') {
     status,
     url: draft.url.trim(),
     image: '',
-    priceNight: null,
-    priceTotal: null,
+    priceNight: Number(draft.priceNight) || null,
+    priceTotal: Number(draft.priceTotal) || null,
     rating: 'Pendiente de IA',
     reviews: null,
     capacity: draft.targetGroup === 'f1' ? 'Subgrupo F1' : 'Por verificar',
@@ -328,6 +331,69 @@ function platformSearchLinks(search, profile) {
   ]
 }
 
+function citySlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function omioLinks(transfer) {
+  const from = citySlug(transfer.origin || 'Madrid')
+  const to = citySlug(transfer.destination || 'Paris')
+
+  return [
+    { label: 'Omio comparar', url: `https://www.omio.es/viajes/${from}/${to}` },
+    { label: 'Tren', url: `https://www.omio.es/trenes/${from}/${to}` },
+    { label: 'Bus', url: `https://www.omio.es/autobuses/${from}/${to}` },
+    { label: 'Avión', url: `https://www.omio.es/vuelos/${from}/${to}` },
+  ]
+}
+
+function estimateNightsFromDates(value) {
+  const dates = parseTripDates(value)
+  if (!dates.checkin || !dates.checkout) return 4
+  const start = new Date(`${dates.checkin}T00:00:00Z`)
+  const end = new Date(`${dates.checkout}T00:00:00Z`)
+  const nights = Math.round((end - start) / 86_400_000)
+  return nights > 0 && nights < 60 ? nights : 4
+}
+
+function travelerCountForOption(option, profile, f1Count) {
+  const total = (Number(profile?.adults) || 0) + (profile?.childrenAges?.length || 0)
+  if (option.targetGroup === 'f1') return Math.max(1, f1Count)
+  if (option.targetGroup === 'non-f1') return Math.max(1, total - f1Count)
+  return Math.max(1, total)
+}
+
+function optionBudget(option, profile, f1Count, nights) {
+  const travelers = travelerCountForOption(option, profile, f1Count)
+  let total
+  let perPerson
+
+  if (option.category === 'lodging') {
+    total = option.priceTotal || (option.priceNight ? option.priceNight * nights : null)
+    perPerson = total ? total / travelers : null
+  } else if (option.category === 'transport' || option.budgetMode === 'perPerson') {
+    perPerson = option.priceNight || (option.priceTotal ? option.priceTotal / travelers : null)
+    total = perPerson ? perPerson * travelers : option.priceTotal || null
+  } else {
+    total = option.priceTotal || null
+    perPerson = total ? total / travelers : option.priceNight || null
+    if (!total && perPerson) total = perPerson * travelers
+  }
+
+  return {
+    travelers,
+    total,
+    perPerson,
+    missing: !total && !perPerson,
+  }
+}
+
 function getPlaceName(place) {
   return place.name || place.displayName?.text || 'Lugar sugerido'
 }
@@ -400,6 +466,8 @@ function App() {
     category: 'lodging',
     city: 'Madrid',
     targetGroup: 'family',
+    priceTotal: '',
+    priceNight: '',
     notes: '',
   })
   const [cityDraft, setCityDraft] = useState({
@@ -430,6 +498,16 @@ function App() {
   const [generatedItinerary, setGeneratedItinerary] = useState(null)
   const [externalLink, setExternalLink] = useState('')
   const [externalBusy, setExternalBusy] = useState(false)
+  const [budgetOptionIds, setBudgetOptionIds] = useState(['lodging-m'])
+  const [transferDraft, setTransferDraft] = useState({
+    origin: 'Madrid',
+    destination: 'París',
+    date: '14 sep 2026',
+    pricePerPerson: '',
+    notes: 'Comparar tren, bus y avión para el grupo',
+  })
+  const [transferResult, setTransferResult] = useState(null)
+  const [transferBusy, setTransferBusy] = useState(false)
 
   const firebaseStatus = getFirebaseStatus()
   const canSync = Boolean(currentUser && canUseFirestore())
@@ -458,6 +536,14 @@ function App() {
       .filter((city, index, list) => city && list.indexOf(city) === index),
     [travelCities],
   )
+  const budgetOptions = useMemo(
+    () =>
+      budgetOptionIds
+        .map((optionId) => options.find((option) => option.id === optionId))
+        .filter(Boolean),
+    [budgetOptionIds, options],
+  )
+  const budgetNights = estimateNightsFromDates(searchDraft.dates)
 
   useEffect(() => {
     if (!firebaseAuth) return undefined
@@ -617,6 +703,18 @@ function App() {
     setFamilyProfileDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function updateTransferDraft(field, value) {
+    setTransferDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  function toggleBudgetOption(optionId) {
+    setBudgetOptionIds((current) =>
+      current.includes(optionId)
+        ? current.filter((item) => item !== optionId)
+        : [...current, optionId],
+    )
+  }
+
   async function handleSignIn() {
     if (!firebaseAuth || !googleProvider) return
 
@@ -677,6 +775,8 @@ function App() {
             category: draft.category,
             city: draft.city,
             targetGroup: draft.targetGroup,
+            priceTotal: '',
+            priceNight: '',
             notes: '',
           })
           setActiveTab(result.option.category)
@@ -705,6 +805,8 @@ function App() {
       category: draft.category,
       city: draft.city,
       targetGroup: draft.targetGroup,
+      priceTotal: '',
+      priceNight: '',
       notes: '',
     })
     setActiveTab(option.category)
@@ -801,6 +903,10 @@ function App() {
       await findFoodPlaces()
       return
     }
+    if (searchDraft.type === 'transport') {
+      await createTransferSearch()
+      return
+    }
 
     if (canSync) {
       setPlaces([])
@@ -852,6 +958,98 @@ function App() {
 
     if (canSync) {
       await saveSearchRequest(request, currentUser)
+    }
+  }
+
+  async function createTransferSearch() {
+    setTransferBusy(true)
+    setTransferResult({
+      id: `transfer-${Date.now()}`,
+      type: 'transport',
+      status: 'working',
+      notes: 'Preparando enlaces de Omio y criterios de comparación.',
+      links: [],
+    })
+
+    const payload = {
+      ...transferDraft,
+      groupProfile: currentTravelGroup,
+      notes: transferDraft.notes,
+    }
+
+    try {
+      const result = canSync
+        ? await suggestTransferWithAI(payload)
+        : {
+            id: `transfer-${Date.now()}`,
+            type: 'transport',
+            status: 'ready',
+            origin: transferDraft.origin,
+            destination: transferDraft.destination,
+            date: transferDraft.date,
+            notes: 'Búsqueda de traslado preparada con enlaces Omio.',
+            links: omioLinks(transferDraft),
+            analysis: {
+              summary: 'Compara tren, bus y avión en Omio y copia el precio visto si quieres fijarlo en presupuesto.',
+              comparisonCriteria: ['Precio por persona', 'Duración total', 'Número de cambios', 'Equipaje incluido'],
+            },
+          }
+      setTransferResult(result)
+    } catch (error) {
+      setTransferResult({
+        id: `transfer-${Date.now()}`,
+        type: 'transport',
+        status: 'error',
+        origin: transferDraft.origin,
+        destination: transferDraft.destination,
+        date: transferDraft.date,
+        notes: `${error.message}. Te dejo enlaces directos a Omio.`,
+        links: omioLinks(transferDraft),
+      })
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+
+  async function addTransferOption() {
+    const pricePerPerson = Number(transferDraft.pricePerPerson) || null
+    const travelers =
+      (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0)
+    const option = {
+      id: `transport-${citySlug(transferDraft.origin)}-${citySlug(transferDraft.destination)}-${Date.now()}`,
+      code: `T${options.filter((item) => item.category === 'transport').length + 1}`,
+      category: 'transport',
+      title: `${transferDraft.origin} → ${transferDraft.destination}`,
+      source: 'Omio',
+      city: `${transferDraft.origin} → ${transferDraft.destination}`,
+      status: activeContributorIsAdult ? 'active' : 'pending',
+      url: omioLinks(transferDraft)[0].url,
+      image: '',
+      priceNight: pricePerPerson,
+      priceTotal: pricePerPerson ? pricePerPerson * travelers : null,
+      budgetMode: 'perPerson',
+      rating: 'Comparar en Omio',
+      reviews: null,
+      capacity: groupSummary(currentTravelGroup),
+      transit: 'Tren, bus o avión',
+      targetGroup: 'family',
+      aiScore: pricePerPerson ? 78 : 66,
+      map: { x: 58, y: 48 },
+      coords: null,
+      highlights: [
+        `Salida: ${transferDraft.date}`,
+        'Comparar duración, cambios, equipaje y hora de llegada',
+        transferResult?.analysis?.summary || 'Búsqueda preparada en Omio',
+      ],
+      cautions: ['Copiar precio real desde Omio si cambia la tarifa'],
+    }
+
+    setOptions((current) => mergeOption(current, option))
+    setBudgetOptionIds((current) => [...new Set([...current, option.id])])
+    setActiveTab('budget')
+
+    if (canSync) {
+      await saveTripOption(option, currentUser)
     }
   }
 
@@ -1307,7 +1505,15 @@ function App() {
             </button>
           </div>
 
-          {activeTab === 'itinerary' ? (
+          {activeTab === 'budget' ? (
+            <BudgetPanel
+              budgetOptions={budgetOptions}
+              currentTravelGroup={currentTravelGroup}
+              f1Count={f1Crew.length}
+              nights={budgetNights}
+              onRemove={toggleBudgetOption}
+            />
+          ) : activeTab === 'itinerary' ? (
             <ItineraryPanel
               busy={itineraryBusy}
               onGenerate={generateSmartItinerary}
@@ -1319,8 +1525,10 @@ function App() {
               activeMember={activeMember}
               onRemove={removeOption}
               onRestore={restoreOption}
+              onToggleBudget={toggleBudgetOption}
               onVote={toggleVote}
               options={visibleOptions}
+              budgetOptionIds={budgetOptionIds}
               votes={votes}
             />
           )}
@@ -1441,6 +1649,26 @@ function App() {
               <option value="non-f1">Planes sin F1</option>
             </select>
           </label>
+          <label>
+            <span>Precio total visto</span>
+            <input
+              min="0"
+              onChange={(event) => updateDraft('priceTotal', event.target.value)}
+              placeholder="Ej. 1781"
+              type="number"
+              value={draft.priceTotal}
+            />
+          </label>
+          <label>
+            <span>Precio/noche o persona</span>
+            <input
+              min="0"
+              onChange={(event) => updateDraft('priceNight', event.target.value)}
+              placeholder="Ej. 445"
+              type="number"
+              value={draft.priceNight}
+            />
+          </label>
           <label className="wide">
             <span>Notas</span>
             <textarea
@@ -1491,6 +1719,7 @@ function App() {
             >
               <option value="lodging">Hospedajes</option>
               <option value="food">Comida</option>
+              <option value="transport">Traslados</option>
             </select>
           </label>
           <label>
@@ -1521,22 +1750,75 @@ function App() {
             />
           </label>
           <button className="primary-button compact" type="submit">
-            <Hotel size={18} aria-hidden="true" />
-            Preparar búsqueda
-          </button>
-          <button
-            className="secondary-button compact"
-            onClick={findFoodPlaces}
-            type="button"
-          >
-            {placesBusy ? (
-              <Loader2 size={18} aria-hidden="true" />
+            {searchDraft.type === 'transport' ? (
+              <TrainFront size={18} aria-hidden="true" />
             ) : (
-              <Utensils size={18} aria-hidden="true" />
+              <Hotel size={18} aria-hidden="true" />
             )}
-            Sugerir comida
+            {searchDraft.type === 'transport' ? 'Buscar traslado' : 'Preparar búsqueda'}
           </button>
+          {searchDraft.type !== 'transport' ? (
+            <button
+              className="secondary-button compact"
+              onClick={findFoodPlaces}
+              type="button"
+            >
+              {placesBusy ? (
+                <Loader2 size={18} aria-hidden="true" />
+              ) : (
+                <Utensils size={18} aria-hidden="true" />
+              )}
+              Sugerir comida
+            </button>
+          ) : null}
         </form>
+
+        {searchDraft.type === 'transport' ? (
+          <div className="transfer-box">
+            <label>
+              <span>Origen</span>
+              <input
+                onChange={(event) => updateTransferDraft('origin', event.target.value)}
+                type="text"
+                value={transferDraft.origin}
+              />
+            </label>
+            <label>
+              <span>Destino</span>
+              <input
+                onChange={(event) => updateTransferDraft('destination', event.target.value)}
+                type="text"
+                value={transferDraft.destination}
+              />
+            </label>
+            <label>
+              <span>Fecha</span>
+              <input
+                onChange={(event) => updateTransferDraft('date', event.target.value)}
+                type="text"
+                value={transferDraft.date}
+              />
+            </label>
+            <label>
+              <span>Precio/persona visto</span>
+              <input
+                min="0"
+                onChange={(event) => updateTransferDraft('pricePerPerson', event.target.value)}
+                placeholder="Opcional"
+                type="number"
+                value={transferDraft.pricePerPerson}
+              />
+            </label>
+            <label className="wide">
+              <span>Notas</span>
+              <input
+                onChange={(event) => updateTransferDraft('notes', event.target.value)}
+                type="text"
+                value={transferDraft.notes}
+              />
+            </label>
+          </div>
+        ) : null}
 
         {searchResult ? (
           <div className="search-result">
@@ -1577,6 +1859,45 @@ function App() {
                 </ul>
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {transferResult ? (
+          <div className="search-result transfer-result">
+            <strong>
+              {transferResult.status === 'working'
+                ? 'Buscando traslado'
+                : `Traslado ${transferDraft.origin} → ${transferDraft.destination}`}
+            </strong>
+            <p>{transferResult.analysis?.summary || transferResult.notes}</p>
+            {transferResult.links?.length ? (
+              <div className="platform-links">
+                {transferResult.links.map((link) => (
+                  <a href={link.url} key={link.label} rel="noreferrer" target="_blank">
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            ) : null}
+            {transferResult.analysis?.comparisonCriteria?.length ? (
+              <div className="search-tips">
+                <span>Qué comparar antes de comprar</span>
+                <ul>
+                  {transferResult.analysis.comparisonCriteria.slice(0, 4).map((criterion) => (
+                    <li key={criterion}>{criterion}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button
+              className="primary-button compact"
+              disabled={transferBusy}
+              onClick={addTransferOption}
+              type="button"
+            >
+              <Plus size={18} aria-hidden="true" />
+              Agregar traslado al presupuesto
+            </button>
           </div>
         ) : null}
 
@@ -1960,8 +2281,10 @@ function ConceptMap({ mapOptions, note }) {
 function OptionGrid({
   activeCategory,
   activeMember,
+  budgetOptionIds,
   onRemove,
   onRestore,
+  onToggleBudget,
   onVote,
   options,
   votes,
@@ -1981,6 +2304,7 @@ function OptionGrid({
       {options.map((option) => {
         const optionVotes = votes[option.id] || []
         const hasVote = optionVotes.includes(activeMember)
+        const inBudget = budgetOptionIds.includes(option.id)
         return (
           <article className={`option-card ${option.status}`} key={option.id}>
             <div className="option-media">
@@ -2037,6 +2361,14 @@ function OptionGrid({
                     Ver link
                   </a>
                 ) : null}
+                <button
+                  className={inBudget ? 'budgeted' : ''}
+                  onClick={() => onToggleBudget(option.id)}
+                  type="button"
+                >
+                  <CircleDollarSign size={16} aria-hidden="true" />
+                  {inBudget ? 'En presupuesto' : 'Presupuesto'}
+                </button>
                 {option.status === 'removed' ? (
                   <button onClick={() => onRestore(option.id)} type="button">
                     Restaurar
@@ -2067,6 +2399,70 @@ function OptionImage({ option }) {
       referrerPolicy="no-referrer"
       src={src}
     />
+  )
+}
+
+function BudgetPanel({ budgetOptions, currentTravelGroup, f1Count, nights, onRemove }) {
+  const rows = budgetOptions.map((option) => ({
+    option,
+    budget: optionBudget(option, currentTravelGroup, f1Count, nights),
+  }))
+  const knownRows = rows.filter((row) => !row.budget.missing)
+  const total = knownRows.reduce((sum, row) => sum + (row.budget.total || 0), 0)
+  const travelers =
+    (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0)
+  const perPerson = travelers ? total / travelers : 0
+
+  if (!budgetOptions.length) {
+    return (
+      <div className="empty-state">
+        <CircleDollarSign size={26} aria-hidden="true" />
+        <h2>No hay partidas en el presupuesto</h2>
+        <p>Agrega hospedajes, planes, comida o traslados desde sus tarjetas.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="budget-panel">
+      <div className="budget-summary">
+        <article>
+          <span>Total estimado</span>
+          <strong>{currency(total)}</strong>
+        </article>
+        <article>
+          <span>Por persona</span>
+          <strong>{currency(perPerson)}</strong>
+        </article>
+        <article>
+          <span>Grupo</span>
+          <strong>{groupSummary(currentTravelGroup)}</strong>
+        </article>
+      </div>
+      <div className="budget-list">
+        {rows.map(({ option, budget }) => (
+          <article key={option.id}>
+            <div>
+              <span>{categoryConfig[option.category]?.shortLabel || 'Opción'}</span>
+              <h2>{option.title}</h2>
+              <p>{budget.travelers} personas consideradas</p>
+            </div>
+            <div className="budget-money">
+              <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
+              <span>{budget.missing ? 'Falta precio' : `${currency(budget.perPerson)} por persona`}</span>
+            </div>
+            <button onClick={() => onRemove(option.id)} type="button">
+              Quitar
+            </button>
+          </article>
+        ))}
+      </div>
+      {rows.some((row) => row.budget.missing) ? (
+        <p className="budget-note">
+          Algunas partidas no tienen precio. Pega el link o escribe el precio visto para que entren en el cálculo.
+        </p>
+      ) : null}
+    </div>
   )
 }
 

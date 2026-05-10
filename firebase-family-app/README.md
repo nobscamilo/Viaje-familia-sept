@@ -83,13 +83,17 @@ APIs activadas:
 - Selector de ruta: transporte público, andando o coche, con tiempos estimados visibles por opción.
 - Ciudades dinámicas con fechas, país, traslado e idea del plan.
 - Perfiles de grupo de viaje para reutilizar la app en futuros viajes.
+- Presupuesto por persona: permite seleccionar hospedajes, planes, comidas y traslados para calcular total y reparto.
 - Búsqueda guiada de hospedajes con fechas y ocupación en Booking/Airbnb; Google Travel se separa en grupos de máximo 6 personas.
 - Importación de links externos: si una opción gusta en Booking/Airbnb/Google Travel, se pega el link y la IA la agrega a Hospedajes.
+- Búsqueda de traslados entre ciudades con Omio: compara tren, bus y avión y agrega la partida al presupuesto.
+- La IA intenta extraer precios desde metadatos y texto público; si la plataforma oculta tarifa, se puede escribir precio visto total o por persona.
 - Los adultos agregan opciones directamente como activas; menores quedan como pendientes de revisión.
 - Sugerencias de restaurantes con Google Maps Places y opción de agregarlos a comida.
 - Cloud Function `analyzeTripOption`: analiza links, extrae metadatos públicos, cruza Places/Routes y guarda la opción en Firestore.
 - Cloud Function `suggestLodgingSearch`: genera búsquedas y criterios para Booking, Airbnb y Google Travel sin inventar disponibilidad.
 - Cloud Function `suggestFoodPlaces`: obtiene lugares desde Google Places y los ordena con IA.
+- Cloud Function `suggestTransferSearch`: prepara búsquedas Omio para tren, bus y avión.
 - Cloud Function `generateItinerary`: crea itinerarios familiares teniendo en cuenta F1, niños, ciudades y opciones guardadas.
 - Fallback visual si Google Maps no carga.
 

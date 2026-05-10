@@ -22,6 +22,7 @@
 - Guardar el análisis en Firestore. Listo.
 - Cloud Function `suggestLodgingSearch` para búsquedas guiadas de hospedaje. Listo.
 - Cloud Function `suggestFoodPlaces` para sugerencias de comida con Google Places + ranking IA. Listo.
+- Cloud Function `suggestTransferSearch` para comparar traslados con Omio por tren, bus y avión. Listo.
 - Cloud Function `generateItinerary` para itinerario familiar por ciudad/fechas. Listo.
 - APIs listas: Vertex AI, Firebase Vertex AI, Generative Language y Secret Manager.
 - Siguiente mejora: App Check obligatorio, control de costos por usuario y proveedores autorizados para disponibilidad real en Booking/Airbnb.
@@ -42,3 +43,4 @@
 - París / España se modelan como fases candidatas hasta decidir destino.
 - La familia puede añadir ciudad, fechas, traslado e idea del plan desde la app.
 - La app permite cambiar o crear perfiles de grupo de viaje con adultos y edades de niños. Listo con `travelGroups`.
+- Presupuesto por persona con partidas seleccionables de hospedaje, comida, planes y traslados. Listo en frontend.

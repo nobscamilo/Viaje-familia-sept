@@ -126,6 +126,26 @@ const foodSearchSchema = {
   required: ['summary', 'rankedPlaces'],
 }
 
+const transferSearchSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    summary: { type: SchemaType.STRING },
+    comparisonCriteria: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+    },
+    recommendedNextSteps: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+    },
+    budgetNotes: {
+      type: SchemaType.ARRAY,
+      items: { type: SchemaType.STRING },
+    },
+  },
+  required: ['summary', 'comparisonCriteria', 'recommendedNextSteps', 'budgetNotes'],
+}
+
 const itinerarySchema = {
   type: SchemaType.OBJECT,
   properties: {
@@ -219,6 +239,99 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, Number(value) || min))
 }
 
+function cleanNumber(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null
+}
+
+function normalizePriceNumber(value) {
+  const raw = cleanText(value)
+    .replace(/[^\d.,\s]/g, '')
+    .replace(/\s+/g, '')
+  if (!raw) return null
+
+  const hasComma = raw.includes(',')
+  const hasDot = raw.includes('.')
+  let normalized = raw
+
+  if (hasComma && hasDot) {
+    normalized = raw.lastIndexOf(',') > raw.lastIndexOf('.')
+      ? raw.replace(/\./g, '').replace(',', '.')
+      : raw.replace(/,/g, '')
+  } else if (hasComma) {
+    normalized = raw.replace(',', '.')
+  } else if (hasDot && /\.\d{3}(\D|$)/.test(raw)) {
+    normalized = raw.replace(/\./g, '')
+  }
+
+  const price = Number(normalized)
+  return Number.isFinite(price) && price > 0 ? Math.round(price) : null
+}
+
+function extractPriceCandidates(text) {
+  const source = cleanText(text).replace(/\s+/g, ' ')
+  const patterns = [
+    /(?:€|eur|euros?)\s*(\d{1,3}(?:[.\s]\d{3})+|\d{2,6})(?:[,.]\d{2})?/gi,
+    /(\d{1,3}(?:[.\s]\d{3})+|\d{2,6})(?:[,.]\d{2})?\s*(?:€|eur|euros?)/gi,
+  ]
+  const prices = patterns.flatMap((pattern) =>
+    [...source.matchAll(pattern)].map((match) => normalizePriceNumber(match[1])),
+  )
+
+  return [...new Set(prices.filter(Boolean))].slice(0, 10)
+}
+
+function inferNights(dates) {
+  const parsed = parseTripDates(dates)
+  if (!parsed.checkin || !parsed.checkout) return 4
+
+  const start = new Date(`${parsed.checkin}T00:00:00Z`)
+  const end = new Date(`${parsed.checkout}T00:00:00Z`)
+  const nights = Math.round((end - start) / 86_400_000)
+  return nights > 0 && nights < 60 ? nights : 4
+}
+
+function inferPrices(input, metadata = {}) {
+  const explicitTotal = cleanNumber(input.priceTotal)
+  const explicitNight = cleanNumber(input.priceNight)
+  if (explicitTotal || explicitNight) {
+    return {
+      priceTotal: explicitTotal || null,
+      priceNight: explicitNight || (explicitTotal ? Math.round(explicitTotal / inferNights(input.dates)) : null),
+      confidence: 'manual',
+    }
+  }
+
+  const candidates = [
+    ...(metadata.priceCandidates || []),
+    ...extractPriceCandidates(`${input.title} ${input.notes} ${metadata.title || ''} ${metadata.description || ''}`),
+  ].filter(Boolean)
+  if (!candidates.length) {
+    return { priceTotal: null, priceNight: null, confidence: 'missing' }
+  }
+
+  const nights = inferNights(input.dates)
+  const sorted = [...new Set(candidates)].sort((a, b) => a - b)
+  const highest = sorted[sorted.length - 1]
+  const lowest = sorted[0]
+
+  if (input.category === 'lodging') {
+    const likelyTotal = highest >= 900 || sorted.length > 1 ? highest : null
+    const likelyNight = likelyTotal ? Math.round(likelyTotal / nights) : lowest
+    return {
+      priceTotal: likelyTotal || Math.round(likelyNight * nights),
+      priceNight: likelyNight,
+      confidence: likelyTotal ? 'detected-total' : 'detected-night',
+    }
+  }
+
+  return {
+    priceTotal: highest,
+    priceNight: lowest,
+    confidence: 'detected',
+  }
+}
+
 function stripUndefined(value) {
   if (Array.isArray(value)) return value.map(stripUndefined)
   if (!value || typeof value !== 'object') return value
@@ -270,12 +383,29 @@ async function extractMetadata(url) {
       $('meta[name="twitter:image"]').attr('content') ||
       ''
     const siteName = $('meta[property="og:site_name"]').attr('content') || hostname(url)
+    const jsonLdPrices = $('script[type="application/ld+json"]')
+      .map((_, node) => {
+        try {
+          return extractPriceCandidates($(node).text())
+        } catch {
+          return []
+        }
+      })
+      .get()
+      .flat()
+    const visiblePriceText = $('body').text().replace(/\s+/g, ' ').slice(0, 80_000)
+    const priceCandidates = [
+      ...jsonLdPrices,
+      ...extractPriceCandidates(visiblePriceText),
+      ...extractPriceCandidates(`${title} ${description}`),
+    ]
 
     return {
       title: cleanText(title).replace(/\s+/g, ' '),
       description: cleanText(description).replace(/\s+/g, ' '),
       image: cleanUrl(image),
       siteName: cleanText(siteName, hostname(url)),
+      priceCandidates: [...new Set(priceCandidates.filter(Boolean))].slice(0, 10),
       sourceStatus: response.status,
     }
   } catch (error) {
@@ -401,11 +531,6 @@ async function computeRoutes(origin) {
   return Object.fromEntries(results.filter(([, route]) => route))
 }
 
-function estimatePriceFromText(text) {
-  const match = cleanText(text).match(/(\d{2,5})(?:\s|\.|,)*(?:€|eur|euro)/i)
-  return match ? Number(match[1]) : null
-}
-
 function routeSummary(routes) {
   const transit = routes.TRANSIT?.duration
   const walk = routes.WALK?.duration
@@ -415,6 +540,27 @@ function routeSummary(routes) {
   if (walk) parts.push(`andando ${walk}`)
   if (drive) parts.push(`coche ${drive}`)
   return parts.join(' · ') || 'Ruta por calcular'
+}
+
+function categoryCodePrefix(category) {
+  return {
+    lodging: 'H',
+    activities: 'P',
+    food: 'C',
+    transport: 'T',
+  }[category] || 'O'
+}
+
+async function nextOptionCode(category) {
+  const prefix = categoryCodePrefix(category)
+  const snapshot = await db.collection('tripOptions').select('code').get()
+  const used = snapshot.docs
+    .map((doc) => cleanText(doc.data().code))
+    .filter((code) => code.startsWith(prefix))
+    .map((code) => Number(code.replace(prefix, '')))
+    .filter((number) => Number.isFinite(number))
+  const next = used.length ? Math.max(...used) + 1 : 1
+  return `${prefix}${next}`
 }
 
 function normalizeGroupProfile(value = {}) {
@@ -490,8 +636,9 @@ function heuristicScore(input, place, routes, priceNight) {
 }
 
 function buildFallbackAnalysis(input, metadata, place, routes) {
-  const combinedText = `${input.notes} ${metadata.description || ''}`
-  const priceNight = estimatePriceFromText(combinedText)
+  const prices = inferPrices(input, metadata)
+  const priceNight = prices.priceNight
+  const priceTotal = prices.priceTotal
   const score = heuristicScore(input, place, routes, priceNight)
   const totalTravelers = input.groupProfile?.totalTravelers || 9
 
@@ -506,7 +653,7 @@ function buildFallbackAnalysis(input, metadata, place, routes) {
     city: input.city,
     targetGroup: input.targetGroup,
     priceNight,
-    priceTotal: priceNight ? priceNight * 4 : null,
+    priceTotal,
     rating: place?.rating ? `${place.rating}/5` : 'Pendiente de validar',
     reviews: place?.userRatingCount || null,
     capacity: input.targetGroup === 'f1' ? 'Subgrupo F1' : `Por verificar para ${totalTravelers} personas`,
@@ -515,6 +662,9 @@ function buildFallbackAnalysis(input, metadata, place, routes) {
     highlights: [
       place?.formattedAddress || metadata.description || 'Información inicial capturada',
       routeSummary(routes),
+      prices.confidence === 'missing'
+        ? 'Precio no visible automáticamente; conviene copiarlo desde la plataforma'
+        : `Precio detectado con confianza ${prices.confidence}`,
       input.notes || 'Pendiente de revisar disponibilidad y fotos',
     ].filter(Boolean),
     cautions: [
@@ -530,14 +680,15 @@ function buildFallbackAnalysis(input, metadata, place, routes) {
   }
 }
 
-function optionFromAnalysis(input, analysis, metadata, place, routes, user) {
+function optionFromAnalysis(input, analysis, metadata, place, routes, user, code) {
   const createdAt = Date.now()
   const title = cleanText(analysis.title, input.title || metadata.title || 'Nueva opción')
   const id = `${input.category}-${slug(title)}-${createdAt}`
+  const prices = inferPrices(input, metadata)
 
   return stripUndefined({
     id,
-    code: input.category === 'lodging' ? 'IA' : input.category === 'food' ? 'IC' : 'IP',
+    code,
     category: input.category,
     title,
     source: cleanText(analysis.source, metadata.siteName || hostname(input.url)),
@@ -545,8 +696,9 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user) {
     status: input.isAdultContributor ? 'active' : 'pending',
     url: input.url,
     image: metadata.image || '',
-    priceNight: analysis.priceNight ?? null,
-    priceTotal: analysis.priceTotal ?? null,
+    priceNight: analysis.priceNight ?? prices.priceNight ?? null,
+    priceTotal: analysis.priceTotal ?? prices.priceTotal ?? null,
+    priceConfidence: prices.confidence,
     rating: cleanText(analysis.rating, 'Pendiente'),
     reviews: analysis.reviews ?? null,
     capacity: cleanText(analysis.capacity, 'Por verificar'),
@@ -647,6 +799,27 @@ function platformLinks(search, groupProfile) {
   ]
 }
 
+function omioSlug(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function omioLinks(transfer) {
+  const origin = omioSlug(transfer.origin || 'Madrid')
+  const destination = omioSlug(transfer.destination || 'Paris')
+
+  return [
+    { label: 'Omio comparar', url: `https://www.omio.es/viajes/${origin}/${destination}` },
+    { label: 'Tren', url: `https://www.omio.es/trenes/${origin}/${destination}` },
+    { label: 'Bus', url: `https://www.omio.es/autobuses/${origin}/${destination}` },
+    { label: 'Avión', url: `https://www.omio.es/vuelos/${origin}/${destination}` },
+  ]
+}
+
 export const analyzeTripOption = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
   const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
@@ -658,6 +831,8 @@ export const analyzeTripOption = onCall(functionOptions, async (request) => {
     targetGroup: cleanText(request.data?.targetGroup, 'family'),
     notes: cleanText(request.data?.notes),
     dates: cleanText(request.data?.dates, '10-14 sep 2026'),
+    priceTotal: cleanNumber(request.data?.priceTotal),
+    priceNight: cleanNumber(request.data?.priceNight),
     isAdultContributor: request.data?.isAdultContributor !== false,
     selectedMemberId: cleanText(request.data?.selectedMemberId),
     groupProfile,
@@ -695,12 +870,14 @@ Contexto fijo:
 - Madrid/F1: 10 al 14 de septiembre de 2026.
 - Presupuesto hospedaje orientativo: 300 a 600 EUR/noche total.
 - Prioridad: alojamiento completo, logística fácil con niños, espacios comunes, ruta razonable a IFEMA/MADRING.
+- Si hay precio manual o candidatos de precio, úsalo. Si no hay precio visible, deja priceNight y priceTotal en null y ponlo como duda.
 
 Analiza esta opción y responde SOLO el JSON del esquema:
 ${JSON.stringify({ input, metadata, place, routes })}
 `
   const analysis = await generateJson(optionSchema, prompt, fallback)
-  const option = optionFromAnalysis(input, analysis, metadata, place, routes, user)
+  const code = await nextOptionCode(input.category)
+  const option = optionFromAnalysis(input, analysis, metadata, place, routes, user, code)
 
   await db
     .collection('tripOptions')
@@ -853,6 +1030,70 @@ Responde SOLO JSON según el esquema.
   await db
     .collection('searchRequests')
     .doc(id)
+    .set(
+      {
+        ...payload,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+  return payload
+})
+
+export const suggestTransferSearch = onCall(functionOptions, async (request) => {
+  const user = requireAuth(request)
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
+  const transfer = {
+    id: `transfer-${Date.now()}`,
+    type: 'transport',
+    origin: cleanText(request.data?.origin, 'Madrid'),
+    destination: cleanText(request.data?.destination, 'París'),
+    date: cleanText(request.data?.date, '14 sep 2026'),
+    notes: cleanText(request.data?.notes, 'Comparar tren, bus y avión'),
+    pricePerPerson: cleanNumber(request.data?.pricePerPerson),
+    status: 'ready',
+    groupProfile,
+  }
+  const fallback = {
+    summary: `Búsqueda Omio preparada para ${transfer.origin} → ${transfer.destination}. Compara tren, bus y avión antes de fijar presupuesto.`,
+    comparisonCriteria: [
+      'Precio por persona',
+      'Duración total puerta a puerta',
+      'Número de cambios o escalas',
+      'Equipaje incluido',
+      'Hora de salida y llegada con niños',
+    ],
+    recommendedNextSteps: [
+      'Abrir Omio comparar y revisar tren, bus y avión',
+      'Copiar el precio por persona visto y agregar el traslado al presupuesto',
+    ],
+    budgetNotes: [
+      `Grupo: ${groupProfile.totalTravelers} personas`,
+      'El presupuesto usará precio por persona multiplicado por el grupo',
+    ],
+  }
+  const prompt = `
+Prepara una guía de comparación de traslado para un viaje familiar.
+Ruta: ${transfer.origin} a ${transfer.destination}.
+Fecha: ${transfer.date}.
+Grupo: ${groupProfile.name}, ${groupProfile.totalTravelers} personas.
+Canal de búsqueda: Omio, comparando tren, bus y avión.
+Notas: ${transfer.notes}
+Responde SOLO JSON según el esquema. No inventes tarifas exactas si no están en la entrada.
+`
+  const analysis = await generateJson(transferSearchSchema, prompt, fallback)
+  const payload = stripUndefined({
+    ...transfer,
+    links: omioLinks(transfer),
+    analysis,
+    createdBy: user.uid,
+    createdByName: user.name,
+  })
+
+  await db
+    .collection('searchRequests')
+    .doc(transfer.id)
     .set(
       {
         ...payload,

@@ -719,6 +719,12 @@
   border-color: #fecdd3;
 }
 
+.card-actions button.budgeted {
+  color: #0f5132;
+  background: #edf8f1;
+  border-color: #b7e3c8;
+}
+
 .empty-state {
   display: grid;
   min-height: 300px;
@@ -732,6 +738,104 @@
 .empty-state h2,
 .empty-state p {
   margin: 0;
+}
+
+.budget-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.budget-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.budget-summary article,
+.budget-list article {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.budget-summary article {
+  padding: 14px;
+}
+
+.budget-summary span,
+.budget-list span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.budget-summary strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.budget-list {
+  display: grid;
+  gap: 10px;
+}
+
+.budget-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+}
+
+.budget-list h2,
+.budget-list p {
+  margin: 0;
+}
+
+.budget-list h2 {
+  margin-top: 4px;
+  font-size: 1rem;
+}
+
+.budget-list p {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.budget-money {
+  text-align: right;
+}
+
+.budget-money strong,
+.budget-money span {
+  display: block;
+}
+
+.budget-money strong {
+  color: var(--ink);
+}
+
+.budget-list button {
+  min-height: 36px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.budget-note {
+  margin: 0;
+  padding: 12px;
+  color: #7c2d12;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
 }
 
 .decision-map-grid {
@@ -978,6 +1082,10 @@
   background: #b45309;
 }
 
+.map-pin.transport {
+  background: #0d9488;
+}
+
 .add-panel,
 .search-panel,
 .future-cities {
@@ -1048,6 +1156,7 @@
 .suggestion-form textarea,
 .search-form input,
 .search-form select,
+.transfer-box input,
 .external-import input,
 .city-form input,
 .city-form select {
@@ -1062,6 +1171,32 @@
   font: inherit;
 }
 
+.transfer-box {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  background: #f8fffd;
+  border: 1px solid #b7e4d6;
+  border-radius: 8px;
+}
+
+.transfer-box label {
+  display: grid;
+  gap: 7px;
+}
+
+.transfer-box label.wide {
+  grid-column: span 2;
+}
+
+.transfer-box span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
 .external-import {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
@@ -1072,6 +1207,10 @@
   background: #fbfcff;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.transfer-result .primary-button {
+  margin-top: 12px;
 }
 
 .external-import strong,
@@ -1446,13 +1585,16 @@
   .search-form,
   .city-form,
   .external-import,
-  .route-summary-list {
+  .route-summary-list,
+  .transfer-box,
+  .budget-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .suggestion-form label.wide,
   .search-form label.wide,
-  .city-form label.wide {
+  .city-form label.wide,
+  .transfer-box label.wide {
     grid-column: span 2;
   }
 
@@ -1497,6 +1639,8 @@
   .login-hero,
   .external-import,
   .route-summary-list,
+  .transfer-box,
+  .budget-summary,
   .itinerary-columns,
   .itinerary-notes {
     grid-template-columns: 1fr;
@@ -1516,8 +1660,17 @@
 
   .suggestion-form label.wide,
   .search-form label.wide,
-  .city-form label.wide {
+  .city-form label.wide,
+  .transfer-box label.wide {
     grid-column: auto;
+  }
+
+  .budget-list article {
+    grid-template-columns: 1fr;
+  }
+
+  .budget-money {
+    text-align: left;
   }
 
   .login-screen {

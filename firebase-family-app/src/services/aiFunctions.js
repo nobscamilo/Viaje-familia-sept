@@ -27,6 +27,12 @@ export async function suggestFoodWithAI(payload) {
   return result.data
 }
 
+export async function suggestTransferWithAI(payload) {
+  const run = callable('suggestTransferSearch')
+  const result = await run(payload)
+  return result.data
+}
+
 export async function generateItineraryWithAI(payload) {
   const run = callable('generateItinerary')
   const result = await run(payload)

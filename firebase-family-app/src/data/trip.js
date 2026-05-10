@@ -155,10 +155,20 @@ export const categoryConfig = {
     shortLabel: 'Comida',
     tone: '#b45309',
   },
+  transport: {
+    label: 'Traslados',
+    shortLabel: 'Traslado',
+    tone: '#0d9488',
+  },
   itinerary: {
     label: 'Itinerario',
     shortLabel: 'Ruta',
     tone: '#7c3aed',
+  },
+  budget: {
+    label: 'Presupuesto',
+    shortLabel: 'Presupuesto',
+    tone: '#111827',
   },
 }
 
