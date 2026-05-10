@@ -37,6 +37,11 @@ service cloud.firestore {
       allow create, update: if signedIn();
     }
 
+    match /travelGroups/{groupId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+    }
+
     match /searchRequests/{requestId} {
       allow read: if signedIn();
       allow create, update: if signedIn();

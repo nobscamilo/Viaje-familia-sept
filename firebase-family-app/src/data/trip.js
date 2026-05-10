@@ -3,46 +3,79 @@ export const familyMembers = [
     id: 'camilo',
     name: 'Camilo',
     group: 'f1',
+    adult: true,
   },
   {
     id: 'juliana-bueno',
     name: 'Juliana Bueno',
     group: 'f1',
+    adult: true,
   },
   {
     id: 'julian-papa',
     name: 'Julián',
     group: 'family',
+    adult: true,
   },
   {
     id: 'cielo',
     name: 'Cielo',
     group: 'family',
+    adult: true,
   },
   {
     id: 'juliana-hermana',
     name: 'Juliana',
     group: 'family',
+    adult: true,
   },
   {
     id: 'fernando',
     name: 'Fernando',
     group: 'f1',
+    adult: true,
   },
   {
     id: 'juliancho',
     name: 'Juliancho',
     group: 'family',
+    adult: true,
   },
   {
     id: 'juanfe',
     name: 'Juanfe',
     group: 'family',
+    adult: false,
   },
   {
     id: 'guillermo',
     name: 'Guillermo',
     group: 'family',
+    adult: false,
+  },
+]
+
+export const familyProfiles = [
+  {
+    id: 'familia-sept-2026',
+    name: 'Familia septiembre 2026',
+    adults: 7,
+    childrenAges: [9, 5],
+    note: 'Grupo completo para Madrid/F1',
+  },
+  {
+    id: 'pareja',
+    name: 'Pareja',
+    adults: 2,
+    childrenAges: [],
+    note: 'Viajes futuros de 2 adultos',
+  },
+  {
+    id: 'adultos-4',
+    name: 'Grupo adultos',
+    adults: 4,
+    childrenAges: [],
+    note: 'Escapada con amigos o familia adulta',
   },
 ]
 

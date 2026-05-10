@@ -11,12 +11,14 @@ import {
 import { firestoreDb, isFirebaseConfigured } from './firebaseClient'
 import { initialOptions } from '../data/trip'
 import { cityIdeas } from '../data/trip'
+import { familyProfiles } from '../data/trip'
 
 const optionsCollection = 'tripOptions'
 const votesCollection = 'votes'
 const membersCollection = 'familyMembers'
 const citiesCollection = 'travelCities'
 const searchesCollection = 'searchRequests'
+const groupsCollection = 'travelGroups'
 
 export function canUseFirestore() {
   return Boolean(isFirebaseConfigured && firestoreDb)
@@ -76,6 +78,24 @@ export async function seedInitialTravelCities(user) {
   )
 }
 
+export async function seedInitialTravelGroups(user) {
+  if (!canUseFirestore() || !user) return
+
+  const snapshot = await getDocs(collection(firestoreDb, groupsCollection))
+  if (!snapshot.empty) return
+
+  await Promise.all(
+    familyProfiles.map((profile) =>
+      setDoc(doc(firestoreDb, groupsCollection, profile.id), {
+        ...profile,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    ),
+  )
+}
+
 export function subscribeTripOptions(onData, onError) {
   if (!canUseFirestore()) return () => {}
 
@@ -124,6 +144,22 @@ export function subscribeTravelCities(onData, onError) {
   )
 }
 
+export function subscribeTravelGroups(onData, onError) {
+  if (!canUseFirestore()) return () => {}
+
+  return onSnapshot(
+    query(collection(firestoreDb, groupsCollection)),
+    (snapshot) => {
+      const profiles = snapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data(),
+      }))
+      onData(profiles)
+    },
+    onError,
+  )
+}
+
 export async function saveTripOption(option, user) {
   if (!canUseFirestore() || !user) return
 
@@ -141,6 +177,18 @@ export async function saveTravelCity(city, user) {
 
   await setDoc(doc(firestoreDb, citiesCollection, city.id), {
     ...city,
+    createdBy: user.uid,
+    createdByName: user.displayName || user.email || 'Familiar',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function saveTravelGroup(profile, user) {
+  if (!canUseFirestore() || !user) return
+
+  await setDoc(doc(firestoreDb, groupsCollection, profile.id), {
+    ...profile,
     createdBy: user.uid,
     createdByName: user.displayName || user.email || 'Familiar',
     createdAt: serverTimestamp(),

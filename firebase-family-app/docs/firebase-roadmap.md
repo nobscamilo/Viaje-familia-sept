@@ -12,7 +12,7 @@
 - Guardar nuevas sugerencias en `tripOptions`. Listo en primera versión.
 - Permitir votos por familiar en `votes`. Listo en primera versión.
 - Marcar opciones como `active`, `pending` o `removed`. Listo en primera versión.
-- Panel simple de aprobación para Camilo.
+- Adultos agregan opciones directamente; menores quedan como pendientes. Listo.
 
 ## Fase 3: IA
 
@@ -41,3 +41,4 @@
 - Madrid queda como fase F1.
 - París / España se modelan como fases candidatas hasta decidir destino.
 - La familia puede añadir ciudad, fechas, traslado e idea del plan desde la app.
+- La app permite cambiar o crear perfiles de grupo de viaje con adultos y edades de niños. Listo con `travelGroups`.

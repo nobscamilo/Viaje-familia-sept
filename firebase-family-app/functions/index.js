@@ -417,6 +417,66 @@ function routeSummary(routes) {
   return parts.join(' · ') || 'Ruta por calcular'
 }
 
+function normalizeGroupProfile(value = {}) {
+  const childrenAges = Array.isArray(value.childrenAges)
+    ? value.childrenAges
+        .map((age) => Number(age))
+        .filter((age) => Number.isFinite(age) && age > 0 && age < 18)
+    : []
+  const adults = Math.max(1, Number(value.adults) || 7)
+
+  return {
+    id: cleanText(value.id, 'familia-sept-2026'),
+    name: cleanText(value.name, 'Familia septiembre 2026'),
+    adults,
+    childrenAges,
+    totalTravelers: adults + childrenAges.length,
+    note: cleanText(value.note),
+  }
+}
+
+function parseTripDates(value) {
+  const text = cleanText(value).toLowerCase()
+  const year = text.match(/\b(20\d{2})\b/)?.[1] || '2026'
+  const monthMap = {
+    ene: '01',
+    enero: '01',
+    feb: '02',
+    febrero: '02',
+    mar: '03',
+    marzo: '03',
+    abr: '04',
+    abril: '04',
+    may: '05',
+    mayo: '05',
+    jun: '06',
+    junio: '06',
+    jul: '07',
+    julio: '07',
+    ago: '08',
+    agosto: '08',
+    sep: '09',
+    septiembre: '09',
+    oct: '10',
+    octubre: '10',
+    nov: '11',
+    noviembre: '11',
+    dic: '12',
+    diciembre: '12',
+  }
+  const monthKey = Object.keys(monthMap).find((key) => text.includes(key))
+  const days = [...text.matchAll(/\b(\d{1,2})\b/g)]
+    .map((match) => Number(match[1]))
+    .filter((day) => day >= 1 && day <= 31)
+
+  if (!monthKey || days.length < 2) return { checkin: '', checkout: '' }
+
+  return {
+    checkin: `${year}-${monthMap[monthKey]}-${String(days[0]).padStart(2, '0')}`,
+    checkout: `${year}-${monthMap[monthKey]}-${String(days[1]).padStart(2, '0')}`,
+  }
+}
+
 function heuristicScore(input, place, routes, priceNight) {
   let score = 64
   if (input.category === 'lodging') score += 8
@@ -433,6 +493,7 @@ function buildFallbackAnalysis(input, metadata, place, routes) {
   const combinedText = `${input.notes} ${metadata.description || ''}`
   const priceNight = estimatePriceFromText(combinedText)
   const score = heuristicScore(input, place, routes, priceNight)
+  const totalTravelers = input.groupProfile?.totalTravelers || 9
 
   return {
     title:
@@ -448,7 +509,7 @@ function buildFallbackAnalysis(input, metadata, place, routes) {
     priceTotal: priceNight ? priceNight * 4 : null,
     rating: place?.rating ? `${place.rating}/5` : 'Pendiente de validar',
     reviews: place?.userRatingCount || null,
-    capacity: input.targetGroup === 'f1' ? 'Subgrupo F1' : 'Por verificar para 9 personas',
+    capacity: input.targetGroup === 'f1' ? 'Subgrupo F1' : `Por verificar para ${totalTravelers} personas`,
     transit: routeSummary(routes),
     aiScore: score,
     highlights: [
@@ -481,7 +542,7 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user) {
     title,
     source: cleanText(analysis.source, metadata.siteName || hostname(input.url)),
     city: cleanText(analysis.city, input.city),
-    status: 'pending',
+    status: input.isAdultContributor ? 'active' : 'pending',
     url: input.url,
     image: metadata.image || '',
     priceNight: analysis.priceNight ?? null,
@@ -499,6 +560,8 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user) {
     aiSummary: analysis.summary || '',
     aiQuestions: analysis.questions || [],
     routeModes: routes,
+    groupProfile: input.groupProfile,
+    contributorMemberId: input.selectedMemberId || null,
     createdBy: user.uid,
     createdByName: user.name,
   })
@@ -540,28 +603,53 @@ async function generateJson(schema, prompt, fallback) {
   }
 }
 
-function platformLinks(search) {
+function platformLinks(search, groupProfile) {
   const city = encodeURIComponent(search.city || 'Madrid')
-  const query = encodeURIComponent(`${search.city || 'Madrid'} alojamiento 9 personas`)
+  const dates = parseTripDates(search.dates)
+  const adults = groupProfile.adults
+  const children = groupProfile.childrenAges.length
+  const total = groupProfile.totalTravelers
+  const query = encodeURIComponent(
+    `${search.city || 'Madrid'} alojamiento ${total} personas ${search.dates || ''}`,
+  )
+  const bookingDates = dates.checkin && dates.checkout
+    ? `&checkin=${dates.checkin}&checkout=${dates.checkout}`
+    : ''
+  const airbnbDates = dates.checkin && dates.checkout
+    ? `&checkin=${dates.checkin}&checkout=${dates.checkout}`
+    : ''
+  const bookingAges = groupProfile.childrenAges.map((age) => `&age=${age}`).join('')
+  const googleDates = dates.checkin && dates.checkout
+    ? ` ${dates.checkin} ${dates.checkout}`
+    : ''
 
   return [
     {
       label: 'Booking',
-      url: `https://www.booking.com/searchresults.es.html?ss=${city}&group_adults=6&group_children=3`,
+      url: `https://www.booking.com/searchresults.es.html?ss=${city}${bookingDates}&group_adults=${adults}&group_children=${children}${bookingAges}&no_rooms=1`,
     },
     {
       label: 'Airbnb',
-      url: `https://www.airbnb.com/s/${city}/homes?adults=6&children=3`,
+      url: `https://www.airbnb.com/s/${city}/homes?adults=${adults}&children=${children}${airbnbDates}`,
     },
     {
-      label: 'Google Travel',
-      url: `https://www.google.com/travel/search?q=${query}`,
+      label: total > 6 ? 'Google Travel 6 personas' : 'Google Travel',
+      url: `https://www.google.com/travel/search?q=${query}${encodeURIComponent(googleDates)}&adults=${Math.min(total, 6)}`,
     },
+    ...(total > 6
+      ? [
+          {
+            label: `Google Travel resto (${total - 6})`,
+            url: `https://www.google.com/travel/search?q=${encodeURIComponent(`${search.city || 'Madrid'} alojamiento ${total - 6} personas${googleDates}`)}&adults=${total - 6}`,
+          },
+        ]
+      : []),
   ]
 }
 
 export const analyzeTripOption = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
   const input = {
     title: cleanText(request.data?.title),
     url: cleanUrl(request.data?.url),
@@ -570,6 +658,9 @@ export const analyzeTripOption = onCall(functionOptions, async (request) => {
     targetGroup: cleanText(request.data?.targetGroup, 'family'),
     notes: cleanText(request.data?.notes),
     dates: cleanText(request.data?.dates, '10-14 sep 2026'),
+    isAdultContributor: request.data?.isAdultContributor !== false,
+    selectedMemberId: cleanText(request.data?.selectedMemberId),
+    groupProfile,
   }
 
   if (!input.url && !input.title && !input.notes) {
@@ -599,7 +690,7 @@ export const analyzeTripOption = onCall(functionOptions, async (request) => {
 Eres el copiloto IA del viaje familiar de Camilo a Madrid/F1 2026.
 
 Contexto fijo:
-- Viajeros: 9 personas.
+- Grupo de viaje: ${groupProfile.name}, ${groupProfile.totalTravelers} personas (${groupProfile.adults} adultos, ${groupProfile.childrenAges.length} niños).
 - F1: Camilo, Juliana Bueno y Fernando.
 - Madrid/F1: 10 al 14 de septiembre de 2026.
 - Presupuesto hospedaje orientativo: 300 a 600 EUR/noche total.
@@ -642,6 +733,7 @@ ${JSON.stringify({ input, metadata, place, routes })}
 
 export const suggestLodgingSearch = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
   const search = {
     id: `search-${Date.now()}`,
     type: 'lodging',
@@ -649,21 +741,22 @@ export const suggestLodgingSearch = onCall(functionOptions, async (request) => {
     dates: cleanText(request.data?.dates, '10-14 sep 2026'),
     notes: cleanText(
       request.data?.notes,
-      '9 personas, presupuesto 300-600 EUR/noche, buena movilidad familiar',
+      `${groupProfile.totalTravelers} personas, presupuesto 300-600 EUR/noche, buena movilidad familiar`,
     ),
     status: 'ready',
     platforms: ['Booking', 'Airbnb', 'Google Travel'],
+    groupProfile,
   }
   const fallback = {
-    summary: `Búsqueda preparada para ${search.city}: priorizar apartamentos completos para 9 personas y buena conexión familiar.`,
+    summary: `Búsqueda preparada para ${search.city}: priorizar apartamentos completos para ${groupProfile.totalTravelers} personas y buena conexión familiar.`,
     searchQueries: [
-      `${search.city} apartamento 9 personas ${search.dates}`,
+      `${search.city} apartamento ${groupProfile.totalTravelers} personas ${search.dates}`,
       `${search.city} alojamiento familiar 4 habitaciones`,
       `${search.city} cerca metro apartamento grupo`,
     ],
     comparisonCriteria: [
       'Precio total por noche dentro de 300-600 EUR',
-      'Capacidad real para 9 personas y baños suficientes',
+      `Capacidad real para ${groupProfile.totalTravelers} personas y baños suficientes`,
       'Ruta a IFEMA/MADRING en transporte público',
       'Fotos claras de habitaciones, cocina y zonas comunes',
     ],
@@ -679,7 +772,8 @@ export const suggestLodgingSearch = onCall(functionOptions, async (request) => {
   }
   const prompt = `
 Genera una estrategia de búsqueda de hospedaje para el viaje familiar.
-Familia: 9 viajeros, niños de 18, 9 y 5 años. F1 solo para Camilo, Juliana Bueno y Fernando.
+Grupo: ${groupProfile.name}. ${groupProfile.totalTravelers} viajeros: ${groupProfile.adults} adultos y niños con edades ${groupProfile.childrenAges.join(', ') || 'ninguna'}.
+F1 solo para Camilo, Juliana Bueno y Fernando cuando aplique.
 Datos de búsqueda:
 ${JSON.stringify(search)}
 Responde SOLO JSON según el esquema. No inventes disponibilidad exacta.
@@ -687,7 +781,7 @@ Responde SOLO JSON según el esquema. No inventes disponibilidad exacta.
   const analysis = await generateJson(lodgingSearchSchema, prompt, fallback)
   const payload = stripUndefined({
     ...search,
-    links: platformLinks(search),
+    links: platformLinks(search, groupProfile),
     analysis,
     createdBy: user.uid,
     createdByName: user.name,
@@ -711,6 +805,7 @@ export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
   const city = cleanText(request.data?.city, 'Madrid')
   const notes = cleanText(request.data?.notes, 'restaurantes familiares bien valorados')
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
   const rawPlaces = await searchPlaces(`${notes} en ${city}`, 8).catch((error) => {
     throw new HttpsError('unavailable', error.message)
   })
@@ -722,12 +817,12 @@ export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
       name: place.name,
       score: clamp(Math.round((place.rating || 4) * 18), 50, 95),
       why: place.formattedAddress || 'Buena opción para revisar en Maps',
-      caution: 'Confirmar reserva para 9 personas y menú para niños',
+      caution: `Confirmar reserva para ${groupProfile.totalTravelers} personas y menú para niños`,
     })),
   }
   const prompt = `
-Ordena estas opciones de comida para una familia de 9 personas en ${city}.
-Niños: 18, 9 y 5 años. Prioriza reservas fáciles, comida flexible, buena ubicación y reseñas.
+Ordena estas opciones de comida para ${groupProfile.name}: ${groupProfile.totalTravelers} personas en ${city}.
+Niños: ${groupProfile.childrenAges.join(', ') || 'ninguno'}. Prioriza reservas fáciles, comida flexible, buena ubicación y reseñas.
 Lugares de Google Places:
 ${JSON.stringify(places)}
 Responde SOLO JSON según el esquema.
@@ -748,6 +843,7 @@ Responde SOLO JSON según el esquema.
     city,
     notes,
     status: 'ready',
+    groupProfile,
     places: rankedPlaces,
     analysis,
     createdBy: user.uid,
@@ -773,6 +869,7 @@ export const generateItinerary = onCall(functionOptions, async (request) => {
   const city = cleanText(request.data?.city, 'Madrid')
   const dates = cleanText(request.data?.dates, '10-14 sep 2026')
   const routeMode = cleanText(request.data?.routeMode, 'TRANSIT')
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
   const [optionsSnapshot, citiesSnapshot] = await Promise.all([
     db.collection('tripOptions').where('status', 'in', ['active', 'pending']).limit(20).get(),
     db.collection('travelCities').limit(12).get(),
@@ -812,9 +909,8 @@ export const generateItinerary = onCall(functionOptions, async (request) => {
   const prompt = `
 Genera un itinerario familiar práctico. No hagas marketing; debe servir para decidir.
 Contexto:
-- Familia de 9 personas.
+- Grupo de viaje: ${groupProfile.name}. ${groupProfile.totalTravelers} personas: ${groupProfile.adults} adultos y niños ${groupProfile.childrenAges.join(', ') || 'ninguno'}.
 - Camilo, Juliana Bueno y Fernando van a F1; el resto necesita planes alternos.
-- Niños: Juliancho 18, Juanfe 9, Guillermo 5.
 - Ciudad base solicitada: ${city}.
 - Fechas: ${dates}.
 - Modo de ruta preferido: ${routeMode}.
@@ -831,6 +927,7 @@ Responde SOLO JSON según el esquema.
     city,
     dates,
     routeMode,
+    groupProfile,
     ...itinerary,
     createdBy: user.uid,
     createdByName: user.name,

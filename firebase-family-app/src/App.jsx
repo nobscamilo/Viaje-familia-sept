@@ -30,6 +30,7 @@ import {
   categoryConfig,
   cityIdeas,
   familyMembers,
+  familyProfiles,
   initialOptions,
   itineraryDraft,
   tripSegments,
@@ -54,11 +55,14 @@ import {
   saveSearchRequest,
   saveTripOption,
   saveTravelCity,
+  saveTravelGroup,
   saveUserProfile,
   seedInitialTripOptions,
   seedInitialTravelCities,
+  seedInitialTravelGroups,
   subscribeTripOptions,
   subscribeTravelCities,
+  subscribeTravelGroups,
   subscribeVotes,
   updateTripOptionStatus,
 } from './services/tripRepository'
@@ -146,7 +150,7 @@ function scoreDraft(draft) {
   return Math.min(score, 94)
 }
 
-function buildDraftOption(draft) {
+function buildDraftOption(draft, status = 'pending') {
   const fallbackTitle = draft.url
     ? `Opción de ${getHostname(draft.url)}`
     : 'Nueva opción familiar'
@@ -158,7 +162,7 @@ function buildDraftOption(draft) {
     title: draft.title.trim() || fallbackTitle,
     source: draft.url ? getHostname(draft.url) : 'Propuesta familiar',
     city: draft.city,
-    status: 'pending',
+    status,
     url: draft.url.trim(),
     image: '',
     priceNight: null,
@@ -199,25 +203,128 @@ function buildCityDraft(draft) {
   }
 }
 
-function platformSearchLinks(search) {
+function buildFamilyProfileDraft(draft) {
+  const slug = draft.name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  const childrenAges = draft.childrenAges
+    .split(',')
+    .map((age) => Number(age.trim()))
+    .filter((age) => Number.isFinite(age) && age > 0 && age < 18)
+
+  return {
+    id: `${slug || 'grupo'}-${Date.now()}`,
+    name: draft.name.trim(),
+    adults: Math.max(1, Number(draft.adults) || 1),
+    childrenAges,
+    note: draft.note.trim() || 'Grupo personalizado',
+  }
+}
+
+function parseTripDates(value) {
+  const text = String(value || '').toLowerCase()
+  const year = text.match(/\b(20\d{2})\b/)?.[1] || '2026'
+  const monthMap = {
+    ene: '01',
+    enero: '01',
+    feb: '02',
+    febrero: '02',
+    mar: '03',
+    marzo: '03',
+    abr: '04',
+    abril: '04',
+    may: '05',
+    mayo: '05',
+    jun: '06',
+    junio: '06',
+    jul: '07',
+    julio: '07',
+    ago: '08',
+    agosto: '08',
+    sep: '09',
+    septiembre: '09',
+    oct: '10',
+    octubre: '10',
+    nov: '11',
+    noviembre: '11',
+    dic: '12',
+    diciembre: '12',
+  }
+  const monthKey = Object.keys(monthMap).find((key) => text.includes(key))
+  const days = [...text.matchAll(/\b(\d{1,2})\b/g)]
+    .map((match) => Number(match[1]))
+    .filter((day) => day >= 1 && day <= 31)
+
+  if (!monthKey || days.length < 2) {
+    return { checkin: '', checkout: '' }
+  }
+
+  const month = monthMap[monthKey]
+  const [startDay, endDay] = days
+
+  return {
+    checkin: `${year}-${month}-${String(startDay).padStart(2, '0')}`,
+    checkout: `${year}-${month}-${String(endDay).padStart(2, '0')}`,
+  }
+}
+
+function groupSummary(profile) {
+  const children = profile.childrenAges?.length || 0
+  const total = (Number(profile.adults) || 0) + children
+  return `${total} viajeros · ${profile.adults} adultos · ${children} niños`
+}
+
+function isAdultMember(memberId) {
+  return Boolean(familyMembers.find((member) => member.id === memberId)?.adult)
+}
+
+function platformSearchLinks(search, profile) {
   const city = encodeURIComponent(search.city || 'Madrid')
-  const adults = 6
-  const children = 3
-  const query = encodeURIComponent(`${search.city || 'Madrid'} alojamiento 9 personas`)
+  const dates = parseTripDates(search.dates)
+  const adults = Math.max(1, Number(profile?.adults) || 1)
+  const childrenAges = profile?.childrenAges || []
+  const children = childrenAges.length
+  const total = adults + children
+  const query = encodeURIComponent(
+    `${search.city || 'Madrid'} alojamiento ${total} personas ${search.dates || ''}`,
+  )
+  const dateParams = dates.checkin && dates.checkout
+    ? `&checkin=${dates.checkin}&checkout=${dates.checkout}`
+    : ''
+  const bookingAges = childrenAges.map((age) => `&age=${age}`).join('')
+  const bookingDates = dates.checkin && dates.checkout
+    ? `&checkin=${dates.checkin}&checkout=${dates.checkout}`
+    : ''
+  const googleDates = dates.checkin && dates.checkout
+    ? ` ${dates.checkin} ${dates.checkout}`
+    : ''
 
   return [
     {
       label: 'Booking',
-      url: `https://www.booking.com/searchresults.es.html?ss=${city}&group_adults=${adults}&group_children=${children}`,
+      url: `https://www.booking.com/searchresults.es.html?ss=${city}${bookingDates}&group_adults=${adults}&group_children=${children}${bookingAges}&no_rooms=1`,
     },
     {
       label: 'Airbnb',
-      url: `https://www.airbnb.com/s/${city}/homes?adults=${adults}&children=${children}`,
+      url: `https://www.airbnb.com/s/${city}/homes?adults=${adults}&children=${children}${dateParams}`,
     },
     {
-      label: 'Google Travel',
-      url: `https://www.google.com/travel/search?q=${query}`,
+      label: total > 6 ? 'Google Travel 6 personas' : 'Google Travel',
+      url: `https://www.google.com/travel/search?q=${query}${encodeURIComponent(googleDates)}&adults=${Math.min(total, 6)}`,
     },
+    ...(total > 6
+      ? [
+          {
+            label: `Google Travel resto (${total - 6})`,
+            url: `https://www.google.com/travel/search?q=${encodeURIComponent(`${search.city || 'Madrid'} alojamiento ${total - 6} personas${googleDates}`)}&adults=${total - 6}`,
+          },
+        ]
+      : []),
   ]
 }
 
@@ -280,6 +387,8 @@ function App() {
   })
   const [options, setOptions] = useState(initialOptions)
   const [travelCities, setTravelCities] = useState(cityIdeas)
+  const [travelGroups, setTravelGroups] = useState(familyProfiles)
+  const [activeTravelGroupId, setActiveTravelGroupId] = useState('familia-sept-2026')
   const [votes, setVotes] = useState({
     'lodging-m': ['camilo'],
     'lodging-b': ['juliana-bueno'],
@@ -300,6 +409,12 @@ function App() {
     transfer: '',
     angle: '',
   })
+  const [familyProfileDraft, setFamilyProfileDraft] = useState({
+    name: '',
+    adults: 2,
+    childrenAges: '',
+    note: '',
+  })
   const [searchDraft, setSearchDraft] = useState({
     city: 'Madrid',
     dates: '10-14 sep 2026',
@@ -313,6 +428,8 @@ function App() {
   const [aiFeedback, setAiFeedback] = useState(null)
   const [itineraryBusy, setItineraryBusy] = useState(false)
   const [generatedItinerary, setGeneratedItinerary] = useState(null)
+  const [externalLink, setExternalLink] = useState('')
+  const [externalBusy, setExternalBusy] = useState(false)
 
   const firebaseStatus = getFirebaseStatus()
   const canSync = Boolean(currentUser && canUseFirestore())
@@ -328,6 +445,14 @@ function App() {
   const activeCategory = categoryConfig[activeTab]
   const f1Crew = familyMembers.filter((member) => member.group === 'f1')
   const familyCrew = familyMembers.filter((member) => member.group !== 'f1')
+  const activeContributorIsAdult = isAdultMember(activeMember)
+  const currentTravelGroup = useMemo(
+    () =>
+      travelGroups.find((profile) => profile.id === activeTravelGroupId) ||
+      travelGroups[0] ||
+      familyProfiles[0],
+    [activeTravelGroupId, travelGroups],
+  )
   const cityFilters = useMemo(
     () => ['Todas', 'Madrid', ...travelCities.map((idea) => idea.city)]
       .filter((city, index, list) => city && list.indexOf(city) === index),
@@ -354,6 +479,7 @@ function App() {
         Promise.all([
           seedInitialTripOptions(currentUser),
           seedInitialTravelCities(currentUser),
+          seedInitialTravelGroups(currentUser),
         ]),
       )
       .catch((error) => {
@@ -413,13 +539,32 @@ function App() {
       },
     )
 
+    const unsubscribeGroups = subscribeTravelGroups(
+      (nextGroups) => {
+        if (!active || !nextGroups.length) return
+        setTravelGroups(nextGroups)
+        if (!nextGroups.some((profile) => profile.id === activeTravelGroupId)) {
+          setActiveTravelGroupId(nextGroups[0].id)
+        }
+      },
+      (error) => {
+        if (!active) return
+        setSyncStatus({
+          label: 'Grupos locales',
+          detail: error.message,
+          online: false,
+        })
+      },
+    )
+
     return () => {
       active = false
       unsubscribeOptions()
       unsubscribeVotes()
       unsubscribeCities()
+      unsubscribeGroups()
     }
-  }, [activeMember, currentUser])
+  }, [activeMember, activeTravelGroupId, currentUser])
 
   const visibleOptions = useMemo(() => {
     return options
@@ -468,6 +613,10 @@ function App() {
     setSearchDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function updateFamilyProfileDraft(field, value) {
+    setFamilyProfileDraft((current) => ({ ...current, [field]: value }))
+  }
+
   async function handleSignIn() {
     if (!firebaseAuth || !googleProvider) return
 
@@ -487,6 +636,8 @@ function App() {
     await signOut(firebaseAuth)
     setOptions(initialOptions)
     setTravelCities(cityIdeas)
+    setTravelGroups(familyProfiles)
+    setActiveTravelGroupId('familia-sept-2026')
     setVotes({
       'lodging-m': ['camilo'],
       'lodging-b': ['juliana-bueno'],
@@ -509,6 +660,9 @@ function App() {
         const result = await analyzeOptionWithAI({
           ...draft,
           dates: searchDraft.dates,
+          isAdultContributor: activeContributorIsAdult,
+          selectedMemberId: activeMember,
+          groupProfile: currentTravelGroup,
         })
         if (result.option) {
           setOptions((current) => mergeOption(current, result.option))
@@ -540,7 +694,7 @@ function App() {
       }
     }
 
-    const option = buildDraftOption(draft)
+    const option = buildDraftOption(draft, activeContributorIsAdult ? 'active' : 'pending')
     setOptions((current) => mergeOption(current, option))
     if (canSync) {
       await saveTripOption(option, currentUser)
@@ -554,6 +708,52 @@ function App() {
       notes: '',
     })
     setActiveTab(option.category)
+  }
+
+  async function analyzeExternalLink(event) {
+    event.preventDefault()
+    if (!externalLink.trim()) return
+
+    setExternalBusy(true)
+    setAiFeedback({
+      tone: 'working',
+      title: 'Trayendo opción externa',
+      detail: 'Copié el link a la IA para convertirlo en hospedaje comparable.',
+    })
+
+    try {
+      const result = await analyzeOptionWithAI({
+        title: '',
+        url: externalLink,
+        category: 'lodging',
+        city: searchDraft.city,
+        targetGroup: 'family',
+        notes: searchDraft.notes,
+        dates: searchDraft.dates,
+        isAdultContributor: activeContributorIsAdult,
+        selectedMemberId: activeMember,
+        groupProfile: currentTravelGroup,
+      })
+
+      if (result.option) {
+        setOptions((current) => mergeOption(current, result.option))
+        setExternalLink('')
+        setActiveTab('lodging')
+        setAiFeedback({
+          tone: 'ready',
+          title: 'Hospedaje agregado',
+          detail: result.analysis?.summary || 'El link externo ya quedó en la lista para comparar.',
+        })
+      }
+    } catch (error) {
+      setAiFeedback({
+        tone: 'warning',
+        title: 'No pude importar el link',
+        detail: error.message,
+      })
+    } finally {
+      setExternalBusy(false)
+    }
   }
 
   async function addCity(event) {
@@ -576,6 +776,25 @@ function App() {
     }
   }
 
+  async function addTravelGroup(event) {
+    event.preventDefault()
+    if (!familyProfileDraft.name.trim()) return
+
+    const profile = buildFamilyProfileDraft(familyProfileDraft)
+    setTravelGroups((current) => [profile, ...current])
+    setActiveTravelGroupId(profile.id)
+    setFamilyProfileDraft({
+      name: '',
+      adults: 2,
+      childrenAges: '',
+      note: '',
+    })
+
+    if (canSync) {
+      await saveTravelGroup(profile, currentUser)
+    }
+  }
+
   async function createLodgingSearch(event) {
     event.preventDefault()
     if (searchDraft.type === 'food') {
@@ -595,7 +814,10 @@ function App() {
       })
 
       try {
-        const result = await suggestLodgingWithAI(searchDraft)
+        const result = await suggestLodgingWithAI({
+          ...searchDraft,
+          groupProfile: currentTravelGroup,
+        })
         setSearchResult(result)
         return
       } catch (error) {
@@ -605,7 +827,7 @@ function App() {
           city: searchDraft.city,
           status: 'error',
           notes: `${error.message}. Te dejo los enlaces base para continuar.`,
-          links: platformSearchLinks(searchDraft),
+          links: platformSearchLinks(searchDraft, currentTravelGroup),
         })
       }
     }
@@ -625,7 +847,7 @@ function App() {
 
     setSearchResult({
       ...request,
-      links: platformSearchLinks(searchDraft),
+      links: platformSearchLinks(searchDraft, currentTravelGroup),
     })
 
     if (canSync) {
@@ -639,7 +861,10 @@ function App() {
 
     if (canSync) {
       try {
-        const result = await suggestFoodWithAI(searchDraft)
+        const result = await suggestFoodWithAI({
+          ...searchDraft,
+          groupProfile: currentTravelGroup,
+        })
         setPlaces(result.places || [])
         setSearchResult({
           id: result.id,
@@ -726,7 +951,7 @@ function App() {
       title: name,
       source: 'Google Maps',
       city: searchDraft.city || 'Madrid',
-      status: 'pending',
+      status: activeContributorIsAdult ? 'active' : 'pending',
       url: getPlaceUrl(place),
       image: photo,
       priceNight: null,
@@ -833,6 +1058,7 @@ function App() {
         city: selectedCity === 'Todas' ? 'Madrid' : selectedCity,
         dates: searchDraft.dates,
         routeMode,
+        groupProfile: currentTravelGroup,
       })
       setGeneratedItinerary(result)
       setActiveTab('itinerary')
@@ -950,7 +1176,9 @@ function App() {
         </div>
         <div className="collab-actions">
           <span>{currentUser ? currentUser.displayName || currentUser.email : 'Sin sesión'}</span>
-          <strong>Votando como {memberName(activeMember)}</strong>
+          <strong>
+            {memberName(activeMember)} · {activeContributorIsAdult ? 'agrega directo' : 'requiere revisión'}
+          </strong>
         </div>
       </section>
 
@@ -985,6 +1213,55 @@ function App() {
               <span>Planes alternos</span>
               <strong>{familyCrew.map((member) => member.name).join(', ')}</strong>
             </div>
+          </div>
+
+          <div className="panel-block travel-group">
+            <h2>Grupo de viaje</h2>
+            <label>
+              <span>Perfil activo</span>
+              <select
+                onChange={(event) => setActiveTravelGroupId(event.target.value)}
+                value={currentTravelGroup.id}
+              >
+                {travelGroups.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p>{groupSummary(currentTravelGroup)}</p>
+            <small>{currentTravelGroup.note}</small>
+            <form className="mini-group-form" onSubmit={addTravelGroup}>
+              <input
+                onChange={(event) => updateFamilyProfileDraft('name', event.target.value)}
+                placeholder="Nuevo grupo"
+                type="text"
+                value={familyProfileDraft.name}
+              />
+              <input
+                min="1"
+                onChange={(event) => updateFamilyProfileDraft('adults', event.target.value)}
+                type="number"
+                value={familyProfileDraft.adults}
+              />
+              <input
+                onChange={(event) => updateFamilyProfileDraft('childrenAges', event.target.value)}
+                placeholder="Edades niños: 9, 5"
+                type="text"
+                value={familyProfileDraft.childrenAges}
+              />
+              <input
+                onChange={(event) => updateFamilyProfileDraft('note', event.target.value)}
+                placeholder="Nota"
+                type="text"
+                value={familyProfileDraft.note}
+              />
+              <button type="submit">
+                <Plus size={15} aria-hidden="true" />
+                Guardar
+              </button>
+            </form>
           </div>
         </aside>
 
@@ -1201,6 +1478,11 @@ function App() {
           </div>
         </div>
         <form className="search-form" onSubmit={createLodgingSearch}>
+          <div className="search-context">
+            <span>Grupo usado en búsquedas</span>
+            <strong>{currentTravelGroup.name}</strong>
+            <p>{groupSummary(currentTravelGroup)}</p>
+          </div>
           <label>
             <span>Tipo</span>
             <select
@@ -1297,6 +1579,26 @@ function App() {
             ) : null}
           </div>
         ) : null}
+
+        <form className="external-import" onSubmit={analyzeExternalLink}>
+          <div>
+            <strong>Traer una opción externa a la comparación</strong>
+            <p>
+              Cuando abras Booking, Airbnb o Google Travel, copia el link del hospedaje
+              que te guste y lo agrego a Hospedajes con análisis IA.
+            </p>
+          </div>
+          <input
+            onChange={(event) => setExternalLink(event.target.value)}
+            placeholder="Pega aquí el link del hospedaje"
+            type="url"
+            value={externalLink}
+          />
+          <button className="primary-button compact" disabled={externalBusy} type="submit">
+            {externalBusy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
+            Analizar link
+          </button>
+        </form>
 
         {places.length ? (
           <div className="places-grid">
@@ -1451,6 +1753,7 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
 function MadridMap({ options, routeMode }) {
   const mapRef = useRef(null)
   const [mapError, setMapError] = useState('')
+  const [routeSummaries, setRouteSummaries] = useState({})
   const hasRealMap = hasMapsKey() && options.some((option) => option.coords)
 
   useEffect(() => {
@@ -1458,6 +1761,8 @@ function MadridMap({ options, routeMode }) {
 
     let cancelled = false
     const mapItems = []
+    setMapError('')
+    setRouteSummaries({})
 
     loadGoogleMaps()
       .then((google) => {
@@ -1512,10 +1817,19 @@ function MadridMap({ options, routeMode }) {
             })
 
             const routeLabel = routeModes[routeMode]?.label || 'Ruta'
+            marker.routeStatus = option.transit
+            setRouteSummaries((current) => ({
+              ...current,
+              [option.id]: {
+                title: option.title,
+                code: option.code,
+                status: option.id === 'f1-madring' ? 'Destino' : 'Calculando...',
+              },
+            }))
 
             marker.addListener('click', () => {
               infoWindow.setContent(
-                `<strong>${option.title}</strong><br>${routeLabel}<br>${option.transit}<br>${option.aiScore}/100`,
+                `<strong>${option.title}</strong><br>${routeLabel}<br>${marker.routeStatus || option.transit}<br>${option.aiScore}/100`,
               )
               infoWindow.open({ anchor: marker, map })
             })
@@ -1528,7 +1842,32 @@ function MadridMap({ options, routeMode }) {
                   travelMode: google.maps.TravelMode[routeMode],
                 },
                 (result, status) => {
-                  if (status !== google.maps.DirectionsStatus.OK || !result) return
+                  if (status !== google.maps.DirectionsStatus.OK || !result) {
+                    marker.routeStatus = 'Sin tiempo disponible'
+                    setRouteSummaries((current) => ({
+                      ...current,
+                      [option.id]: {
+                        title: option.title,
+                        code: option.code,
+                        status: 'Sin tiempo disponible',
+                      },
+                    }))
+                    return
+                  }
+                  const leg = result.routes?.[0]?.legs?.[0]
+                  const duration = leg?.duration?.text || 'Tiempo no disponible'
+                  const distance = leg?.distance?.text || ''
+                  marker.routeStatus = `${duration}${distance ? ` · ${distance}` : ''}`
+                  setRouteSummaries((current) => ({
+                    ...current,
+                    [option.id]: {
+                      title: option.title,
+                      code: option.code,
+                      duration,
+                      distance,
+                      status: `${duration}${distance ? ` · ${distance}` : ''}`,
+                    },
+                  }))
                   fallbackLine.setMap(null)
                   const renderer = new google.maps.DirectionsRenderer({
                     directions: result,
@@ -1572,6 +1911,20 @@ function MadridMap({ options, routeMode }) {
       <div className="map-caption">
         <CheckCircle2 size={16} aria-hidden="true" />
         <span>Rutas en modo {routeModes[routeMode]?.label || 'ruta'} hacia IFEMA / MADRING</span>
+      </div>
+      <div className="route-summary-list">
+        {options
+          .filter((option) => option.coords && option.id !== 'f1-madring')
+          .map((option) => {
+            const summary = routeSummaries[option.id]
+            return (
+              <article key={option.id}>
+                <strong>{option.code}</strong>
+                <span>{option.title}</span>
+                <em>{summary?.status || 'Calculando...'}</em>
+              </article>
+            )
+          })}
       </div>
     </div>
   )

@@ -80,9 +80,12 @@ APIs activadas:
 - Con sesión, se sincronizan opciones, votos, ciudades y estado de retirar/restaurar en Firestore.
 - Las opciones base se siembran automáticamente en Firestore cuando entra el primer usuario.
 - Mapa real de Google Maps con marcadores y rutas hacia IFEMA / MADRING.
-- Selector de ruta: transporte público, andando o coche.
+- Selector de ruta: transporte público, andando o coche, con tiempos estimados visibles por opción.
 - Ciudades dinámicas con fechas, país, traslado e idea del plan.
-- Búsqueda guiada de hospedajes con enlaces preparados a Booking, Airbnb y Google Travel.
+- Perfiles de grupo de viaje para reutilizar la app en futuros viajes.
+- Búsqueda guiada de hospedajes con fechas y ocupación en Booking/Airbnb; Google Travel se separa en grupos de máximo 6 personas.
+- Importación de links externos: si una opción gusta en Booking/Airbnb/Google Travel, se pega el link y la IA la agrega a Hospedajes.
+- Los adultos agregan opciones directamente como activas; menores quedan como pendientes de revisión.
 - Sugerencias de restaurantes con Google Maps Places y opción de agregarlos a comida.
 - Cloud Function `analyzeTripOption`: analiza links, extrae metadatos públicos, cruza Places/Routes y guarda la opción en Firestore.
 - Cloud Function `suggestLodgingSearch`: genera búsquedas y criterios para Booking, Airbnb y Google Travel sin inventar disponibilidad.
