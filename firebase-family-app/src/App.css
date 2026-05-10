@@ -32,7 +32,7 @@
 .ghost-button,
 .primary-button,
 .tabbar button,
-.city-filter button,
+.city-chip button,
 .route-mode-control button,
 .card-actions button,
 .card-actions a {
@@ -529,7 +529,7 @@
 }
 
 .tabbar button,
-.city-filter button,
+.city-chip button,
 .ghost-button,
 .card-actions button,
 .card-actions a {
@@ -544,7 +544,7 @@
 }
 
 .tabbar button.active,
-.city-filter button.active {
+.city-chip.active button:first-child {
   color: #0d3f91;
   background: #eaf2ff;
   border-color: #9bbcff;
@@ -560,9 +560,31 @@
   flex-wrap: wrap;
 }
 
-.city-filter button {
+.city-chip {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.city-chip button {
   min-height: 36px;
   padding: 0 12px;
+}
+
+.city-chip button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.city-chip.single button:first-child {
+  border-radius: 8px;
+}
+
+.city-chip-remove {
+  width: 38px;
+  padding: 0;
+  color: #7c2d12;
+  background: #fff7ed;
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
 }
 
 .ghost-button {
@@ -858,6 +880,52 @@
   border-radius: 8px;
 }
 
+.transport-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.transport-planner {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.transport-form {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.transport-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.transport-form label.wide {
+  grid-column: span 2;
+}
+
+.transport-form span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.transport-form input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+
 .decision-map-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
@@ -950,6 +1018,34 @@
   color: #0d3f91;
   background: #eaf2ff;
   border-color: #9bbcff;
+}
+
+.map-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.map-status strong,
+.map-status span {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.map-status strong {
+  color: #ffffff;
+  background: #111827;
+}
+
+.map-status span {
+  color: #334155;
+  background: #f1f5f9;
 }
 
 .real-map-wrap {

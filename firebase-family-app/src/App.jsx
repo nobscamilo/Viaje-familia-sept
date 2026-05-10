@@ -1080,6 +1080,13 @@ function App() {
     }
   }
 
+  function removeCityByName(cityName) {
+    const city = travelCities.find(
+      (item) => item.city === cityName && item.status !== 'removed',
+    )
+    if (city) removeCity(city.id)
+  }
+
   async function addTravelGroup(event) {
     event.preventDefault()
     if (!familyProfileDraft.name.trim()) return
@@ -1687,14 +1694,14 @@ function App() {
           <div className="controls-row">
             <div className="city-filter" aria-label="Filtro por ciudad">
               {cityFilters.map((city) => (
-                <button
-                  className={effectiveSelectedCity === city ? 'active' : ''}
+                <CityFilterChip
+                  active={effectiveSelectedCity === city}
+                  city={city}
                   key={city}
-                  onClick={() => selectCityFilter(city)}
-                  type="button"
-                >
-                  {city}
-                </button>
+                  onRemove={removeCityByName}
+                  onSelect={selectCityFilter}
+                  removable={city !== 'Todas' && city !== 'Madrid'}
+                />
               ))}
             </div>
             <button
@@ -1720,6 +1727,24 @@ function App() {
               busy={itineraryBusy}
               onGenerate={generateSmartItinerary}
               plan={generatedItinerary}
+            />
+          ) : activeTab === 'transport' ? (
+            <TransportPanel
+              activeCategory={activeCategory}
+              activeMember={activeMember}
+              budgetOptionIds={budgetOptionIds}
+              busy={transferBusy}
+              onAddToBudget={addTransferOption}
+              onRemove={removeOption}
+              onRestore={restoreOption}
+              onSearch={createTransferSearch}
+              onToggleBudget={toggleBudgetOption}
+              onUpdateDraft={updateTransferDraft}
+              onVote={toggleVote}
+              options={visibleOptions}
+              result={transferResult}
+              transferDraft={transferDraft}
+              votes={votes}
             />
           ) : (
             <OptionGrid
@@ -1786,6 +1811,15 @@ function App() {
                 </button>
               )
             })}
+          </div>
+          <div className="map-status">
+            <strong>{currentMapCity.city}</strong>
+            <span>
+              Centro: {currentMapCity.coords
+                ? `${currentMapCity.coords.lat.toFixed(3)}, ${currentMapCity.coords.lng.toFixed(3)}`
+                : 'por definir'}
+            </span>
+            <span>{mapOptions.length} opciones visibles</span>
           </div>
           <MadridMap
             city={currentMapCity.city}
@@ -2259,6 +2293,26 @@ function App() {
   )
 }
 
+function CityFilterChip({ active, city, onRemove, onSelect, removable }) {
+  return (
+    <span className={`city-chip ${active ? 'active' : ''} ${removable ? '' : 'single'}`}>
+      <button onClick={() => onSelect(city)} type="button">
+        {city}
+      </button>
+      {removable ? (
+        <button
+          aria-label={`Quitar ${city}`}
+          className="city-chip-remove"
+          onClick={() => onRemove(city)}
+          type="button"
+        >
+          <Trash2 size={14} aria-hidden="true" />
+        </button>
+      ) : null}
+    </span>
+  )
+}
+
 function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
   return (
     <main className="login-screen">
@@ -2516,6 +2570,132 @@ function ConceptMap({ city, mapOptions, note }) {
         </a>
       ))}
       {note ? <span className="map-note">{note}</span> : null}
+    </div>
+  )
+}
+
+function TransportPanel({
+  activeCategory,
+  activeMember,
+  budgetOptionIds,
+  busy,
+  onAddToBudget,
+  onRemove,
+  onRestore,
+  onSearch,
+  onToggleBudget,
+  onUpdateDraft,
+  onVote,
+  options,
+  result,
+  transferDraft,
+  votes,
+}) {
+  const links = result?.links?.length ? result.links : omioLinks(transferDraft)
+
+  function submitSearch(event) {
+    event.preventDefault()
+    onSearch()
+  }
+
+  return (
+    <div className="transport-panel">
+      <section className="transport-planner">
+        <div className="section-heading">
+          <TrainFront size={20} aria-hidden="true" />
+          <div>
+            <p className="eyebrow">Omio + presupuesto</p>
+            <h2>Buscar traslado y sumarlo al viaje</h2>
+          </div>
+        </div>
+
+        <form className="transport-form" onSubmit={submitSearch}>
+          <label>
+            <span>Origen</span>
+            <input
+              onChange={(event) => onUpdateDraft('origin', event.target.value)}
+              type="text"
+              value={transferDraft.origin}
+            />
+          </label>
+          <label>
+            <span>Destino</span>
+            <input
+              onChange={(event) => onUpdateDraft('destination', event.target.value)}
+              type="text"
+              value={transferDraft.destination}
+            />
+          </label>
+          <label>
+            <span>Fecha</span>
+            <input
+              onChange={(event) => onUpdateDraft('date', event.target.value)}
+              type="text"
+              value={transferDraft.date}
+            />
+          </label>
+          <label>
+            <span>EUR/persona visto</span>
+            <input
+              min="0"
+              onChange={(event) => onUpdateDraft('pricePerPerson', event.target.value)}
+              placeholder="Ej. 84"
+              type="number"
+              value={transferDraft.pricePerPerson}
+            />
+          </label>
+          <label className="wide">
+            <span>Notas</span>
+            <input
+              onChange={(event) => onUpdateDraft('notes', event.target.value)}
+              type="text"
+              value={transferDraft.notes}
+            />
+          </label>
+          <button className="primary-button compact" disabled={busy} type="submit">
+            {busy ? <Loader2 size={18} aria-hidden="true" /> : <Search size={18} aria-hidden="true" />}
+            Buscar en Omio
+          </button>
+          <button className="secondary-button compact" onClick={onAddToBudget} type="button">
+            <CircleDollarSign size={18} aria-hidden="true" />
+            Agregar al presupuesto
+          </button>
+        </form>
+
+        <div className="platform-links">
+          {links.map((link) => (
+            <a href={link.url} key={link.label} rel="noreferrer" target="_blank">
+              {link.label}
+            </a>
+          ))}
+        </div>
+
+        {result ? (
+          <div className="search-tips">
+            <span>{result.analysis?.summary || result.notes}</span>
+            {result.analysis?.comparisonCriteria?.length ? (
+              <ul>
+                {result.analysis.comparisonCriteria.slice(0, 4).map((criterion) => (
+                  <li key={criterion}>{criterion}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      <OptionGrid
+        activeCategory={activeCategory}
+        activeMember={activeMember}
+        budgetOptionIds={budgetOptionIds}
+        nights={1}
+        onRemove={onRemove}
+        onRestore={onRestore}
+        onToggleBudget={onToggleBudget}
+        onVote={onVote}
+        options={options}
+        votes={votes}
+      />
     </div>
   )
 }
