@@ -20,6 +20,7 @@
 - Entrada: link, ciudad, categoría, grupo objetivo y notas.
 - Salida: nombre, fotos, precio, ubicación, capacidad, pros/contras, puntaje y dudas.
 - Guardar el análisis en Firestore.
+- APIs listas: Vertex AI, Firebase Vertex AI, Generative Language y Secret Manager.
 
 ## Fase 4: Google Maps
 
@@ -27,6 +28,7 @@
 - Routes API para tiempos reales.
 - Map JavaScript API para marcadores y rutas.
 - Itinerarios por día con trayectos validados.
+- API key de navegador creada con restricciones por dominio y por APIs de Maps.
 
 ## Fase 5: Multi-ciudad
 

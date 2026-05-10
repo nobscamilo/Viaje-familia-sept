@@ -35,8 +35,19 @@ Proyecto creado:
 - Firebase Console: https://console.firebase.google.com/project/viaje-familia-sept-2026/overview
 - Hosting: https://viaje-familia-sept-2026.web.app
 - Firestore: `(default)` en `europe-west1`, free tier activo
+- Billing: activo
+- Maps browser key: creada y restringida por dominios permitidos
+- Firebase browser key: restringida por dominios permitidos
 
 La app local ya tiene `.env.local` con la configuración pública de Firebase. Ese archivo no se sube al repo porque `*.local` está ignorado.
+
+APIs activadas:
+
+- Firebase/Auth/Firestore: `firebase.googleapis.com`, `identitytoolkit.googleapis.com`, `firestore.googleapis.com`, `firebaserules.googleapis.com`, `firebasestorage.googleapis.com`, `firebaseappcheck.googleapis.com`.
+- Hosting/backend: `firebasehosting.googleapis.com`, `cloudfunctions.googleapis.com`, `run.googleapis.com`, `cloudbuild.googleapis.com`, `artifactregistry.googleapis.com`, `eventarc.googleapis.com`, `pubsub.googleapis.com`, `secretmanager.googleapis.com`.
+- IA: `aiplatform.googleapis.com`, `firebasevertexai.googleapis.com`, `generativelanguage.googleapis.com`.
+- Maps/rutas: `maps-backend.googleapis.com`, `routes.googleapis.com`, `geocoding-backend.googleapis.com`, `places.googleapis.com`, `static-maps-backend.googleapis.com`.
+- Llaves: `apikeys.googleapis.com`.
 
 ## Estructura
 
@@ -50,11 +61,6 @@ La app local ya tiene `.env.local` con la configuración pública de Firebase. E
 
 Firebase CLI, GCloud CLI y ADC quedaron autenticados con `juancamilo.sarmiento@gmail.com`.
 
-La primera cuenta de facturación abierta (`01535C-22D39F-1D84A8`) no pudo vincularse porque Google devolvió `Cloud billing quota exceeded`. Para activar Maps Platform, Vertex AI y rutas con costo hace falta una de estas dos opciones:
-
-- Pedir aumento de cuota de billing para esa cuenta.
-- Confirmar que se use otra cuenta de facturación abierta.
-
 Comandos útiles:
 
 ```bash
@@ -63,4 +69,4 @@ gcloud auth login
 gcloud billing accounts list
 ```
 
-Luego se podrán activar Maps/Vertex AI y añadir Cloud Functions.
+Siguientes pasos: añadir Auth real en frontend, persistencia Firestore, Functions y llamadas controladas a Vertex AI / Maps Routes.
