@@ -164,6 +164,7 @@ export const initialOptions = [
     targetGroup: 'family',
     aiScore: 88,
     map: { x: 47, y: 56 },
+    coords: { lat: 40.418, lng: -3.7045 },
     highlights: [
       'Dentro de presupuesto',
       'Cocina y apartamentos completos',
@@ -191,6 +192,7 @@ export const initialOptions = [
     targetGroup: 'family',
     aiScore: 86,
     map: { x: 45, y: 50 },
+    coords: { lat: 40.4252, lng: -3.7028 },
     highlights: [
       'Cumple presupuesto',
       'Toda la familia junta',
@@ -218,6 +220,7 @@ export const initialOptions = [
     targetGroup: 'family',
     aiScore: 71,
     map: { x: 48, y: 57 },
+    coords: { lat: 40.417, lng: -3.7038 },
     highlights: ['Muy céntrico', 'Buena calificación inicial'],
     cautions: ['Supera presupuesto', 'Menos reseñas históricas'],
   },
@@ -240,6 +243,7 @@ export const initialOptions = [
     targetGroup: 'f1',
     aiScore: 95,
     map: { x: 72, y: 33 },
+    coords: { lat: 40.4625, lng: -3.6155 },
     highlights: [
       'Solo subgrupo F1',
       'Debe coordinarse con transporte y horarios',
@@ -266,6 +270,7 @@ export const initialOptions = [
     targetGroup: 'non-f1',
     aiScore: 84,
     map: { x: 55, y: 58 },
+    coords: { lat: 40.4153, lng: -3.6844 },
     highlights: [
       'Plan flexible mientras hay F1',
       'Mezcla exterior + cultura',
@@ -292,6 +297,7 @@ export const initialOptions = [
     targetGroup: 'non-f1',
     aiScore: 78,
     map: { x: 64, y: 74 },
+    coords: { lat: 40.2302, lng: -3.5939 },
     highlights: ['Plan completo para Juanfe y Guillermo', 'Día claro mientras los demás van a F1'],
     cautions: ['Más desplazamiento y costo de entradas'],
   },
@@ -314,6 +320,7 @@ export const initialOptions = [
     targetGroup: 'family',
     aiScore: 76,
     map: { x: 46, y: 59 },
+    coords: { lat: 40.4154, lng: -3.7089 },
     highlights: ['Muchas opciones de comida', 'Buena primera noche'],
     cautions: ['Puede estar lleno y no siempre es barato'],
   },

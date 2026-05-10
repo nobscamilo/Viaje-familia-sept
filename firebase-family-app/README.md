@@ -53,9 +53,20 @@ APIs activadas:
 
 - `src/data/trip.js`: datos iniciales de familia, ciudades, opciones e itinerario.
 - `src/services/firebaseClient.js`: inicialización opcional de Firebase por variables de entorno.
+- `src/services/tripRepository.js`: sincronización de opciones y votos con Firestore.
+- `src/services/googleMaps.js`: carga controlada de Google Maps en el navegador.
 - `legacy-current-site/`: copia de la web estática actual como referencia.
 - `firebase.json`: configuración de Hosting y Firestore.
 - `firestore.rules`: reglas iniciales para colaboración familiar autenticada.
+
+## Funcionalidad actual
+
+- Login con Google.
+- Si no hay sesión, la app funciona como demo local.
+- Si hay sesión, se sincronizan opciones, votos y estado de retirar/restaurar en Firestore.
+- Las opciones base se siembran automáticamente en Firestore cuando entra el primer usuario.
+- Mapa real de Google Maps con marcadores y líneas hacia IFEMA / MADRING cuando existe `VITE_GOOGLE_MAPS_BROWSER_KEY`.
+- Fallback visual si Google Maps no carga.
 
 ## Pendiente de enlazar
 

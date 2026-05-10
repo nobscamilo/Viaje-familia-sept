@@ -1,11 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarDays,
   CheckCircle2,
   CircleDollarSign,
+  CloudOff,
   Heart,
   Home,
   Landmark,
+  Loader2,
+  LogIn,
+  LogOut,
   MapPinned,
   Plane,
   Plus,
@@ -24,7 +28,24 @@ import {
   itineraryDraft,
   tripSegments,
 } from './data/trip'
-import { getFirebaseStatus } from './services/firebaseClient'
+import {
+  firebaseAuth,
+  getFirebaseStatus,
+  googleProvider,
+  isFirebaseConfigured,
+} from './services/firebaseClient'
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
+import { hasMapsKey, loadGoogleMaps } from './services/googleMaps'
+import {
+  canUseFirestore,
+  saveOptionVotes,
+  saveTripOption,
+  saveUserProfile,
+  seedInitialTripOptions,
+  subscribeTripOptions,
+  subscribeVotes,
+  updateTripOptionStatus,
+} from './services/tripRepository'
 
 const tabs = [
   { id: 'lodging', icon: Home },
@@ -40,6 +61,8 @@ const targetLabels = {
 }
 
 const cityFilters = ['Todas', 'Madrid', 'París', 'España por decidir']
+
+const ifemaCoords = { lat: 40.4625, lng: -3.6155 }
 
 const fallbackImages = {
   lodging:
@@ -78,6 +101,10 @@ function fallbackImage(option) {
   return fallbackImages[option.category] || fallbackImages.activities
 }
 
+function memberName(memberId) {
+  return familyMembers.find((member) => member.id === memberId)?.name || 'Familiar'
+}
+
 function scoreDraft(draft) {
   let score = 64
   if (draft.category === 'lodging') score += 8
@@ -113,6 +140,7 @@ function buildDraftOption(draft) {
     targetGroup: draft.targetGroup,
     aiScore: scoreDraft(draft),
     map: { x: 58, y: 48 },
+    coords: null,
     highlights: [
       draft.notes.trim() || 'Pendiente de extracción automática del link',
       'La IA deberá revisar fotos, precio, ubicación y tiempos reales',
@@ -126,6 +154,13 @@ function App() {
   const [selectedCity, setSelectedCity] = useState('Todas')
   const [activeMember, setActiveMember] = useState('camilo')
   const [showRemoved, setShowRemoved] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [authReady, setAuthReady] = useState(!isFirebaseConfigured)
+  const [syncStatus, setSyncStatus] = useState({
+    label: 'Sincronizando',
+    detail: 'Conectando opciones y votos familiares...',
+    online: true,
+  })
   const [options, setOptions] = useState(initialOptions)
   const [votes, setVotes] = useState({
     'lodging-m': ['camilo'],
@@ -142,9 +177,86 @@ function App() {
   })
 
   const firebaseStatus = getFirebaseStatus()
+  const canSync = Boolean(currentUser && canUseFirestore())
+  const displayedSyncStatus = currentUser
+    ? syncStatus
+    : {
+        label: isFirebaseConfigured ? 'Sin sesión' : 'Modo local',
+        detail: isFirebaseConfigured
+          ? 'Inicia sesión para sincronizar sugerencias y votos.'
+          : 'Configura Firebase para activar colaboración.',
+        online: false,
+      }
   const activeCategory = categoryConfig[activeTab]
   const f1Crew = familyMembers.filter((member) => member.group === 'f1')
   const familyCrew = familyMembers.filter((member) => member.group !== 'f1')
+
+  useEffect(() => {
+    if (!firebaseAuth) return undefined
+
+    return onAuthStateChanged(firebaseAuth, (user) => {
+      setCurrentUser(user)
+      setAuthReady(true)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!currentUser || !canUseFirestore()) {
+      return undefined
+    }
+
+    let active = true
+    saveUserProfile(currentUser, activeMember)
+      .then(() => seedInitialTripOptions(currentUser))
+      .catch((error) => {
+        if (!active) return
+        setSyncStatus({
+          label: 'Revisar permisos',
+          detail: error.message,
+          online: false,
+        })
+      })
+
+    const unsubscribeOptions = subscribeTripOptions(
+      (nextOptions) => {
+        if (!active) return
+        if (nextOptions.length) setOptions(nextOptions)
+        setSyncStatus({
+          label: 'Sincronizado',
+          detail: currentUser.email || 'Sesión activa',
+          online: true,
+        })
+      },
+      (error) => {
+        if (!active) return
+        setSyncStatus({
+          label: 'Sin conexión',
+          detail: error.message,
+          online: false,
+        })
+      },
+    )
+
+    const unsubscribeVotes = subscribeVotes(
+      (nextVotes) => {
+        if (active) setVotes(nextVotes)
+      },
+      (error) => {
+        if (!active) return
+        setSyncStatus({
+          label: 'Votos locales',
+          detail: error.message,
+          online: false,
+        })
+      },
+    )
+
+    return () => {
+      active = false
+      unsubscribeOptions()
+      unsubscribeVotes()
+    }
+  }, [activeMember, currentUser])
 
   const visibleOptions = useMemo(() => {
     return options
@@ -185,10 +297,38 @@ function App() {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
-  function addOption(event) {
+  async function handleSignIn() {
+    if (!firebaseAuth || !googleProvider) return
+
+    try {
+      await signInWithPopup(firebaseAuth, googleProvider)
+    } catch (error) {
+      setSyncStatus({
+        label: 'Login pendiente',
+        detail: error.message,
+        online: false,
+      })
+    }
+  }
+
+  async function handleSignOut() {
+    if (!firebaseAuth) return
+    await signOut(firebaseAuth)
+    setOptions(initialOptions)
+    setVotes({
+      'lodging-m': ['camilo'],
+      'lodging-b': ['juliana-novia'],
+      'activity-retiro': ['cielo'],
+    })
+  }
+
+  async function addOption(event) {
     event.preventDefault()
     const option = buildDraftOption(draft)
     setOptions((current) => [option, ...current])
+    if (canSync) {
+      await saveTripOption(option, currentUser)
+    }
     setDraft({
       title: '',
       url: '',
@@ -201,13 +341,24 @@ function App() {
   }
 
   function toggleVote(optionId) {
+    const currentVotes = votes[optionId] || []
+    const nextVotes = currentVotes.includes(activeMember)
+      ? currentVotes.filter((memberId) => memberId !== activeMember)
+      : [...currentVotes, activeMember]
+
     setVotes((current) => {
-      const currentVotes = current[optionId] || []
-      const nextVotes = currentVotes.includes(activeMember)
-        ? currentVotes.filter((memberId) => memberId !== activeMember)
-        : [...currentVotes, activeMember]
       return { ...current, [optionId]: nextVotes }
     })
+
+    if (canSync) {
+      saveOptionVotes(optionId, nextVotes, currentUser).catch((error) => {
+        setSyncStatus({
+          label: 'Voto local',
+          detail: error.message,
+          online: false,
+        })
+      })
+    }
   }
 
   function removeOption(optionId) {
@@ -216,6 +367,15 @@ function App() {
         option.id === optionId ? { ...option, status: 'removed' } : option,
       ),
     )
+    if (canSync) {
+      updateTripOptionStatus(optionId, 'removed', currentUser).catch((error) => {
+        setSyncStatus({
+          label: 'Cambio local',
+          detail: error.message,
+          online: false,
+        })
+      })
+    }
   }
 
   function restoreOption(optionId) {
@@ -224,6 +384,15 @@ function App() {
         option.id === optionId ? { ...option, status: 'active' } : option,
       ),
     )
+    if (canSync) {
+      updateTripOptionStatus(optionId, 'active', currentUser).catch((error) => {
+        setSyncStatus({
+          label: 'Cambio local',
+          detail: error.message,
+          online: false,
+        })
+      })
+    }
   }
 
   return (
@@ -233,9 +402,39 @@ function App() {
           <p className="eyebrow">Viaje familiar septiembre 2026</p>
           <h1>Plan familiar Madrid y siguientes ciudades</h1>
         </div>
-        <div className={`firebase-pill ${firebaseStatus.ready ? 'ready' : ''}`}>
-          <CheckCircle2 size={18} aria-hidden="true" />
-          <span>{firebaseStatus.label}</span>
+        <div className="status-stack">
+          <div className={`firebase-pill ${firebaseStatus.ready ? 'ready' : ''}`}>
+            <CheckCircle2 size={18} aria-hidden="true" />
+            <span>{firebaseStatus.label}</span>
+          </div>
+          <div className={`sync-pill ${displayedSyncStatus.online ? 'ready' : ''}`}>
+            {displayedSyncStatus.online ? (
+              <CheckCircle2 size={18} aria-hidden="true" />
+            ) : (
+              <CloudOff size={18} aria-hidden="true" />
+            )}
+            <span>{displayedSyncStatus.label}</span>
+          </div>
+          {currentUser ? (
+            <button className="auth-button" onClick={handleSignOut} type="button">
+              <LogOut size={17} aria-hidden="true" />
+              Salir
+            </button>
+          ) : (
+            <button
+              className="auth-button primary"
+              disabled={!authReady || !isFirebaseConfigured}
+              onClick={handleSignIn}
+              type="button"
+            >
+              {authReady ? (
+                <LogIn size={17} aria-hidden="true" />
+              ) : (
+                <Loader2 size={17} aria-hidden="true" />
+              )}
+              Entrar con Google
+            </button>
+          )}
         </div>
       </header>
 
@@ -257,6 +456,17 @@ function App() {
           <h2>9 viajeros</h2>
           <span>{f1Crew.length} van a F1, {familyCrew.length} necesitan planes alternos</span>
         </article>
+      </section>
+
+      <section className="collab-strip" aria-label="Estado de colaboración">
+        <div>
+          <p className="eyebrow">Colaboración familiar</p>
+          <h2>{displayedSyncStatus.detail}</h2>
+        </div>
+        <div className="collab-actions">
+          <span>{currentUser ? currentUser.displayName || currentUser.email : 'Sin sesión'}</span>
+          <strong>Votando como {memberName(activeMember)}</strong>
+        </div>
       </section>
 
       <section className="workspace">
@@ -385,27 +595,7 @@ function App() {
               <h2>Madrid: opciones y planes</h2>
             </div>
           </div>
-          <div className="map-stage" aria-label="Mapa conceptual de Madrid">
-            <div className="route-line route-one" />
-            <div className="route-line route-two" />
-            <div className="ifema-pin">
-              <Plane size={16} aria-hidden="true" />
-              <span>IFEMA</span>
-            </div>
-            {mapOptions.map((option) => (
-              <a
-                className={`map-pin ${option.category}`}
-                href={option.url || '#'}
-                key={option.id}
-                rel="noreferrer"
-                style={{ left: `${option.map.x}%`, top: `${option.map.y}%` }}
-                target={option.url ? '_blank' : undefined}
-                title={option.title}
-              >
-                {option.code}
-              </a>
-            ))}
-          </div>
+          <MadridMap options={mapOptions} />
         </section>
       </section>
 
@@ -507,6 +697,135 @@ function App() {
         </div>
       </section>
     </main>
+  )
+}
+
+function MadridMap({ options }) {
+  const mapRef = useRef(null)
+  const [mapError, setMapError] = useState('')
+  const hasRealMap = hasMapsKey() && options.some((option) => option.coords)
+
+  useEffect(() => {
+    if (!hasRealMap || !mapRef.current) return undefined
+
+    let cancelled = false
+    let map
+    const mapItems = []
+
+    loadGoogleMaps()
+      .then((google) => {
+        if (cancelled || !mapRef.current) return
+
+        map = new google.maps.Map(mapRef.current, {
+          center: ifemaCoords,
+          zoom: 12,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false,
+          clickableIcons: false,
+          styles: [
+            {
+              featureType: 'poi.business',
+              stylers: [{ visibility: 'off' }],
+            },
+          ],
+        })
+
+        const bounds = new google.maps.LatLngBounds()
+        const infoWindow = new google.maps.InfoWindow()
+        const ifemaPosition = new google.maps.LatLng(ifemaCoords.lat, ifemaCoords.lng)
+
+        const ifemaMarker = new google.maps.Marker({
+          map,
+          position: ifemaPosition,
+          title: 'IFEMA / MADRING',
+          label: 'F1',
+        })
+        mapItems.push(ifemaMarker)
+        bounds.extend(ifemaPosition)
+
+        options
+          .filter((option) => option.coords)
+          .forEach((option) => {
+            const position = new google.maps.LatLng(option.coords.lat, option.coords.lng)
+            const marker = new google.maps.Marker({
+              map,
+              position,
+              title: option.title,
+              label: option.code,
+            })
+            const line = new google.maps.Polyline({
+              map,
+              path: [position, ifemaPosition],
+              geodesic: true,
+              strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
+              strokeOpacity: 0.55,
+              strokeWeight: 3,
+            })
+
+            marker.addListener('click', () => {
+              infoWindow.setContent(
+                `<strong>${option.title}</strong><br>${option.transit}<br>${option.aiScore}/100`,
+              )
+              infoWindow.open({ anchor: marker, map })
+            })
+
+            mapItems.push(marker, line)
+            bounds.extend(position)
+          })
+
+        map.fitBounds(bounds, 42)
+      })
+      .catch((error) => {
+        if (!cancelled) setMapError(error.message)
+      })
+
+    return () => {
+      cancelled = true
+      mapItems.forEach((item) => item.setMap(null))
+      map = null
+    }
+  }, [hasRealMap, options])
+
+  if (!hasRealMap || mapError) {
+    return <ConceptMap mapOptions={options} note={mapError} />
+  }
+
+  return (
+    <div className="real-map-wrap">
+      <div className="google-map" ref={mapRef} />
+      <div className="map-caption">
+        <CheckCircle2 size={16} aria-hidden="true" />
+        <span>Mapa real con marcadores y líneas hacia IFEMA / MADRING</span>
+      </div>
+    </div>
+  )
+}
+
+function ConceptMap({ mapOptions, note }) {
+  return (
+    <div className="map-stage" aria-label="Mapa conceptual de Madrid">
+      <div className="route-line route-one" />
+      <div className="route-line route-two" />
+      <div className="ifema-pin">
+        <Plane size={16} aria-hidden="true" />
+        <span>IFEMA</span>
+      </div>
+      {mapOptions.map((option) => (
+        <a
+          className={`map-pin ${option.category}`}
+          href={option.url || '#'}
+          key={option.id}
+          rel="noreferrer"
+          style={{ left: `${option.map.x}%`, top: `${option.map.y}%` }}
+          target={option.url ? '_blank' : undefined}
+          title={option.title}
+        >
+          {option.code}
+        </a>
+      ))}
+      {note ? <span className="map-note">{note}</span> : null}
+    </div>
   )
 }
 

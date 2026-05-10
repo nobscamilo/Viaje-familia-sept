@@ -9,9 +9,9 @@
 
 ## Fase 2: Colaboración real
 
-- Guardar nuevas sugerencias en `tripOptions`.
-- Permitir votos por usuario en `votes`.
-- Marcar opciones como `active`, `pending` o `removed`.
+- Guardar nuevas sugerencias en `tripOptions`. Listo en primera versión.
+- Permitir votos por familiar en `votes`. Listo en primera versión.
+- Marcar opciones como `active`, `pending` o `removed`. Listo en primera versión.
 - Panel simple de aprobación para Camilo.
 
 ## Fase 3: IA
@@ -26,7 +26,7 @@
 
 - Geocoding para direcciones.
 - Routes API para tiempos reales.
-- Map JavaScript API para marcadores y rutas.
+- Map JavaScript API para marcadores y líneas hacia IFEMA. Listo en primera versión.
 - Itinerarios por día con trayectos validados.
 - API key de navegador creada con restricciones por dominio y por APIs de Maps.
 
