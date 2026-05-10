@@ -17,6 +17,17 @@ const mapsApiKey = defineSecret('GOOGLE_MAPS_API_KEY')
 const db = getFirestore()
 
 const ifemaCoords = { latitude: 40.4625, longitude: -3.6155 }
+const cityCenters = {
+  madrid: ifemaCoords,
+  barcelona: { latitude: 41.3874, longitude: 2.1686 },
+  valencia: { latitude: 39.4699, longitude: -0.3763 },
+  sevilla: { latitude: 37.3891, longitude: -5.9845 },
+  paris: { latitude: 48.8566, longitude: 2.3522 },
+  lisboa: { latitude: 38.7223, longitude: -9.1393 },
+  bilbao: { latitude: 43.263, longitude: -2.935 },
+  granada: { latitude: 37.1773, longitude: -3.5986 },
+  malaga: { latitude: 36.7213, longitude: -4.4214 },
+}
 const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT
 const vertexLocation = process.env.VERTEX_LOCATION || 'europe-west1'
 const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
@@ -235,6 +246,17 @@ function slug(value) {
     .slice(0, 48)
 }
 
+function cityKey(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function destinationForCity(city) {
+  return cityCenters[cityKey(city)] || ifemaCoords
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, Number(value) || min))
 }
@@ -281,6 +303,66 @@ function extractPriceCandidates(text) {
   return [...new Set(prices.filter(Boolean))].slice(0, 10)
 }
 
+function collectStructuredPrices(value, results = []) {
+  if (results.length >= 20 || value === null || value === undefined) return results
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectStructuredPrices(item, results))
+    return results
+  }
+
+  if (typeof value !== 'object') return results
+
+  Object.entries(value).forEach(([key, item]) => {
+    const priceKey = /price|amount|cost|fare|rate/i.test(key)
+
+    if (priceKey && (typeof item === 'string' || typeof item === 'number')) {
+      const direct = normalizePriceNumber(String(item))
+      if (direct && direct >= 20 && direct <= 100000) {
+        results.push(direct)
+      }
+      results.push(...extractPriceCandidates(String(item)))
+      return
+    }
+
+    collectStructuredPrices(item, results)
+  })
+
+  return results
+}
+
+function isOpaqueTravelPlatform(url) {
+  const raw = cleanText(url)
+  const host = (raw.includes('://') ? hostname(raw) : raw).toLowerCase()
+  return [
+    'airbnb.',
+    'booking.',
+    'expedia.',
+    'google.',
+    'hotels.',
+    'kayak.',
+    'omio.',
+    'skyscanner.',
+    'travel.google',
+    'trivago.',
+    'vrbo.',
+  ].some((pattern) => host.includes(pattern))
+}
+
+function extractUrlPriceCandidates(url) {
+  try {
+    const parsed = new URL(cleanText(url))
+    const bookingPriceBlocks = parsed.searchParams.getAll('sr_pri_blocks').join('_')
+    const bookingMatches = [...bookingPriceBlocks.matchAll(/__(\d{4,})/g)]
+      .map((match) => Math.round(Number(match[1]) / 100))
+      .filter((value) => Number.isFinite(value) && value >= 20 && value <= 100000)
+
+    return [...new Set(bookingMatches)].slice(0, 5)
+  } catch {
+    return []
+  }
+}
+
 function inferNights(dates) {
   const parsed = parseTripDates(dates)
   if (!parsed.checkin || !parsed.checkout) return 4
@@ -302,9 +384,15 @@ function inferPrices(input, metadata = {}) {
     }
   }
 
+  const opaquePlatform = isOpaqueTravelPlatform(input.url || metadata.host || metadata.siteName)
+  const urlCandidates = extractUrlPriceCandidates(input.url)
+  const manualTextCandidates = extractPriceCandidates(`${input.title} ${input.notes}`)
+  const structuredCandidates = metadata.structuredPriceCandidates || []
   const candidates = [
-    ...(metadata.priceCandidates || []),
-    ...extractPriceCandidates(`${input.title} ${input.notes} ${metadata.title || ''} ${metadata.description || ''}`),
+    ...urlCandidates,
+    ...structuredCandidates,
+    ...(opaquePlatform ? [] : metadata.priceCandidates || []),
+    ...manualTextCandidates,
   ].filter(Boolean)
   if (!candidates.length) {
     return { priceTotal: null, priceNight: null, confidence: 'missing' }
@@ -316,7 +404,7 @@ function inferPrices(input, metadata = {}) {
   const lowest = sorted[0]
 
   if (input.category === 'lodging') {
-    const likelyTotal = highest >= 900 || sorted.length > 1 ? highest : null
+    const likelyTotal = highest >= 900 ? highest : null
     const likelyNight = likelyTotal ? Math.round(likelyTotal / nights) : lowest
     return {
       priceTotal: likelyTotal || Math.round(likelyNight * nights),
@@ -353,6 +441,8 @@ function getMapsKey() {
 
 async function extractMetadata(url) {
   if (!url) return {}
+  const host = hostname(url)
+  const opaquePlatform = isOpaqueTravelPlatform(url)
 
   try {
     const response = await fetch(url, {
@@ -366,6 +456,8 @@ async function extractMetadata(url) {
 
     if (!response.ok) {
       return {
+        host,
+        siteName: host,
         sourceStatus: response.status,
         sourceNote: `La página respondió HTTP ${response.status}`,
       }
@@ -382,34 +474,41 @@ async function extractMetadata(url) {
       $('meta[property="og:image"]').attr('content') ||
       $('meta[name="twitter:image"]').attr('content') ||
       ''
-    const siteName = $('meta[property="og:site_name"]').attr('content') || hostname(url)
-    const jsonLdPrices = $('script[type="application/ld+json"]')
+    const siteName = $('meta[property="og:site_name"]').attr('content') || host
+    const structuredPriceCandidates = $('script[type="application/ld+json"]')
       .map((_, node) => {
         try {
-          return extractPriceCandidates($(node).text())
+          return collectStructuredPrices(JSON.parse($(node).text().trim()))
         } catch {
           return []
         }
       })
       .get()
       .flat()
-    const visiblePriceText = $('body').text().replace(/\s+/g, ' ').slice(0, 80_000)
+    const visiblePriceText = opaquePlatform
+      ? ''
+      : $('body').text().replace(/\s+/g, ' ').slice(0, 80_000)
     const priceCandidates = [
-      ...jsonLdPrices,
+      ...structuredPriceCandidates,
       ...extractPriceCandidates(visiblePriceText),
-      ...extractPriceCandidates(`${title} ${description}`),
+      ...(opaquePlatform ? [] : extractPriceCandidates(`${title} ${description}`)),
     ]
 
     return {
+      host,
       title: cleanText(title).replace(/\s+/g, ' '),
       description: cleanText(description).replace(/\s+/g, ' '),
       image: cleanUrl(image),
-      siteName: cleanText(siteName, hostname(url)),
+      siteName: cleanText(siteName, host),
+      structuredPriceCandidates: [...new Set(structuredPriceCandidates.filter(Boolean))].slice(0, 10),
       priceCandidates: [...new Set(priceCandidates.filter(Boolean))].slice(0, 10),
+      priceCandidateSource: opaquePlatform ? 'structured-only' : 'page-visible',
       sourceStatus: response.status,
     }
   } catch (error) {
     return {
+      host,
+      siteName: host,
       sourceStatus: 'unavailable',
       sourceNote: error.message,
     }
@@ -469,7 +568,7 @@ function normalizePlace(place) {
   }
 }
 
-async function computeRoute(origin, travelMode) {
+async function computeRoute(origin, travelMode, destination = ifemaCoords) {
   const key = getMapsKey()
   if (!key || !origin?.lat || !origin?.lng) return null
 
@@ -492,7 +591,7 @@ async function computeRoute(origin, travelMode) {
       },
       destination: {
         location: {
-          latLng: ifemaCoords,
+          latLng: destination,
         },
       },
       travelMode,
@@ -516,12 +615,12 @@ async function computeRoute(origin, travelMode) {
   }
 }
 
-async function computeRoutes(origin) {
+async function computeRoutes(origin, destination = ifemaCoords) {
   const modes = ['TRANSIT', 'WALK', 'DRIVE']
   const results = await Promise.all(
     modes.map(async (mode) => {
       try {
-        return [mode, await computeRoute(origin, mode)]
+        return [mode, await computeRoute(origin, mode, destination)]
       } catch {
         return [mode, null]
       }
@@ -685,6 +784,10 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user, code
   const title = cleanText(analysis.title, input.title || metadata.title || 'Nueva opción')
   const id = `${input.category}-${slug(title)}-${createdAt}`
   const prices = inferPrices(input, metadata)
+  const analysisNight = cleanNumber(analysis.priceNight)
+  const analysisTotal = cleanNumber(analysis.priceTotal)
+  const safePriceNight = prices.priceNight || (prices.confidence === 'missing' ? null : analysisNight)
+  const safePriceTotal = prices.priceTotal || (prices.confidence === 'missing' ? null : analysisTotal)
 
   return stripUndefined({
     id,
@@ -696,8 +799,8 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user, code
     status: input.isAdultContributor ? 'active' : 'pending',
     url: input.url,
     image: metadata.image || '',
-    priceNight: analysis.priceNight ?? prices.priceNight ?? null,
-    priceTotal: analysis.priceTotal ?? prices.priceTotal ?? null,
+    priceNight: safePriceNight,
+    priceTotal: safePriceTotal,
     priceConfidence: prices.confidence,
     rating: cleanText(analysis.rating, 'Pendiente'),
     reviews: analysis.reviews ?? null,
@@ -859,7 +962,8 @@ export const analyzeTripOption = onCall(functionOptions, async (request) => {
     .join(' ')
   const rawPlaces = await searchPlaces(placeQuery, 1).catch(() => [])
   const place = rawPlaces[0] ? normalizePlace(rawPlaces[0]) : null
-  const routes = place?.location ? await computeRoutes(place.location) : {}
+  const routeDestination = destinationForCity(input.city)
+  const routes = place?.location ? await computeRoutes(place.location, routeDestination) : {}
   const fallback = buildFallbackAnalysis(input, metadata, place, routes)
   const prompt = `
 Eres el copiloto IA del viaje familiar de Camilo a Madrid/F1 2026.
@@ -870,7 +974,7 @@ Contexto fijo:
 - Madrid/F1: 10 al 14 de septiembre de 2026.
 - Presupuesto hospedaje orientativo: 300 a 600 EUR/noche total.
 - Prioridad: alojamiento completo, logística fácil con niños, espacios comunes, ruta razonable a IFEMA/MADRING.
-- Si hay precio manual o candidatos de precio, úsalo. Si no hay precio visible, deja priceNight y priceTotal en null y ponlo como duda.
+- No inventes precios. Solo llena priceNight y priceTotal si input.priceNight/input.priceTotal o metadata.priceCandidates traen una cifra explícita; si no hay precio visible, deja ambos en null y ponlo como duda.
 
 Analiza esta opción y responde SOLO el JSON del esquema:
 ${JSON.stringify({ input, metadata, place, routes })}

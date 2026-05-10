@@ -65,6 +65,7 @@ import {
   subscribeTravelCities,
   subscribeTravelGroups,
   subscribeVotes,
+  updateTravelCityStatus,
   updateTripOptionStatus,
 } from './services/tripRepository'
 
@@ -84,6 +85,83 @@ const targetLabels = {
 }
 
 const ifemaCoords = { lat: 40.4625, lng: -3.6155 }
+
+const obviousCityDefaults = {
+  madrid: {
+    country: 'España',
+    transfer: 'Vuelo internacional o tren según origen',
+    angle: 'Base para F1, museos, parques y comida familiar',
+    coords: { lat: 40.4168, lng: -3.7038 },
+  },
+  barcelona: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE desde Madrid',
+    angle: 'Ciudad, playa, arquitectura y tren desde Madrid',
+    coords: { lat: 41.3874, lng: 2.1686 },
+  },
+  valencia: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE desde Madrid',
+    angle: 'Ciudad de las Artes, playa y ritmo familiar',
+    coords: { lat: 39.4699, lng: -0.3763 },
+  },
+  sevilla: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE desde Madrid',
+    angle: 'Centro histórico, comida y tren cómodo',
+    coords: { lat: 37.3891, lng: -5.9845 },
+  },
+  paris: {
+    country: 'Francia',
+    dates: 'Posible 14-19 sep',
+    transfer: 'Tren o vuelo desde Madrid',
+    angle: 'Museos, paseo urbano y parques para niños',
+    coords: { lat: 48.8566, lng: 2.3522 },
+  },
+  lisboa: {
+    country: 'Portugal',
+    dates: 'Flexible',
+    transfer: 'Vuelo o tren/bus desde Madrid',
+    angle: 'Miradores, tranvías y ritmo familiar',
+    coords: { lat: 38.7223, lng: -9.1393 },
+  },
+  bilbao: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'Vuelo, tren o coche desde Madrid',
+    angle: 'Guggenheim, comida y ciudad caminable',
+    coords: { lat: 43.263, lng: -2.935 },
+  },
+  granada: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE o coche desde Madrid',
+    angle: 'Alhambra, centro histórico y tapas',
+    coords: { lat: 37.1773, lng: -3.5986 },
+  },
+  malaga: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE desde Madrid',
+    angle: 'Playa, centro histórico y plan suave con niños',
+    coords: { lat: 36.7213, lng: -4.4214 },
+  },
+}
+
+const citySuggestionNames = [
+  'Madrid',
+  'Barcelona',
+  'Valencia',
+  'Sevilla',
+  'París',
+  'Lisboa',
+  'Bilbao',
+  'Granada',
+  'Málaga',
+]
 
 const routeModes = {
   TRANSIT: {
@@ -123,6 +201,14 @@ function getHostname(url) {
   } catch {
     return 'link pendiente'
   }
+}
+
+function cityKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function displayImage(url) {
@@ -202,7 +288,47 @@ function buildCityDraft(draft) {
     dates: draft.dates.trim() || 'Fechas por definir',
     transfer: draft.transfer.trim() || 'Traslado por definir',
     angle: draft.angle.trim() || 'Pendiente de analizar con IA',
+    coords: draft.coords || obviousCityDefaults[cityKey(draft.city)]?.coords || null,
     readiness: 18,
+    status: 'active',
+  }
+}
+
+function cityCenter(city, travelCities) {
+  if (city === 'Todas') return { city: 'Madrid', coords: ifemaCoords }
+  const fromTravel = travelCities.find((item) => item.city === city && item.status !== 'removed')
+  return {
+    city,
+    coords:
+      fromTravel?.coords ||
+      obviousCityDefaults[cityKey(city)]?.coords ||
+      (city === 'Madrid' ? ifemaCoords : null),
+  }
+}
+
+function priceBreakdown(option, nights = 4) {
+  const priceNight = option.priceConfidence === 'missing' ? null : option.priceNight
+  const priceTotal = option.priceConfidence === 'missing' ? null : option.priceTotal
+
+  if (option.category === 'lodging') {
+    const total = priceTotal || (priceNight ? priceNight * nights : null)
+    const nightly = priceNight || (total ? Math.round(total / nights) : null)
+    return {
+      primary: nightly ? `${currency(nightly)} / noche` : 'Precio/noche por estimar',
+      secondary: total ? `${currency(total)} total` : 'Total por estimar',
+    }
+  }
+
+  if (option.category === 'transport' || option.budgetMode === 'perPerson') {
+    return {
+      primary: priceNight ? `${currency(priceNight)} / persona` : 'Precio/persona por estimar',
+      secondary: priceTotal ? `${currency(priceTotal)} total` : 'Total por estimar',
+    }
+  }
+
+  return {
+    primary: priceTotal ? `${currency(priceTotal)} total` : currency(priceNight),
+    secondary: priceNight && priceTotal ? `${currency(priceNight)} referencia` : '',
   }
 }
 
@@ -371,18 +497,20 @@ function travelerCountForOption(option, profile, f1Count) {
 
 function optionBudget(option, profile, f1Count, nights) {
   const travelers = travelerCountForOption(option, profile, f1Count)
+  const priceNight = option.priceConfidence === 'missing' ? null : option.priceNight
+  const priceTotal = option.priceConfidence === 'missing' ? null : option.priceTotal
   let total
   let perPerson
 
   if (option.category === 'lodging') {
-    total = option.priceTotal || (option.priceNight ? option.priceNight * nights : null)
+    total = priceTotal || (priceNight ? priceNight * nights : null)
     perPerson = total ? total / travelers : null
   } else if (option.category === 'transport' || option.budgetMode === 'perPerson') {
-    perPerson = option.priceNight || (option.priceTotal ? option.priceTotal / travelers : null)
-    total = perPerson ? perPerson * travelers : option.priceTotal || null
+    perPerson = priceNight || (priceTotal ? priceTotal / travelers : null)
+    total = perPerson ? perPerson * travelers : priceTotal || null
   } else {
-    total = option.priceTotal || null
-    perPerson = total ? total / travelers : option.priceNight || null
+    total = priceTotal || null
+    perPerson = total ? total / travelers : priceNight || null
     if (!total && perPerson) total = perPerson * travelers
   }
 
@@ -476,6 +604,7 @@ function App() {
     dates: '',
     transfer: '',
     angle: '',
+    coords: null,
   })
   const [familyProfileDraft, setFamilyProfileDraft] = useState({
     name: '',
@@ -497,6 +626,8 @@ function App() {
   const [itineraryBusy, setItineraryBusy] = useState(false)
   const [generatedItinerary, setGeneratedItinerary] = useState(null)
   const [externalLink, setExternalLink] = useState('')
+  const [externalPriceTotal, setExternalPriceTotal] = useState('')
+  const [externalPriceNight, setExternalPriceNight] = useState('')
   const [externalBusy, setExternalBusy] = useState(false)
   const [budgetOptionIds, setBudgetOptionIds] = useState(['lodging-m'])
   const [transferDraft, setTransferDraft] = useState({
@@ -531,11 +662,16 @@ function App() {
       familyProfiles[0],
     [activeTravelGroupId, travelGroups],
   )
-  const cityFilters = useMemo(
-    () => ['Todas', 'Madrid', ...travelCities.map((idea) => idea.city)]
-      .filter((city, index, list) => city && list.indexOf(city) === index),
+  const activeTravelCities = useMemo(
+    () => travelCities.filter((idea) => idea.status !== 'removed'),
     [travelCities],
   )
+  const cityFilters = useMemo(
+    () => ['Todas', 'Madrid', ...activeTravelCities.map((idea) => idea.city)]
+      .filter((city, index, list) => city && list.indexOf(city) === index),
+    [activeTravelCities],
+  )
+  const effectiveSelectedCity = cityFilters.includes(selectedCity) ? selectedCity : 'Todas'
   const budgetOptions = useMemo(
     () =>
       budgetOptionIds
@@ -657,14 +793,14 @@ function App() {
       .filter((option) => {
         if (option.category !== activeTab) return false
         if (!showRemoved && option.status === 'removed') return false
-        if (selectedCity === 'Todas') return true
-        if (selectedCity === 'España por decidir') {
+        if (effectiveSelectedCity === 'Todas') return true
+        if (effectiveSelectedCity === 'España por decidir') {
           return option.city !== 'Madrid' && option.city !== 'París'
         }
-        return option.city === selectedCity
+        return option.city === effectiveSelectedCity
       })
       .sort((a, b) => b.aiScore - a.aiScore)
-  }, [activeTab, options, selectedCity, showRemoved])
+  }, [activeTab, effectiveSelectedCity, options, showRemoved])
 
   const bestOptions = useMemo(
     () =>
@@ -680,23 +816,52 @@ function App() {
       options.filter(
         (option) =>
           option.status !== 'removed' &&
-          option.city === 'Madrid' &&
+          option.city === (effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity) &&
           option.map &&
           option.category !== 'itinerary',
       ),
-    [options],
+    [effectiveSelectedCity, options],
   )
+  const currentMapCity = cityCenter(effectiveSelectedCity, activeTravelCities)
 
   function updateDraft(field, value) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
   function updateCityDraft(field, value) {
-    setCityDraft((current) => ({ ...current, [field]: value }))
+    setCityDraft((current) => {
+      if (field !== 'city') return { ...current, [field]: value }
+
+      const defaults = obviousCityDefaults[cityKey(value)]
+      if (!defaults) return { ...current, city: value }
+
+      return {
+        ...current,
+        city: value,
+        country: defaults.country || current.country,
+        dates: current.dates || defaults.dates || '',
+        transfer: defaults.transfer || current.transfer,
+        angle: current.angle || defaults.angle,
+        coords: defaults.coords,
+      }
+    })
   }
 
   function updateSearchDraft(field, value) {
     setSearchDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  function selectCityFilter(city) {
+    setSelectedCity(city)
+
+    if (city === 'Todas') return
+
+    setDraft((current) => ({ ...current, city }))
+    setSearchDraft((current) => ({ ...current, city }))
+    setTransferDraft((current) => ({
+      ...current,
+      destination: city === 'Madrid' ? current.destination : city,
+    }))
   }
 
   function updateFamilyProfileDraft(field, value) {
@@ -830,6 +995,8 @@ function App() {
         category: 'lodging',
         city: searchDraft.city,
         targetGroup: 'family',
+        priceTotal: externalPriceTotal,
+        priceNight: externalPriceNight,
         notes: searchDraft.notes,
         dates: searchDraft.dates,
         isAdultContributor: activeContributorIsAdult,
@@ -840,6 +1007,8 @@ function App() {
       if (result.option) {
         setOptions((current) => mergeOption(current, result.option))
         setExternalLink('')
+        setExternalPriceTotal('')
+        setExternalPriceNight('')
         setActiveTab('lodging')
         setAiFeedback({
           tone: 'ready',
@@ -865,16 +1034,49 @@ function App() {
     const city = buildCityDraft(cityDraft)
     setTravelCities((current) => [city, ...current])
     setSelectedCity(city.city)
+    setDraft((current) => ({ ...current, city: city.city }))
+    setSearchDraft((current) => ({
+      ...current,
+      city: city.city,
+      dates: city.dates === 'Fechas por definir' ? current.dates : city.dates,
+    }))
+    setTransferDraft((current) => ({
+      ...current,
+      destination: city.city === 'Madrid' ? current.destination : city.city,
+    }))
     setCityDraft({
       city: '',
       country: '',
       dates: '',
       transfer: '',
       angle: '',
+      coords: null,
     })
 
     if (canSync) {
       await saveTravelCity(city, currentUser)
+    }
+  }
+
+  function removeCity(cityId) {
+    const city = travelCities.find((item) => item.id === cityId)
+    setTravelCities((current) =>
+      current.map((item) =>
+        item.id === cityId ? { ...item, status: 'removed' } : item,
+      ),
+    )
+    if (city?.city === selectedCity) {
+      setSelectedCity('Todas')
+    }
+
+    if (canSync) {
+      updateTravelCityStatus(cityId, 'removed', currentUser).catch((error) => {
+        setSyncStatus({
+          label: 'Ciudad local',
+          detail: error.message,
+          online: false,
+        })
+      })
     }
   }
 
@@ -1253,7 +1455,7 @@ function App() {
     setItineraryBusy(true)
     try {
       const result = await generateItineraryWithAI({
-        city: selectedCity === 'Todas' ? 'Madrid' : selectedCity,
+        city: effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity,
         dates: searchDraft.dates,
         routeMode,
         groupProfile: currentTravelGroup,
@@ -1486,9 +1688,9 @@ function App() {
             <div className="city-filter" aria-label="Filtro por ciudad">
               {cityFilters.map((city) => (
                 <button
-                  className={selectedCity === city ? 'active' : ''}
+                  className={effectiveSelectedCity === city ? 'active' : ''}
                   key={city}
-                  onClick={() => setSelectedCity(city)}
+                  onClick={() => selectCityFilter(city)}
                   type="button"
                 >
                   {city}
@@ -1529,6 +1731,7 @@ function App() {
               onVote={toggleVote}
               options={visibleOptions}
               budgetOptionIds={budgetOptionIds}
+              nights={budgetNights}
               votes={votes}
             />
           )}
@@ -1565,7 +1768,7 @@ function App() {
             <MapPinned size={20} aria-hidden="true" />
             <div>
               <p className="eyebrow">Mapa operativo</p>
-              <h2>Madrid: opciones y planes</h2>
+              <h2>{currentMapCity.city}: opciones y planes</h2>
             </div>
           </div>
           <div className="route-mode-control" aria-label="Modo de ruta">
@@ -1584,7 +1787,12 @@ function App() {
               )
             })}
           </div>
-          <MadridMap options={mapOptions} routeMode={routeMode} />
+          <MadridMap
+            city={currentMapCity.city}
+            destinationCoords={currentMapCity.coords}
+            options={mapOptions}
+            routeMode={routeMode}
+          />
         </section>
       </section>
 
@@ -1725,7 +1933,7 @@ function App() {
           <label>
             <span>Ciudad</span>
             <select
-              onChange={(event) => updateSearchDraft('city', event.target.value)}
+              onChange={(event) => selectCityFilter(event.target.value)}
               value={searchDraft.city}
             >
               {cityFilters.filter((city) => city !== 'Todas').map((city) => (
@@ -1915,6 +2123,26 @@ function App() {
             type="url"
             value={externalLink}
           />
+          <label>
+            <span>Total visto</span>
+            <input
+              min="0"
+              onChange={(event) => setExternalPriceTotal(event.target.value)}
+              placeholder="Ej. 1781"
+              type="number"
+              value={externalPriceTotal}
+            />
+          </label>
+          <label>
+            <span>EUR/noche visto</span>
+            <input
+              min="0"
+              onChange={(event) => setExternalPriceNight(event.target.value)}
+              placeholder="Ej. 445"
+              type="number"
+              value={externalPriceNight}
+            />
+          </label>
           <button className="primary-button compact" disabled={externalBusy} type="submit">
             {externalBusy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
             Analizar link
@@ -1951,7 +2179,7 @@ function App() {
           </div>
         </div>
         <div className="city-grid">
-          {travelCities.map((idea) => (
+          {activeTravelCities.map((idea) => (
             <article key={idea.id}>
               <span>{idea.country}</span>
               <h3>{idea.city}</h3>
@@ -1961,6 +2189,10 @@ function App() {
                 <i style={{ width: `${idea.readiness}%` }} />
               </div>
               <strong>{idea.dates}</strong>
+              <button onClick={() => removeCity(idea.id)} type="button">
+                <Trash2 size={15} aria-hidden="true" />
+                Quitar ciudad
+              </button>
             </article>
           ))}
         </div>
@@ -1968,12 +2200,18 @@ function App() {
           <label>
             <span>Ciudad</span>
             <input
+              list="city-suggestions"
               onChange={(event) => updateCityDraft('city', event.target.value)}
               placeholder="Lisboa, Bilbao..."
               required
               type="text"
               value={cityDraft.city}
             />
+            <datalist id="city-suggestions">
+              {citySuggestionNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </label>
           <label>
             <span>País</span>
@@ -2071,11 +2309,12 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
   )
 }
 
-function MadridMap({ options, routeMode }) {
+function MadridMap({ city, destinationCoords, options, routeMode }) {
   const mapRef = useRef(null)
   const [mapError, setMapError] = useState('')
   const [routeSummaries, setRouteSummaries] = useState({})
-  const hasRealMap = hasMapsKey() && options.some((option) => option.coords)
+  const hasDestination = Boolean(destinationCoords?.lat && destinationCoords?.lng)
+  const hasRealMap = hasMapsKey() && hasDestination
 
   useEffect(() => {
     if (!hasRealMap || !mapRef.current) return undefined
@@ -2090,7 +2329,7 @@ function MadridMap({ options, routeMode }) {
         if (cancelled || !mapRef.current) return
 
         const map = new google.maps.Map(mapRef.current, {
-          center: ifemaCoords,
+          center: destinationCoords,
           zoom: 12,
           mapTypeControl: false,
           fullscreenControl: false,
@@ -2107,16 +2346,17 @@ function MadridMap({ options, routeMode }) {
         const bounds = new google.maps.LatLngBounds()
         const infoWindow = new google.maps.InfoWindow()
         const directionsService = new google.maps.DirectionsService()
-        const ifemaPosition = new google.maps.LatLng(ifemaCoords.lat, ifemaCoords.lng)
+        const destinationPosition = new google.maps.LatLng(destinationCoords.lat, destinationCoords.lng)
+        const isMadrid = city === 'Madrid'
 
-        const ifemaMarker = new google.maps.Marker({
+        const destinationMarker = new google.maps.Marker({
           map,
-          position: ifemaPosition,
-          title: 'IFEMA / MADRING',
-          label: 'F1',
+          position: destinationPosition,
+          title: isMadrid ? 'IFEMA / MADRING' : `Centro de ${city}`,
+          label: isMadrid ? 'F1' : 'C',
         })
-        mapItems.push(ifemaMarker)
-        bounds.extend(ifemaPosition)
+        mapItems.push(destinationMarker)
+        bounds.extend(destinationPosition)
 
         options
           .filter((option) => option.coords)
@@ -2130,7 +2370,7 @@ function MadridMap({ options, routeMode }) {
             })
             const fallbackLine = new google.maps.Polyline({
               map,
-              path: [position, ifemaPosition],
+              path: [position, destinationPosition],
               geodesic: true,
               strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
               strokeOpacity: 0.55,
@@ -2144,7 +2384,7 @@ function MadridMap({ options, routeMode }) {
               [option.id]: {
                 title: option.title,
                 code: option.code,
-                status: option.id === 'f1-madring' ? 'Destino' : 'Calculando...',
+                status: option.id === 'f1-madring' || !isMadrid ? 'Destino de referencia' : 'Calculando...',
               },
             }))
 
@@ -2159,7 +2399,7 @@ function MadridMap({ options, routeMode }) {
               directionsService.route(
                 {
                   origin: position,
-                  destination: ifemaPosition,
+                  destination: destinationPosition,
                   travelMode: google.maps.TravelMode[routeMode],
                 },
                 (result, status) => {
@@ -2220,10 +2460,10 @@ function MadridMap({ options, routeMode }) {
       cancelled = true
       mapItems.forEach((item) => item.setMap(null))
     }
-  }, [hasRealMap, options, routeMode])
+  }, [city, destinationCoords, hasRealMap, options, routeMode])
 
   if (!hasRealMap || mapError) {
-    return <ConceptMap mapOptions={options} note={mapError} />
+    return <ConceptMap city={city} mapOptions={options} note={mapError} />
   }
 
   return (
@@ -2231,7 +2471,9 @@ function MadridMap({ options, routeMode }) {
       <div className="google-map" ref={mapRef} />
       <div className="map-caption">
         <CheckCircle2 size={16} aria-hidden="true" />
-        <span>Rutas en modo {routeModes[routeMode]?.label || 'ruta'} hacia IFEMA / MADRING</span>
+        <span>
+          Rutas en modo {routeModes[routeMode]?.label || 'ruta'} hacia {city === 'Madrid' ? 'IFEMA / MADRING' : `centro de ${city}`}
+        </span>
       </div>
       <div className="route-summary-list">
         {options
@@ -2251,14 +2493,14 @@ function MadridMap({ options, routeMode }) {
   )
 }
 
-function ConceptMap({ mapOptions, note }) {
+function ConceptMap({ city, mapOptions, note }) {
   return (
-    <div className="map-stage" aria-label="Mapa conceptual de Madrid">
+    <div className="map-stage" aria-label={`Mapa conceptual de ${city}`}>
       <div className="route-line route-one" />
       <div className="route-line route-two" />
       <div className="ifema-pin">
         <Plane size={16} aria-hidden="true" />
-        <span>IFEMA</span>
+        <span>{city === 'Madrid' ? 'IFEMA' : city}</span>
       </div>
       {mapOptions.map((option) => (
         <a
@@ -2282,6 +2524,7 @@ function OptionGrid({
   activeCategory,
   activeMember,
   budgetOptionIds,
+  nights,
   onRemove,
   onRestore,
   onToggleBudget,
@@ -2305,6 +2548,7 @@ function OptionGrid({
         const optionVotes = votes[option.id] || []
         const hasVote = optionVotes.includes(activeMember)
         const inBudget = budgetOptionIds.includes(option.id)
+        const price = priceBreakdown(option, nights)
         return (
           <article className={`option-card ${option.status}`} key={option.id}>
             <div className="option-media">
@@ -2323,7 +2567,10 @@ function OptionGrid({
               <div className="metric-row">
                 <span>
                   <CircleDollarSign size={16} aria-hidden="true" />
-                  {currency(option.priceNight)}
+                  <span>
+                    <strong>{price.primary}</strong>
+                    {price.secondary ? <small>{price.secondary}</small> : null}
+                  </span>
                 </span>
                 <span>
                   <Users size={16} aria-hidden="true" />

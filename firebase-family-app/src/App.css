@@ -663,7 +663,7 @@
   flex-wrap: wrap;
 }
 
-.metric-row span {
+.metric-row > span {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
@@ -676,6 +676,26 @@
   font-size: 0.84rem;
   font-weight: 800;
   white-space: normal;
+}
+
+.metric-row > span > span {
+  display: grid;
+  gap: 2px;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.metric-row strong,
+.metric-row small {
+  display: block;
+  line-height: 1.2;
+}
+
+.metric-row small {
+  color: var(--muted);
+  font-size: 0.74rem;
 }
 
 .tag-row {
@@ -1199,7 +1219,7 @@
 
 .external-import {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) repeat(2, minmax(130px, 0.45fr)) auto;
   gap: 12px;
   align-items: end;
   margin-top: 14px;
@@ -1213,10 +1233,22 @@
   margin-top: 12px;
 }
 
+.external-import label {
+  display: grid;
+  gap: 7px;
+}
+
 .external-import strong,
-.external-import p {
+.external-import p,
+.external-import span {
   display: block;
   margin: 0;
+}
+
+.external-import span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .external-import p {
@@ -1460,6 +1492,23 @@
 
 .city-grid strong {
   color: var(--ink);
+}
+
+.city-grid button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 0 10px;
+  color: #7c2d12;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .itinerary-panel {

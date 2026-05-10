@@ -108,7 +108,9 @@ export const cityIdeas = [
     dates: 'Posible 14-19 sep',
     transfer: 'Tren o vuelo desde Madrid',
     angle: 'Museos, paseo urbano y parques para niños',
+    coords: { lat: 48.8566, lng: 2.3522 },
     readiness: 42,
+    status: 'active',
   },
   {
     id: 'barcelona',
@@ -117,7 +119,9 @@ export const cityIdeas = [
     dates: 'Flexible',
     transfer: 'AVE desde Madrid',
     angle: 'Ciudad, playa, arquitectura y tren desde Madrid',
+    coords: { lat: 41.3874, lng: 2.1686 },
     readiness: 36,
+    status: 'active',
   },
   {
     id: 'valencia',
@@ -126,7 +130,9 @@ export const cityIdeas = [
     dates: 'Flexible',
     transfer: 'AVE desde Madrid',
     angle: 'Ciudad de las Artes, playa y ritmo familiar',
+    coords: { lat: 39.4699, lng: -0.3763 },
     readiness: 34,
+    status: 'active',
   },
   {
     id: 'sevilla',
@@ -135,7 +141,9 @@ export const cityIdeas = [
     dates: 'Flexible',
     transfer: 'AVE desde Madrid',
     angle: 'Centro histórico, comida y tren cómodo',
+    coords: { lat: 37.3891, lng: -5.9845 },
     readiness: 31,
+    status: 'active',
   },
 ]
 

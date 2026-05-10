@@ -184,6 +184,16 @@ export async function saveTravelCity(city, user) {
   })
 }
 
+export async function updateTravelCityStatus(cityId, status, user) {
+  if (!canUseFirestore() || !user) return
+
+  await updateDoc(doc(firestoreDb, citiesCollection, cityId), {
+    status,
+    updatedBy: user.uid,
+    updatedAt: serverTimestamp(),
+  })
+}
+
 export async function saveTravelGroup(profile, user) {
   if (!canUseFirestore() || !user) return
 
