@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarDays,
+  Car,
   CheckCircle2,
   CircleDollarSign,
   CloudOff,
+  Footprints,
   Heart,
   Home,
+  Hotel,
   Landmark,
   Loader2,
   LogIn,
@@ -14,8 +17,11 @@ import {
   Plane,
   Plus,
   Route,
+  Search,
+  ShieldCheck,
   Sparkles,
   Trash2,
+  TrainFront,
   Utensils,
   Users,
 } from 'lucide-react'
@@ -39,10 +45,14 @@ import { hasMapsKey, loadGoogleMaps } from './services/googleMaps'
 import {
   canUseFirestore,
   saveOptionVotes,
+  saveSearchRequest,
   saveTripOption,
+  saveTravelCity,
   saveUserProfile,
   seedInitialTripOptions,
+  seedInitialTravelCities,
   subscribeTripOptions,
+  subscribeTravelCities,
   subscribeVotes,
   updateTripOptionStatus,
 } from './services/tripRepository'
@@ -60,9 +70,22 @@ const targetLabels = {
   'non-f1': 'Planes sin F1',
 }
 
-const cityFilters = ['Todas', 'Madrid', 'París', 'España por decidir']
-
 const ifemaCoords = { lat: 40.4625, lng: -3.6155 }
+
+const routeModes = {
+  TRANSIT: {
+    label: 'Transporte público',
+    icon: TrainFront,
+  },
+  WALKING: {
+    label: 'Andando',
+    icon: Footprints,
+  },
+  DRIVING: {
+    label: 'Coche',
+    icon: Car,
+  },
+}
 
 const fallbackImages = {
   lodging:
@@ -102,6 +125,7 @@ function fallbackImage(option) {
 }
 
 function memberName(memberId) {
+  if (memberId === 'juliana-novia') return 'Juliana Bueno'
   return familyMembers.find((member) => member.id === memberId)?.name || 'Familiar'
 }
 
@@ -149,22 +173,66 @@ function buildDraftOption(draft) {
   }
 }
 
+function buildCityDraft(draft) {
+  const slug = draft.city
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  return {
+    id: `${slug || 'ciudad'}-${Date.now()}`,
+    city: draft.city.trim(),
+    country: draft.country.trim() || 'Por definir',
+    dates: draft.dates.trim() || 'Fechas por definir',
+    transfer: draft.transfer.trim() || 'Traslado por definir',
+    angle: draft.angle.trim() || 'Pendiente de analizar con IA',
+    readiness: 18,
+  }
+}
+
+function platformSearchLinks(search) {
+  const city = encodeURIComponent(search.city || 'Madrid')
+  const adults = 6
+  const children = 3
+  const query = encodeURIComponent(`${search.city || 'Madrid'} alojamiento 9 personas`)
+
+  return [
+    {
+      label: 'Booking',
+      url: `https://www.booking.com/searchresults.es.html?ss=${city}&group_adults=${adults}&group_children=${children}`,
+    },
+    {
+      label: 'Airbnb',
+      url: `https://www.airbnb.com/s/${city}/homes?adults=${adults}&children=${children}`,
+    },
+    {
+      label: 'Google Travel',
+      url: `https://www.google.com/travel/search?q=${query}`,
+    },
+  ]
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('lodging')
   const [selectedCity, setSelectedCity] = useState('Todas')
   const [activeMember, setActiveMember] = useState('camilo')
   const [showRemoved, setShowRemoved] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
-  const [authReady, setAuthReady] = useState(!isFirebaseConfigured)
+  const [authReady, setAuthReady] = useState(true)
+  const [routeMode, setRouteMode] = useState('TRANSIT')
   const [syncStatus, setSyncStatus] = useState({
     label: 'Sincronizando',
     detail: 'Conectando opciones y votos familiares...',
     online: true,
   })
   const [options, setOptions] = useState(initialOptions)
+  const [travelCities, setTravelCities] = useState(cityIdeas)
   const [votes, setVotes] = useState({
     'lodging-m': ['camilo'],
-    'lodging-b': ['juliana-novia'],
+    'lodging-b': ['juliana-bueno'],
     'activity-retiro': ['cielo'],
   })
   const [draft, setDraft] = useState({
@@ -175,6 +243,22 @@ function App() {
     targetGroup: 'family',
     notes: '',
   })
+  const [cityDraft, setCityDraft] = useState({
+    city: '',
+    country: '',
+    dates: '',
+    transfer: '',
+    angle: '',
+  })
+  const [searchDraft, setSearchDraft] = useState({
+    city: 'Madrid',
+    dates: '10-14 sep 2026',
+    type: 'lodging',
+    notes: '9 personas, presupuesto 300-600 EUR/noche, buena movilidad familiar',
+  })
+  const [searchResult, setSearchResult] = useState(null)
+  const [places, setPlaces] = useState([])
+  const [placesBusy, setPlacesBusy] = useState(false)
 
   const firebaseStatus = getFirebaseStatus()
   const canSync = Boolean(currentUser && canUseFirestore())
@@ -190,6 +274,11 @@ function App() {
   const activeCategory = categoryConfig[activeTab]
   const f1Crew = familyMembers.filter((member) => member.group === 'f1')
   const familyCrew = familyMembers.filter((member) => member.group !== 'f1')
+  const cityFilters = useMemo(
+    () => ['Todas', 'Madrid', ...travelCities.map((idea) => idea.city)]
+      .filter((city, index, list) => city && list.indexOf(city) === index),
+    [travelCities],
+  )
 
   useEffect(() => {
     if (!firebaseAuth) return undefined
@@ -207,7 +296,12 @@ function App() {
 
     let active = true
     saveUserProfile(currentUser, activeMember)
-      .then(() => seedInitialTripOptions(currentUser))
+      .then(() =>
+        Promise.all([
+          seedInitialTripOptions(currentUser),
+          seedInitialTravelCities(currentUser),
+        ]),
+      )
       .catch((error) => {
         if (!active) return
         setSyncStatus({
@@ -251,10 +345,25 @@ function App() {
       },
     )
 
+    const unsubscribeCities = subscribeTravelCities(
+      (nextCities) => {
+        if (active && nextCities.length) setTravelCities(nextCities)
+      },
+      (error) => {
+        if (!active) return
+        setSyncStatus({
+          label: 'Ciudades locales',
+          detail: error.message,
+          online: false,
+        })
+      },
+    )
+
     return () => {
       active = false
       unsubscribeOptions()
       unsubscribeVotes()
+      unsubscribeCities()
     }
   }, [activeMember, currentUser])
 
@@ -297,6 +406,14 @@ function App() {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function updateCityDraft(field, value) {
+    setCityDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  function updateSearchDraft(field, value) {
+    setSearchDraft((current) => ({ ...current, [field]: value }))
+  }
+
   async function handleSignIn() {
     if (!firebaseAuth || !googleProvider) return
 
@@ -315,9 +432,10 @@ function App() {
     if (!firebaseAuth) return
     await signOut(firebaseAuth)
     setOptions(initialOptions)
+    setTravelCities(cityIdeas)
     setVotes({
       'lodging-m': ['camilo'],
-      'lodging-b': ['juliana-novia'],
+      'lodging-b': ['juliana-bueno'],
       'activity-retiro': ['cielo'],
     })
   }
@@ -338,6 +456,152 @@ function App() {
       notes: '',
     })
     setActiveTab(option.category)
+  }
+
+  async function addCity(event) {
+    event.preventDefault()
+    if (!cityDraft.city.trim()) return
+
+    const city = buildCityDraft(cityDraft)
+    setTravelCities((current) => [city, ...current])
+    setSelectedCity(city.city)
+    setCityDraft({
+      city: '',
+      country: '',
+      dates: '',
+      transfer: '',
+      angle: '',
+    })
+
+    if (canSync) {
+      await saveTravelCity(city, currentUser)
+    }
+  }
+
+  async function createLodgingSearch(event) {
+    event.preventDefault()
+    if (searchDraft.type === 'food') {
+      await findFoodPlaces()
+      return
+    }
+
+    const request = {
+      id: `search-${Date.now()}`,
+      type: searchDraft.type,
+      city: searchDraft.city,
+      dates: searchDraft.dates,
+      notes: searchDraft.notes,
+      status: 'pending',
+      platforms:
+        searchDraft.type === 'lodging'
+          ? ['Booking', 'Airbnb', 'Google Travel']
+          : ['Google Maps Places'],
+    }
+
+    setSearchResult({
+      ...request,
+      links: platformSearchLinks(searchDraft),
+    })
+
+    if (canSync) {
+      await saveSearchRequest(request, currentUser)
+    }
+  }
+
+  async function findFoodPlaces() {
+    setPlacesBusy(true)
+    setPlaces([])
+
+    try {
+      const google = await loadGoogleMaps()
+      const service = new google.maps.places.PlacesService(document.createElement('div'))
+      const query = `restaurantes familiares bien valorados en ${searchDraft.city || 'Madrid'}`
+
+      service.textSearch(
+        {
+          query,
+          region: 'es',
+        },
+        (results, status) => {
+          setPlacesBusy(false)
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
+            setSearchResult({
+              id: `places-${Date.now()}`,
+              type: 'food',
+              city: searchDraft.city,
+              status: 'error',
+              notes: `Google Places respondió: ${status}`,
+              links: [],
+            })
+            return
+          }
+
+          setPlaces(results.slice(0, 6))
+          setSearchResult({
+            id: `places-${Date.now()}`,
+            type: 'food',
+            city: searchDraft.city,
+            status: 'ready',
+            notes: 'Sugerencias de comida obtenidas con Google Maps Places.',
+            links: [],
+          })
+        },
+      )
+    } catch (error) {
+      setPlacesBusy(false)
+      setSearchResult({
+        id: `places-${Date.now()}`,
+        type: 'food',
+        city: searchDraft.city,
+        status: 'error',
+        notes: error.message,
+        links: [],
+      })
+    }
+  }
+
+  async function addPlaceOption(place) {
+    const photo = place.photos?.[0]?.getUrl?.({ maxWidth: 1200, maxHeight: 800 }) || ''
+    const option = {
+      id: `food-${place.place_id || Date.now()}`,
+      code: 'GM',
+      category: 'food',
+      title: place.name,
+      source: 'Google Maps',
+      city: searchDraft.city || 'Madrid',
+      status: 'pending',
+      url: place.place_id
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`,
+      image: photo,
+      priceNight: null,
+      priceTotal: null,
+      rating: place.rating ? `${place.rating}/5` : 'Sin rating',
+      reviews: place.user_ratings_total || null,
+      capacity: 'Por validar reserva para grupo',
+      transit: 'Ruta por calcular',
+      targetGroup: 'family',
+      aiScore: Math.min(92, Math.round((place.rating || 4) * 18)),
+      map: { x: 50, y: 58 },
+      coords: place.geometry?.location
+        ? {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          }
+        : null,
+      highlights: [
+        place.formatted_address || 'Dirección pendiente',
+        'Sugerido con Google Maps Places',
+      ],
+      cautions: ['Verificar reserva, precio y comodidad para niños'],
+    }
+
+    setOptions((current) => [option, ...current])
+    setActiveTab('food')
+
+    if (canSync) {
+      await saveTripOption(option, currentUser)
+    }
   }
 
   function toggleVote(optionId) {
@@ -393,6 +657,28 @@ function App() {
         })
       })
     }
+  }
+
+  if (!authReady) {
+    return (
+      <main className="login-screen">
+        <div className="login-panel">
+          <Loader2 size={28} aria-hidden="true" />
+          <h1>Preparando el viaje familiar</h1>
+          <p>Estamos conectando Firebase y la app del viaje.</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        canLogin={isFirebaseConfigured}
+        firebaseStatus={firebaseStatus}
+        onSignIn={handleSignIn}
+      />
+    )
   }
 
   return (
@@ -485,7 +771,6 @@ function App() {
                   type="button"
                 >
                   <span>{member.name}</span>
-                  <small>{member.role}</small>
                 </button>
               ))}
             </div>
@@ -595,7 +880,23 @@ function App() {
               <h2>Madrid: opciones y planes</h2>
             </div>
           </div>
-          <MadridMap options={mapOptions} />
+          <div className="route-mode-control" aria-label="Modo de ruta">
+            {Object.entries(routeModes).map(([mode, config]) => {
+              const Icon = config.icon
+              return (
+                <button
+                  className={routeMode === mode ? 'active' : ''}
+                  key={mode}
+                  onClick={() => setRouteMode(mode)}
+                  type="button"
+                >
+                  <Icon size={16} aria-hidden="true" />
+                  {config.label}
+                </button>
+              )
+            })}
+          </div>
+          <MadridMap options={mapOptions} routeMode={routeMode} />
         </section>
       </section>
 
@@ -674,6 +975,109 @@ function App() {
         </form>
       </section>
 
+      <section className="search-panel">
+        <div className="section-heading">
+          <Search size={20} aria-hidden="true" />
+          <div>
+            <p className="eyebrow">Búsqueda inteligente</p>
+            <h2>Hospedajes y comida por ciudad</h2>
+          </div>
+        </div>
+        <form className="search-form" onSubmit={createLodgingSearch}>
+          <label>
+            <span>Tipo</span>
+            <select
+              onChange={(event) => updateSearchDraft('type', event.target.value)}
+              value={searchDraft.type}
+            >
+              <option value="lodging">Hospedajes</option>
+              <option value="food">Comida</option>
+            </select>
+          </label>
+          <label>
+            <span>Ciudad</span>
+            <select
+              onChange={(event) => updateSearchDraft('city', event.target.value)}
+              value={searchDraft.city}
+            >
+              {cityFilters.filter((city) => city !== 'Todas').map((city) => (
+                <option key={city}>{city}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Fechas</span>
+            <input
+              onChange={(event) => updateSearchDraft('dates', event.target.value)}
+              type="text"
+              value={searchDraft.dates}
+            />
+          </label>
+          <label className="wide">
+            <span>Criterios</span>
+            <input
+              onChange={(event) => updateSearchDraft('notes', event.target.value)}
+              type="text"
+              value={searchDraft.notes}
+            />
+          </label>
+          <button className="primary-button compact" type="submit">
+            <Hotel size={18} aria-hidden="true" />
+            Preparar búsqueda
+          </button>
+          <button
+            className="secondary-button compact"
+            onClick={findFoodPlaces}
+            type="button"
+          >
+            {placesBusy ? (
+              <Loader2 size={18} aria-hidden="true" />
+            ) : (
+              <Utensils size={18} aria-hidden="true" />
+            )}
+            Sugerir comida
+          </button>
+        </form>
+
+        {searchResult ? (
+          <div className="search-result">
+            <strong>
+              {searchResult.status === 'ready'
+                ? 'Sugerencias listas'
+                : searchResult.status === 'error'
+                  ? 'Revisar búsqueda'
+                  : 'Búsqueda solicitada'}
+            </strong>
+            <p>{searchResult.notes}</p>
+            {searchResult.links?.length ? (
+              <div className="platform-links">
+                {searchResult.links.map((link) => (
+                  <a href={link.url} key={link.label} rel="noreferrer" target="_blank">
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {places.length ? (
+          <div className="places-grid">
+            {places.map((place) => (
+              <article key={place.place_id || place.name}>
+                <h3>{place.name}</h3>
+                <p>{place.formatted_address}</p>
+                <span>{place.rating ? `${place.rating}/5` : 'Sin rating'} · {place.user_ratings_total || 0} reseñas</span>
+                <button onClick={() => addPlaceOption(place)} type="button">
+                  <Plus size={16} aria-hidden="true" />
+                  Agregar a comida
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
       <section className="future-cities">
         <div className="section-heading">
           <CalendarDays size={20} aria-hidden="true" />
@@ -683,11 +1087,12 @@ function App() {
           </div>
         </div>
         <div className="city-grid">
-          {cityIdeas.map((idea) => (
+          {travelCities.map((idea) => (
             <article key={idea.id}>
               <span>{idea.country}</span>
               <h3>{idea.city}</h3>
               <p>{idea.angle}</p>
+              <p className="transfer-line">{idea.transfer}</p>
               <div className="progress">
                 <i style={{ width: `${idea.readiness}%` }} />
               </div>
@@ -695,12 +1100,114 @@ function App() {
             </article>
           ))}
         </div>
+        <form className="city-form" onSubmit={addCity}>
+          <label>
+            <span>Ciudad</span>
+            <input
+              onChange={(event) => updateCityDraft('city', event.target.value)}
+              placeholder="Lisboa, Bilbao..."
+              required
+              type="text"
+              value={cityDraft.city}
+            />
+          </label>
+          <label>
+            <span>País</span>
+            <input
+              onChange={(event) => updateCityDraft('country', event.target.value)}
+              placeholder="Portugal, España..."
+              type="text"
+              value={cityDraft.country}
+            />
+          </label>
+          <label>
+            <span>Fechas</span>
+            <input
+              onChange={(event) => updateCityDraft('dates', event.target.value)}
+              placeholder="19-24 sep"
+              type="text"
+              value={cityDraft.dates}
+            />
+          </label>
+          <label>
+            <span>Traslado</span>
+            <input
+              onChange={(event) => updateCityDraft('transfer', event.target.value)}
+              placeholder="Tren, vuelo, coche..."
+              type="text"
+              value={cityDraft.transfer}
+            />
+          </label>
+          <label className="wide">
+            <span>Idea del plan</span>
+            <input
+              onChange={(event) => updateCityDraft('angle', event.target.value)}
+              placeholder="Por qué puede funcionar para todos"
+              type="text"
+              value={cityDraft.angle}
+            />
+          </label>
+          <button className="primary-button compact" type="submit">
+            <Plus size={18} aria-hidden="true" />
+            Agregar ciudad
+          </button>
+        </form>
       </section>
     </main>
   )
 }
 
-function MadridMap({ options }) {
+function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
+  return (
+    <main className="login-screen">
+      <section className="login-hero">
+        <div className="login-copy">
+          <p className="eyebrow">Viaje familiar septiembre 2026</p>
+          <h1>Entrar para planear juntos Madrid y las siguientes ciudades</h1>
+          <p>
+            La app guarda votos, sugerencias, hospedajes, comidas, ciudades e
+            itinerarios. Para que cada cambio quede sincronizado, primero entra
+            con Google.
+          </p>
+          <div className="login-actions">
+            <button
+              className="login-button"
+              disabled={!canLogin}
+              onClick={onSignIn}
+              type="button"
+            >
+              <LogIn size={20} aria-hidden="true" />
+              Entrar con Google
+            </button>
+            <span className={firebaseStatus.ready ? 'ready-note' : 'setup-note'}>
+              {firebaseStatus.ready ? 'Firebase listo' : 'Firebase pendiente'}
+            </span>
+          </div>
+        </div>
+
+        <div className="login-preview" aria-label="Funciones principales">
+          <article>
+            <ShieldCheck size={22} aria-hidden="true" />
+            <h2>Colaboración privada</h2>
+            <p>Solo quienes entren pueden votar, agregar o retirar opciones.</p>
+          </article>
+          <article>
+            <MapPinned size={22} aria-hidden="true" />
+            <h2>Rutas reales</h2>
+            <p>Mapa con transporte público, caminando o en coche hacia IFEMA.</p>
+          </article>
+          <article>
+            <Sparkles size={22} aria-hidden="true" />
+            <h2>IA preparada</h2>
+            <p>Búsqueda guiada para hospedajes, comida y planes por ciudad.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function MadridMap({ options, routeMode }) {
   const mapRef = useRef(null)
   const [mapError, setMapError] = useState('')
   const hasRealMap = hasMapsKey() && options.some((option) => option.coords)
@@ -709,14 +1216,13 @@ function MadridMap({ options }) {
     if (!hasRealMap || !mapRef.current) return undefined
 
     let cancelled = false
-    let map
     const mapItems = []
 
     loadGoogleMaps()
       .then((google) => {
         if (cancelled || !mapRef.current) return
 
-        map = new google.maps.Map(mapRef.current, {
+        const map = new google.maps.Map(mapRef.current, {
           center: ifemaCoords,
           zoom: 12,
           mapTypeControl: false,
@@ -733,6 +1239,7 @@ function MadridMap({ options }) {
 
         const bounds = new google.maps.LatLngBounds()
         const infoWindow = new google.maps.InfoWindow()
+        const directionsService = new google.maps.DirectionsService()
         const ifemaPosition = new google.maps.LatLng(ifemaCoords.lat, ifemaCoords.lng)
 
         const ifemaMarker = new google.maps.Marker({
@@ -754,7 +1261,7 @@ function MadridMap({ options }) {
               title: option.title,
               label: option.code,
             })
-            const line = new google.maps.Polyline({
+            const fallbackLine = new google.maps.Polyline({
               map,
               path: [position, ifemaPosition],
               geodesic: true,
@@ -763,14 +1270,42 @@ function MadridMap({ options }) {
               strokeWeight: 3,
             })
 
+            const routeLabel = routeModes[routeMode]?.label || 'Ruta'
+
             marker.addListener('click', () => {
               infoWindow.setContent(
-                `<strong>${option.title}</strong><br>${option.transit}<br>${option.aiScore}/100`,
+                `<strong>${option.title}</strong><br>${routeLabel}<br>${option.transit}<br>${option.aiScore}/100`,
               )
               infoWindow.open({ anchor: marker, map })
             })
 
-            mapItems.push(marker, line)
+            if (option.id !== 'f1-madring') {
+              directionsService.route(
+                {
+                  origin: position,
+                  destination: ifemaPosition,
+                  travelMode: google.maps.TravelMode[routeMode],
+                },
+                (result, status) => {
+                  if (status !== google.maps.DirectionsStatus.OK || !result) return
+                  fallbackLine.setMap(null)
+                  const renderer = new google.maps.DirectionsRenderer({
+                    directions: result,
+                    map,
+                    preserveViewport: true,
+                    suppressMarkers: true,
+                    polylineOptions: {
+                      strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
+                      strokeOpacity: 0.72,
+                      strokeWeight: 4,
+                    },
+                  })
+                  mapItems.push(renderer)
+                },
+              )
+            }
+
+            mapItems.push(marker, fallbackLine)
             bounds.extend(position)
           })
 
@@ -783,9 +1318,8 @@ function MadridMap({ options }) {
     return () => {
       cancelled = true
       mapItems.forEach((item) => item.setMap(null))
-      map = null
     }
-  }, [hasRealMap, options])
+  }, [hasRealMap, options, routeMode])
 
   if (!hasRealMap || mapError) {
     return <ConceptMap mapOptions={options} note={mapError} />
@@ -796,7 +1330,7 @@ function MadridMap({ options }) {
       <div className="google-map" ref={mapRef} />
       <div className="map-caption">
         <CheckCircle2 size={16} aria-hidden="true" />
-        <span>Mapa real con marcadores y líneas hacia IFEMA / MADRING</span>
+        <span>Rutas en modo {routeModes[routeMode]?.label || 'ruta'} hacia IFEMA / MADRING</span>
       </div>
     </div>
   )

@@ -10,10 +10,13 @@ import {
 } from 'firebase/firestore'
 import { firestoreDb, isFirebaseConfigured } from './firebaseClient'
 import { initialOptions } from '../data/trip'
+import { cityIdeas } from '../data/trip'
 
 const optionsCollection = 'tripOptions'
 const votesCollection = 'votes'
 const membersCollection = 'familyMembers'
+const citiesCollection = 'travelCities'
+const searchesCollection = 'searchRequests'
 
 export function canUseFirestore() {
   return Boolean(isFirebaseConfigured && firestoreDb)
@@ -55,6 +58,24 @@ export async function seedInitialTripOptions(user) {
   )
 }
 
+export async function seedInitialTravelCities(user) {
+  if (!canUseFirestore() || !user) return
+
+  const snapshot = await getDocs(collection(firestoreDb, citiesCollection))
+  if (!snapshot.empty) return
+
+  await Promise.all(
+    cityIdeas.map((city) =>
+      setDoc(doc(firestoreDb, citiesCollection, city.id), {
+        ...city,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }),
+    ),
+  )
+}
+
 export function subscribeTripOptions(onData, onError) {
   if (!canUseFirestore()) return () => {}
 
@@ -87,11 +108,51 @@ export function subscribeVotes(onData, onError) {
   )
 }
 
+export function subscribeTravelCities(onData, onError) {
+  if (!canUseFirestore()) return () => {}
+
+  return onSnapshot(
+    query(collection(firestoreDb, citiesCollection)),
+    (snapshot) => {
+      const cities = snapshot.docs.map((item) => ({
+        id: item.id,
+        ...item.data(),
+      }))
+      onData(cities)
+    },
+    onError,
+  )
+}
+
 export async function saveTripOption(option, user) {
   if (!canUseFirestore() || !user) return
 
   await setDoc(doc(firestoreDb, optionsCollection, option.id), {
     ...option,
+    createdBy: user.uid,
+    createdByName: user.displayName || user.email || 'Familiar',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function saveTravelCity(city, user) {
+  if (!canUseFirestore() || !user) return
+
+  await setDoc(doc(firestoreDb, citiesCollection, city.id), {
+    ...city,
+    createdBy: user.uid,
+    createdByName: user.displayName || user.email || 'Familiar',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function saveSearchRequest(request, user) {
+  if (!canUseFirestore() || !user) return
+
+  await setDoc(doc(firestoreDb, searchesCollection, request.id), {
+    ...request,
     createdBy: user.uid,
     createdByName: user.displayName || user.email || 'Familiar',
     createdAt: serverTimestamp(),

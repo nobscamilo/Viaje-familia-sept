@@ -46,7 +46,7 @@ APIs activadas:
 - Firebase/Auth/Firestore: `firebase.googleapis.com`, `identitytoolkit.googleapis.com`, `firestore.googleapis.com`, `firebaserules.googleapis.com`, `firebasestorage.googleapis.com`, `firebaseappcheck.googleapis.com`.
 - Hosting/backend: `firebasehosting.googleapis.com`, `cloudfunctions.googleapis.com`, `run.googleapis.com`, `cloudbuild.googleapis.com`, `artifactregistry.googleapis.com`, `eventarc.googleapis.com`, `pubsub.googleapis.com`, `secretmanager.googleapis.com`.
 - IA: `aiplatform.googleapis.com`, `firebasevertexai.googleapis.com`, `generativelanguage.googleapis.com`.
-- Maps/rutas: `maps-backend.googleapis.com`, `routes.googleapis.com`, `geocoding-backend.googleapis.com`, `places.googleapis.com`, `static-maps-backend.googleapis.com`.
+- Maps/rutas: `maps-backend.googleapis.com`, `routes.googleapis.com`, `directions-backend.googleapis.com`, `distance-matrix-backend.googleapis.com`, `geocoding-backend.googleapis.com`, `places.googleapis.com`, `static-maps-backend.googleapis.com`.
 - Llaves: `apikeys.googleapis.com`.
 
 ## Estructura
@@ -62,13 +62,17 @@ APIs activadas:
 ## Funcionalidad actual
 
 - Login con Google.
-- Si no hay sesión, la app funciona como demo local.
-- Si hay sesión, se sincronizan opciones, votos y estado de retirar/restaurar en Firestore.
+- Pantalla de inicio obligatoria; sin sesión no se entra a la app.
+- Con sesión, se sincronizan opciones, votos, ciudades y estado de retirar/restaurar en Firestore.
 - Las opciones base se siembran automáticamente en Firestore cuando entra el primer usuario.
-- Mapa real de Google Maps con marcadores y líneas hacia IFEMA / MADRING cuando existe `VITE_GOOGLE_MAPS_BROWSER_KEY`.
+- Mapa real de Google Maps con marcadores y rutas hacia IFEMA / MADRING.
+- Selector de ruta: transporte público, andando o coche.
+- Ciudades dinámicas con fechas, país, traslado e idea del plan.
+- Búsqueda guiada de hospedajes con enlaces preparados a Booking, Airbnb y Google Travel.
+- Sugerencias de restaurantes con Google Maps Places y opción de agregarlos a comida.
 - Fallback visual si Google Maps no carga.
 
-## Pendiente de enlazar
+## Conexiones locales
 
 Firebase CLI, GCloud CLI y ADC quedaron autenticados con `juancamilo.sarmiento@gmail.com`.
 
@@ -80,4 +84,4 @@ gcloud auth login
 gcloud billing accounts list
 ```
 
-Siguientes pasos: añadir Auth real en frontend, persistencia Firestore, Functions y llamadas controladas a Vertex AI / Maps Routes.
+Siguientes pasos: añadir Cloud Functions para análisis con IA, extracción controlada de links, generación de itinerarios y llamadas de servidor a Vertex AI / Maps Routes.

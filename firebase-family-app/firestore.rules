@@ -31,5 +31,15 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create, update: if signedIn();
     }
+
+    match /travelCities/{cityId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+    }
+
+    match /searchRequests/{requestId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+    }
   }
 }

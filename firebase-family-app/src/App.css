@@ -27,10 +27,13 @@
 .firebase-pill,
 .sync-pill,
 .auth-button,
+.login-button,
+.secondary-button,
 .ghost-button,
 .primary-button,
 .tabbar button,
 .city-filter button,
+.route-mode-control button,
 .card-actions button,
 .card-actions a {
   display: inline-flex;
@@ -43,6 +46,124 @@
   font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.login-screen {
+  min-height: 100vh;
+  padding: 28px;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(rgba(245, 247, 251, 0.86), rgba(245, 247, 251, 0.96)),
+    url("https://images.unsplash.com/photo-1539037116277-4db20889f2d4?auto=format&fit=crop&w=1800&q=80");
+  background-size: cover;
+  background-position: center;
+}
+
+.login-hero {
+  display: grid;
+  width: min(1180px, 100%);
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.login-copy,
+.login-preview,
+.login-panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(220, 227, 238, 0.92);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.login-copy {
+  padding: 34px;
+}
+
+.login-copy h1,
+.login-panel h1 {
+  margin: 0;
+}
+
+.login-copy > p:not(.eyebrow),
+.login-panel p {
+  max-width: 720px;
+  margin: 16px 0 0;
+  font-size: 1.08rem;
+}
+
+.login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.login-button {
+  min-height: 48px;
+  padding: 0 18px;
+  color: #ffffff;
+  background: #111827;
+  border: 1px solid #111827;
+  cursor: pointer;
+}
+
+.login-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ready-note,
+.setup-note {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.ready-note {
+  color: #0f5132;
+  background: #edf8f1;
+  border: 1px solid #b7e3c8;
+}
+
+.setup-note {
+  color: #7c2d12;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.login-preview {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.login-preview article {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.login-preview h2 {
+  margin: 10px 0 6px;
+  font-size: 1.05rem;
+}
+
+.login-preview p {
+  margin: 0;
+}
+
+.login-panel {
+  display: grid;
+  max-width: 620px;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
 }
 
 .firebase-pill {
@@ -622,6 +743,28 @@
     auto;
 }
 
+.route-mode-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.route-mode-control button {
+  min-height: 38px;
+  padding: 0 11px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.route-mode-control button.active {
+  color: #0d3f91;
+  background: #eaf2ff;
+  border-color: #9bbcff;
+}
+
 .real-map-wrap {
   margin-top: 18px;
 }
@@ -729,27 +872,36 @@
 }
 
 .add-panel,
+.search-panel,
 .future-cities {
   margin-top: 18px;
 }
 
-.suggestion-form {
+.suggestion-form,
+.search-form,
+.city-form {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-top: 18px;
 }
 
-.suggestion-form label {
+.suggestion-form label,
+.search-form label,
+.city-form label {
   display: grid;
   gap: 7px;
 }
 
-.suggestion-form label.wide {
+.suggestion-form label.wide,
+.search-form label.wide,
+.city-form label.wide {
   grid-column: span 4;
 }
 
-.suggestion-form span {
+.suggestion-form span,
+.search-form span,
+.city-form span {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 900;
@@ -757,7 +909,11 @@
 
 .suggestion-form input,
 .suggestion-form select,
-.suggestion-form textarea {
+.suggestion-form textarea,
+.search-form input,
+.search-form select,
+.city-form input,
+.city-form select {
   width: 100%;
   min-height: 44px;
   box-sizing: border-box;
@@ -782,6 +938,102 @@
   background: #111827;
   border: 1px solid #111827;
   cursor: pointer;
+}
+
+.primary-button.compact,
+.secondary-button.compact {
+  min-height: 44px;
+}
+
+.secondary-button {
+  align-self: end;
+  padding: 0 14px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.search-panel {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.search-result {
+  margin-top: 14px;
+  padding: 14px;
+  background: #fbfcff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.search-result strong,
+.search-result p {
+  display: block;
+  margin: 0;
+}
+
+.search-result p {
+  margin-top: 4px;
+}
+
+.platform-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.platform-links a,
+.places-grid button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 10px;
+  color: #0d3f91;
+  background: #eaf2ff;
+  border: 1px solid #9bbcff;
+  border-radius: 8px;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.places-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.places-grid article {
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.places-grid h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.places-grid p {
+  min-height: 42px;
+  margin: 0 0 10px;
+}
+
+.places-grid span {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
 }
 
 .future-cities .section-heading {
@@ -811,6 +1063,13 @@
   margin: 0;
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+.city-grid .transfer-line {
+  min-height: auto;
+  margin-top: 10px;
+  color: #0d3f91;
+  font-weight: 800;
 }
 
 .progress {
@@ -903,12 +1162,20 @@
     grid-template-columns: 1fr;
   }
 
-  .suggestion-form {
+  .suggestion-form,
+  .search-form,
+  .city-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .suggestion-form label.wide {
+  .suggestion-form label.wide,
+  .search-form label.wide,
+  .city-form label.wide {
     grid-column: span 2;
+  }
+
+  .places-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -942,6 +1209,10 @@
   .decision-map-grid,
   .city-grid,
   .suggestion-form,
+  .search-form,
+  .city-form,
+  .places-grid,
+  .login-hero,
   .itinerary-columns {
     grid-template-columns: 1fr;
   }
@@ -958,8 +1229,18 @@
     overflow-x: hidden;
   }
 
-  .suggestion-form label.wide {
+  .suggestion-form label.wide,
+  .search-form label.wide,
+  .city-form label.wide {
     grid-column: auto;
+  }
+
+  .login-screen {
+    padding: 16px;
+  }
+
+  .login-copy {
+    padding: 22px;
   }
 
   .member-list {
@@ -992,8 +1273,11 @@
   }
 
   .firebase-pill,
+  .sync-pill,
+  .auth-button,
   .card-actions button,
   .card-actions a,
+  .secondary-button,
   .primary-button {
     white-space: normal;
   }
