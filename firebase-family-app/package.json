@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "functions:check": "npm --prefix functions run check",
     "preview": "vite preview",
-    "firebase:deploy": "npm run build && firebase deploy --only hosting,firestore:rules,firestore:indexes",
+    "firebase:deploy": "npm run build && npm run functions:check && firebase deploy --only hosting,firestore:rules,firestore:indexes,functions",
     "firebase:serve": "npm run build && firebase emulators:start --only hosting,firestore"
   },
   "dependencies": {

@@ -43,6 +43,12 @@ import {
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
 import { hasMapsKey, loadGoogleMaps } from './services/googleMaps'
 import {
+  analyzeOptionWithAI,
+  generateItineraryWithAI,
+  suggestFoodWithAI,
+  suggestLodgingWithAI,
+} from './services/aiFunctions'
+import {
   canUseFirestore,
   saveOptionVotes,
   saveSearchRequest,
@@ -215,6 +221,50 @@ function platformSearchLinks(search) {
   ]
 }
 
+function getPlaceName(place) {
+  return place.name || place.displayName?.text || 'Lugar sugerido'
+}
+
+function getPlaceId(place) {
+  return place.placeId || place.place_id || place.id || getPlaceName(place)
+}
+
+function getPlaceAddress(place) {
+  return place.formattedAddress || place.formatted_address || place.vicinity || ''
+}
+
+function getPlaceReviews(place) {
+  return place.userRatingCount || place.user_ratings_total || 0
+}
+
+function getPlaceLocation(place) {
+  if (place.location?.lat && place.location?.lng) return place.location
+  if (place.location?.latitude && place.location?.longitude) {
+    return { lat: place.location.latitude, lng: place.location.longitude }
+  }
+  if (place.geometry?.location) {
+    return {
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng(),
+    }
+  }
+  return null
+}
+
+function getPlaceUrl(place) {
+  const name = getPlaceName(place)
+  const placeId = getPlaceId(place)
+  if (place.googleMapsUri) return place.googleMapsUri
+  if (place.place_id || place.placeId) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeId}`
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`
+}
+
+function mergeOption(current, option) {
+  return [option, ...current.filter((item) => item.id !== option.id)]
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('lodging')
   const [selectedCity, setSelectedCity] = useState('Todas')
@@ -259,6 +309,10 @@ function App() {
   const [searchResult, setSearchResult] = useState(null)
   const [places, setPlaces] = useState([])
   const [placesBusy, setPlacesBusy] = useState(false)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiFeedback, setAiFeedback] = useState(null)
+  const [itineraryBusy, setItineraryBusy] = useState(false)
+  const [generatedItinerary, setGeneratedItinerary] = useState(null)
 
   const firebaseStatus = getFirebaseStatus()
   const canSync = Boolean(currentUser && canUseFirestore())
@@ -442,8 +496,52 @@ function App() {
 
   async function addOption(event) {
     event.preventDefault()
+
+    if (canSync) {
+      setAiBusy(true)
+      setAiFeedback({
+        tone: 'working',
+        title: 'Analizando con IA',
+        detail: 'Estoy leyendo el link, cruzando Maps y preparando pros/contras.',
+      })
+
+      try {
+        const result = await analyzeOptionWithAI({
+          ...draft,
+          dates: searchDraft.dates,
+        })
+        if (result.option) {
+          setOptions((current) => mergeOption(current, result.option))
+          setAiFeedback({
+            tone: 'ready',
+            title: 'Análisis agregado',
+            detail: result.analysis?.summary || 'La opción quedó lista para votar y revisar.',
+          })
+          setDraft({
+            title: '',
+            url: '',
+            category: draft.category,
+            city: draft.city,
+            targetGroup: draft.targetGroup,
+            notes: '',
+          })
+          setActiveTab(result.option.category)
+          setAiBusy(false)
+          return
+        }
+      } catch (error) {
+        setAiFeedback({
+          tone: 'warning',
+          title: 'IA no disponible',
+          detail: `${error.message}. Guardé la opción como pendiente para analizarla después.`,
+        })
+      } finally {
+        setAiBusy(false)
+      }
+    }
+
     const option = buildDraftOption(draft)
-    setOptions((current) => [option, ...current])
+    setOptions((current) => mergeOption(current, option))
     if (canSync) {
       await saveTripOption(option, currentUser)
     }
@@ -485,6 +583,33 @@ function App() {
       return
     }
 
+    if (canSync) {
+      setPlaces([])
+      setSearchResult({
+        id: `search-${Date.now()}`,
+        type: 'lodging',
+        city: searchDraft.city,
+        status: 'working',
+        notes: 'La IA está preparando búsquedas y criterios de comparación.',
+        links: [],
+      })
+
+      try {
+        const result = await suggestLodgingWithAI(searchDraft)
+        setSearchResult(result)
+        return
+      } catch (error) {
+        setSearchResult({
+          id: `search-${Date.now()}`,
+          type: 'lodging',
+          city: searchDraft.city,
+          status: 'error',
+          notes: `${error.message}. Te dejo los enlaces base para continuar.`,
+          links: platformSearchLinks(searchDraft),
+        })
+      }
+    }
+
     const request = {
       id: `search-${Date.now()}`,
       type: searchDraft.type,
@@ -511,6 +636,33 @@ function App() {
   async function findFoodPlaces() {
     setPlacesBusy(true)
     setPlaces([])
+
+    if (canSync) {
+      try {
+        const result = await suggestFoodWithAI(searchDraft)
+        setPlaces(result.places || [])
+        setSearchResult({
+          id: result.id,
+          type: 'food',
+          city: result.city,
+          status: 'ready',
+          notes: result.analysis?.summary || 'Sugerencias de comida obtenidas con IA y Google Places.',
+          links: [],
+          analysis: result.analysis,
+        })
+        setPlacesBusy(false)
+        return
+      } catch (error) {
+        setSearchResult({
+          id: `places-${Date.now()}`,
+          type: 'food',
+          city: searchDraft.city,
+          status: 'error',
+          notes: `${error.message}. Intento con Maps del navegador.`,
+          links: [],
+        })
+      }
+    }
 
     try {
       const google = await loadGoogleMaps()
@@ -561,42 +713,37 @@ function App() {
   }
 
   async function addPlaceOption(place) {
+    const name = getPlaceName(place)
+    const placeId = getPlaceId(place)
+    const address = getPlaceAddress(place)
+    const location = getPlaceLocation(place)
+    const reviews = getPlaceReviews(place)
     const photo = place.photos?.[0]?.getUrl?.({ maxWidth: 1200, maxHeight: 800 }) || ''
     const option = {
-      id: `food-${place.place_id || Date.now()}`,
+      id: `food-${placeId || Date.now()}`,
       code: 'GM',
       category: 'food',
-      title: place.name,
+      title: name,
       source: 'Google Maps',
       city: searchDraft.city || 'Madrid',
       status: 'pending',
-      url: place.place_id
-        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.place_id}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`,
+      url: getPlaceUrl(place),
       image: photo,
       priceNight: null,
       priceTotal: null,
       rating: place.rating ? `${place.rating}/5` : 'Sin rating',
-      reviews: place.user_ratings_total || null,
+      reviews: reviews || null,
       capacity: 'Por validar reserva para grupo',
       transit: 'Ruta por calcular',
       targetGroup: 'family',
-      aiScore: Math.min(92, Math.round((place.rating || 4) * 18)),
+      aiScore: place.score || Math.min(92, Math.round((place.rating || 4) * 18)),
       map: { x: 50, y: 58 },
-      coords: place.geometry?.location
-        ? {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          }
-        : null,
-      highlights: [
-        place.formatted_address || 'Dirección pendiente',
-        'Sugerido con Google Maps Places',
-      ],
-      cautions: ['Verificar reserva, precio y comodidad para niños'],
+      coords: location,
+      highlights: [address || 'Dirección pendiente', place.why || 'Sugerido con Google Maps Places'],
+      cautions: [place.caution || 'Verificar reserva, precio y comodidad para niños'],
     }
 
-    setOptions((current) => [option, ...current])
+    setOptions((current) => mergeOption(current, option))
     setActiveTab('food')
 
     if (canSync) {
@@ -656,6 +803,58 @@ function App() {
           online: false,
         })
       })
+    }
+  }
+
+  async function generateSmartItinerary() {
+    if (!canSync) {
+      setGeneratedItinerary({
+        title: 'Itinerario base',
+        summary: 'Inicia sesión con Firebase activo para generar itinerarios con IA.',
+        days: itineraryDraft.map((item) => ({
+          date: item.day,
+          city: item.city,
+          title: item.title,
+          familyPlan: item.family,
+          f1Plan: item.f1,
+          foodIdea: 'Por definir',
+          routeNotes: 'Por calcular',
+          backup: 'Mantener plan flexible',
+          energyLevel: 'Media',
+        })),
+        openQuestions: ['Conectar IA para recalcular con opciones actuales'],
+      })
+      return
+    }
+
+    setItineraryBusy(true)
+    try {
+      const result = await generateItineraryWithAI({
+        city: selectedCity === 'Todas' ? 'Madrid' : selectedCity,
+        dates: searchDraft.dates,
+        routeMode,
+      })
+      setGeneratedItinerary(result)
+      setActiveTab('itinerary')
+    } catch (error) {
+      setGeneratedItinerary({
+        title: 'Itinerario pendiente',
+        summary: error.message,
+        days: itineraryDraft.map((item) => ({
+          date: item.day,
+          city: item.city,
+          title: item.title,
+          familyPlan: item.family,
+          f1Plan: item.f1,
+          foodIdea: 'Por definir',
+          routeNotes: 'Por calcular',
+          backup: 'Mantener plan flexible',
+          energyLevel: 'Media',
+        })),
+        openQuestions: ['Reintentar cuando Functions/Vertex AI esté disponible'],
+      })
+    } finally {
+      setItineraryBusy(false)
     }
   }
 
@@ -832,7 +1031,11 @@ function App() {
           </div>
 
           {activeTab === 'itinerary' ? (
-            <ItineraryPanel />
+            <ItineraryPanel
+              busy={itineraryBusy}
+              onGenerate={generateSmartItinerary}
+              plan={generatedItinerary}
+            />
           ) : (
             <OptionGrid
               activeCategory={activeCategory}
@@ -944,8 +1147,9 @@ function App() {
               onChange={(event) => updateDraft('city', event.target.value)}
               value={draft.city}
             >
-              <option>Madrid</option>
-              <option>París</option>
+              {cityFilters.filter((city) => city !== 'Todas').map((city) => (
+                <option key={city}>{city}</option>
+              ))}
               <option>España por decidir</option>
             </select>
           </label>
@@ -968,11 +1172,24 @@ function App() {
               value={draft.notes}
             />
           </label>
-          <button className="primary-button" type="submit">
-            <Plus size={18} aria-hidden="true" />
-            Agregar opción
+          <button className="primary-button" disabled={aiBusy} type="submit">
+            {aiBusy ? (
+              <Loader2 size={18} aria-hidden="true" />
+            ) : (
+              <Sparkles size={18} aria-hidden="true" />
+            )}
+            {canSync ? 'Analizar y agregar' : 'Agregar opción'}
           </button>
         </form>
+        {aiFeedback ? (
+          <div className={`ai-feedback ${aiFeedback.tone}`}>
+            <Sparkles size={18} aria-hidden="true" />
+            <div>
+              <strong>{aiFeedback.title}</strong>
+              <p>{aiFeedback.detail}</p>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="search-panel">
@@ -1058,16 +1275,40 @@ function App() {
                 ))}
               </div>
             ) : null}
+            {searchResult.analysis?.searchQueries?.length ? (
+              <div className="search-tips">
+                <span>Búsquedas sugeridas</span>
+                <ul>
+                  {searchResult.analysis.searchQueries.slice(0, 3).map((query) => (
+                    <li key={query}>{query}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {searchResult.analysis?.comparisonCriteria?.length ? (
+              <div className="search-tips">
+                <span>Criterios de comparación</span>
+                <ul>
+                  {searchResult.analysis.comparisonCriteria.slice(0, 4).map((criterion) => (
+                    <li key={criterion}>{criterion}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {places.length ? (
           <div className="places-grid">
             {places.map((place) => (
-              <article key={place.place_id || place.name}>
-                <h3>{place.name}</h3>
-                <p>{place.formatted_address}</p>
-                <span>{place.rating ? `${place.rating}/5` : 'Sin rating'} · {place.user_ratings_total || 0} reseñas</span>
+              <article key={getPlaceId(place)}>
+                <h3>{getPlaceName(place)}</h3>
+                <p>{getPlaceAddress(place)}</p>
+                <span>
+                  {place.rating ? `${place.rating}/5` : 'Sin rating'} · {getPlaceReviews(place)} reseñas
+                </span>
+                {place.why ? <p className="place-meta">{place.why}</p> : null}
+                {place.caution ? <p className="place-meta caution">{place.caution}</p> : null}
                 <button onClick={() => addPlaceOption(place)} type="button">
                   <Plus size={16} aria-hidden="true" />
                   Agregar a comida
@@ -1198,8 +1439,8 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
           </article>
           <article>
             <Sparkles size={22} aria-hidden="true" />
-            <h2>IA preparada</h2>
-            <p>Búsqueda guiada para hospedajes, comida y planes por ciudad.</p>
+            <h2>IA activa</h2>
+            <p>Analiza links, comida, rutas e itinerarios desde Cloud Functions.</p>
           </article>
         </div>
       </section>
@@ -1476,28 +1717,71 @@ function OptionImage({ option }) {
   )
 }
 
-function ItineraryPanel() {
+function ItineraryPanel({ busy, onGenerate, plan }) {
+  const days = plan?.days?.length
+    ? plan.days
+    : itineraryDraft.map((item) => ({
+        date: item.day,
+        city: item.city,
+        title: item.title,
+        familyPlan: item.family,
+        f1Plan: item.f1,
+        foodIdea: '',
+        routeNotes: '',
+        backup: '',
+        energyLevel: '',
+      }))
+
   return (
     <div className="itinerary-panel">
-      {itineraryDraft.map((item) => (
-        <article key={`${item.day}-${item.title}`}>
-          <div className="date-chip">{item.day}</div>
+      <div className="itinerary-toolbar">
+        <div>
+          <p className="eyebrow">Itinerario IA</p>
+          <h2>{plan?.title || 'Plan base familiar'}</h2>
+          {plan?.summary ? <p>{plan.summary}</p> : null}
+        </div>
+        <button className="primary-button compact" disabled={busy} onClick={onGenerate} type="button">
+          {busy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
+          Generar con IA
+        </button>
+      </div>
+      {days.map((item) => (
+        <article key={`${item.date}-${item.title}`}>
+          <div className="date-chip">{item.date}</div>
           <div>
             <p>{item.city}</p>
             <h2>{item.title}</h2>
             <div className="itinerary-columns">
               <span>
                 <Users size={16} aria-hidden="true" />
-                {item.family}
+                {item.familyPlan}
               </span>
               <span>
                 <Plane size={16} aria-hidden="true" />
-                {item.f1}
+                {item.f1Plan}
               </span>
             </div>
+            {item.foodIdea || item.routeNotes || item.backup ? (
+              <div className="itinerary-notes">
+                {item.foodIdea ? <span>Comida: {item.foodIdea}</span> : null}
+                {item.routeNotes ? <span>Ruta: {item.routeNotes}</span> : null}
+                {item.backup ? <span>Plan B: {item.backup}</span> : null}
+                {item.energyLevel ? <span>Energía: {item.energyLevel}</span> : null}
+              </div>
+            ) : null}
           </div>
         </article>
       ))}
+      {plan?.openQuestions?.length ? (
+        <div className="itinerary-questions">
+          <strong>Dudas para cerrar</strong>
+          <ul>
+            {plan.openQuestions.map((question) => (
+              <li key={question}>{question}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   )
 }

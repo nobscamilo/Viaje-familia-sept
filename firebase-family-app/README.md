@@ -11,6 +11,14 @@ npm install
 npm run dev
 ```
 
+Para revisar todo antes de desplegar:
+
+```bash
+npm run lint
+npm run build
+npm run functions:check
+```
+
 ## Firebase
 
 El proyecto está preparado para:
@@ -18,7 +26,7 @@ El proyecto está preparado para:
 - Firebase Hosting.
 - Firebase Auth.
 - Cloud Firestore.
-- Cloud Functions / Vertex AI en una fase posterior.
+- Cloud Functions / Vertex AI.
 - Google Maps Platform para rutas e itinerarios.
 
 Copia `.env.example` a `.env.local` y completa los valores de Firebase cuando el proyecto exista.
@@ -26,7 +34,8 @@ Copia `.env.example` a `.env.local` y completa los valores de Firebase cuando el
 ```bash
 cp .env.example .env.local
 npm run build
-firebase deploy --only hosting
+npm run functions:check
+firebase deploy --only hosting,firestore:rules,firestore:indexes,functions
 ```
 
 Proyecto creado:
@@ -37,7 +46,10 @@ Proyecto creado:
 - Firestore: `(default)` en `europe-west1`, free tier activo
 - Billing: activo
 - Maps browser key: creada y restringida por dominios permitidos
+- Maps functions key: creada, restringida por APIs y guardada como Secret Manager `GOOGLE_MAPS_API_KEY`
 - Firebase browser key: restringida por dominios permitidos
+- Cloud Functions: Node.js 22 en `europe-west1`
+- Artifact Registry: limpieza automática de imágenes mayores a 14 días
 
 La app local ya tiene `.env.local` con la configuración pública de Firebase. Ese archivo no se sube al repo porque `*.local` está ignorado.
 
@@ -54,9 +66,11 @@ APIs activadas:
 - `src/data/trip.js`: datos iniciales de familia, ciudades, opciones e itinerario.
 - `src/services/firebaseClient.js`: inicialización opcional de Firebase por variables de entorno.
 - `src/services/tripRepository.js`: sincronización de opciones y votos con Firestore.
+- `src/services/aiFunctions.js`: llamadas autenticadas a Cloud Functions.
 - `src/services/googleMaps.js`: carga controlada de Google Maps en el navegador.
+- `functions/index.js`: backend IA con Gemini/Vertex AI, Places, Routes y Firestore Admin.
 - `legacy-current-site/`: copia de la web estática actual como referencia.
-- `firebase.json`: configuración de Hosting y Firestore.
+- `firebase.json`: configuración de Hosting, Firestore y Functions.
 - `firestore.rules`: reglas iniciales para colaboración familiar autenticada.
 
 ## Funcionalidad actual
@@ -70,6 +84,10 @@ APIs activadas:
 - Ciudades dinámicas con fechas, país, traslado e idea del plan.
 - Búsqueda guiada de hospedajes con enlaces preparados a Booking, Airbnb y Google Travel.
 - Sugerencias de restaurantes con Google Maps Places y opción de agregarlos a comida.
+- Cloud Function `analyzeTripOption`: analiza links, extrae metadatos públicos, cruza Places/Routes y guarda la opción en Firestore.
+- Cloud Function `suggestLodgingSearch`: genera búsquedas y criterios para Booking, Airbnb y Google Travel sin inventar disponibilidad.
+- Cloud Function `suggestFoodPlaces`: obtiene lugares desde Google Places y los ordena con IA.
+- Cloud Function `generateItinerary`: crea itinerarios familiares teniendo en cuenta F1, niños, ciudades y opciones guardadas.
 - Fallback visual si Google Maps no carga.
 
 ## Conexiones locales
@@ -84,4 +102,4 @@ gcloud auth login
 gcloud billing accounts list
 ```
 
-Siguientes pasos: añadir Cloud Functions para análisis con IA, extracción controlada de links, generación de itinerarios y llamadas de servidor a Vertex AI / Maps Routes.
+Siguientes pasos: añadir App Check obligatorio, panel de aprobación para Camilo y extracción más profunda mediante proveedores autorizados o APIs externas de hospedaje.
