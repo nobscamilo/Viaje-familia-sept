@@ -1518,7 +1518,7 @@ function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Viaje familiar septiembre 2026</p>
-          <h1>Plan familiar Madrid y siguientes ciudades</h1>
+          <h1>Madrid nos espera.</h1>
         </div>
         <div className="status-stack">
           <div className={`firebase-pill ${firebaseStatus.ready ? 'ready' : ''}`}>
@@ -2319,7 +2319,7 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
       <section className="login-hero">
         <div className="login-copy">
           <p className="eyebrow">Viaje familiar septiembre 2026</p>
-          <h1>Entrar para planear juntos Madrid y las siguientes ciudades</h1>
+          <h1>Entrar para planear juntos Madrid.</h1>
           <p>
             La app guarda votos, sugerencias, hospedajes, comidas, ciudades e
             itinerarios. Para que cada cambio quede sincronizado, primero entra
