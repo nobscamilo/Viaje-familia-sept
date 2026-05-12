@@ -74,9 +74,12 @@ const tabs = [
   { id: 'activities', icon: Landmark },
   { id: 'food', icon: Utensils },
   { id: 'transport', icon: TrainFront },
+  { id: 'cities', icon: CalendarDays },
   { id: 'itinerary', icon: Route },
   { id: 'budget', icon: CircleDollarSign },
 ]
+
+const optionWorkspaceTabs = ['lodging', 'activities', 'food']
 
 const targetLabels = {
   family: 'Toda la familia',
@@ -655,6 +658,7 @@ function App() {
   const f1Crew = familyMembers.filter((member) => member.group === 'f1')
   const familyCrew = familyMembers.filter((member) => member.group !== 'f1')
   const activeContributorIsAdult = isAdultMember(activeMember)
+  const showOptionWorkspace = optionWorkspaceTabs.includes(activeTab)
   const currentTravelGroup = useMemo(
     () =>
       travelGroups.find((profile) => profile.id === activeTravelGroupId) ||
@@ -1085,6 +1089,42 @@ function App() {
       (item) => item.city === cityName && item.status !== 'removed',
     )
     if (city) removeCity(city.id)
+  }
+
+  function prepareCityLodging(city) {
+    selectCityFilter(city.city)
+    setSearchDraft((current) => ({
+      ...current,
+      type: 'lodging',
+      city: city.city,
+      dates: city.dates || current.dates,
+      notes: `${groupSummary(currentTravelGroup)}, hospedaje cómodo y bien conectado`,
+    }))
+    setDraft((current) => ({ ...current, category: 'lodging', city: city.city }))
+    setActiveTab('lodging')
+  }
+
+  function prepareCityTransfer(city) {
+    selectCityFilter(city.city)
+    setSearchDraft((current) => ({
+      ...current,
+      type: 'transport',
+      city: city.city,
+      dates: city.dates || current.dates,
+    }))
+    setTransferDraft((current) => ({
+      ...current,
+      origin: 'Madrid',
+      destination: city.city,
+      date: city.dates || current.date,
+      notes: `Comparar tren, bus y avión para ${groupSummary(currentTravelGroup)}`,
+    }))
+    setActiveTab('transport')
+  }
+
+  function openCityMap(cityName) {
+    selectCityFilter(cityName)
+    setActiveTab('lodging')
   }
 
   async function addTravelGroup(event) {
@@ -1691,28 +1731,30 @@ function App() {
             })}
           </nav>
 
-          <div className="controls-row">
-            <div className="city-filter" aria-label="Filtro por ciudad">
-              {cityFilters.map((city) => (
-                <CityFilterChip
-                  active={effectiveSelectedCity === city}
-                  city={city}
-                  key={city}
-                  onRemove={removeCityByName}
-                  onSelect={selectCityFilter}
-                  removable={city !== 'Todas' && city !== 'Madrid'}
-                />
-              ))}
+          {activeTab !== 'cities' ? (
+            <div className="controls-row">
+              <div className="city-filter" aria-label="Filtro por ciudad">
+                {cityFilters.map((city) => (
+                  <CityFilterChip
+                    active={effectiveSelectedCity === city}
+                    city={city}
+                    key={city}
+                    onRemove={removeCityByName}
+                    onSelect={selectCityFilter}
+                    removable={city !== 'Todas' && city !== 'Madrid'}
+                  />
+                ))}
+              </div>
+              <button
+                className="ghost-button"
+                onClick={() => setShowRemoved((value) => !value)}
+                type="button"
+              >
+                <Trash2 size={16} aria-hidden="true" />
+                {showRemoved ? 'Ocultar retiradas' : 'Ver retiradas'}
+              </button>
             </div>
-            <button
-              className="ghost-button"
-              onClick={() => setShowRemoved((value) => !value)}
-              type="button"
-            >
-              <Trash2 size={16} aria-hidden="true" />
-              {showRemoved ? 'Ocultar retiradas' : 'Ver retiradas'}
-            </button>
-          </div>
+          ) : null}
 
           {activeTab === 'budget' ? (
             <BudgetPanel
@@ -1746,6 +1788,20 @@ function App() {
               transferDraft={transferDraft}
               votes={votes}
             />
+          ) : activeTab === 'cities' ? (
+            <NextCitiesPanel
+              activeCity={effectiveSelectedCity}
+              addCity={addCity}
+              cities={activeTravelCities}
+              cityDraft={cityDraft}
+              citySuggestionNames={citySuggestionNames}
+              currentTravelGroup={currentTravelGroup}
+              onPrepareLodging={prepareCityLodging}
+              onPrepareTransfer={prepareCityTransfer}
+              onRemoveCity={removeCity}
+              onOpenMap={openCityMap}
+              updateCityDraft={updateCityDraft}
+            />
           ) : (
             <OptionGrid
               activeCategory={activeCategory}
@@ -1763,74 +1819,77 @@ function App() {
         </section>
       </section>
 
-      <section className="decision-map-grid">
-        <section className="analysis-panel">
-          <div className="section-heading">
-            <Sparkles size={20} aria-hidden="true" />
-            <div>
-              <p className="eyebrow">Análisis IA</p>
-              <h2>Mejor equilibrio familiar ahora</h2>
+      {showOptionWorkspace ? (
+        <section className="decision-map-grid">
+          <section className="analysis-panel">
+            <div className="section-heading">
+              <Sparkles size={20} aria-hidden="true" />
+              <div>
+                <p className="eyebrow">Análisis IA</p>
+                <h2>Mejor equilibrio familiar ahora</h2>
+              </div>
             </div>
-          </div>
-          <div className="ranking-list">
-            {bestOptions.map((option, index) => (
-              <article key={option.id}>
-                <strong>{index + 1}</strong>
-                <div>
-                  <h3>{option.title}</h3>
-                  <p>
-                    {categoryConfig[option.category].shortLabel} · {targetLabels[option.targetGroup]}
-                  </p>
-                </div>
-                <span>{option.aiScore}/100</span>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="map-panel">
-          <div className="section-heading">
-            <MapPinned size={20} aria-hidden="true" />
-            <div>
-              <p className="eyebrow">Mapa operativo</p>
-              <h2>{currentMapCity.city}: opciones y planes</h2>
+            <div className="ranking-list">
+              {bestOptions.map((option, index) => (
+                <article key={option.id}>
+                  <strong>{index + 1}</strong>
+                  <div>
+                    <h3>{option.title}</h3>
+                    <p>
+                      {categoryConfig[option.category].shortLabel} · {targetLabels[option.targetGroup]}
+                    </p>
+                  </div>
+                  <span>{option.aiScore}/100</span>
+                </article>
+              ))}
             </div>
-          </div>
-          <div className="route-mode-control" aria-label="Modo de ruta">
-            {Object.entries(routeModes).map(([mode, config]) => {
-              const Icon = config.icon
-              return (
-                <button
-                  className={routeMode === mode ? 'active' : ''}
-                  key={mode}
-                  onClick={() => setRouteMode(mode)}
-                  type="button"
-                >
-                  <Icon size={16} aria-hidden="true" />
-                  {config.label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="map-status">
-            <strong>{currentMapCity.city}</strong>
-            <span>
-              Centro: {currentMapCity.coords
-                ? `${currentMapCity.coords.lat.toFixed(3)}, ${currentMapCity.coords.lng.toFixed(3)}`
-                : 'por definir'}
-            </span>
-            <span>{mapOptions.length} opciones visibles</span>
-          </div>
-          <MadridMap
-            city={currentMapCity.city}
-            destinationCoords={currentMapCity.coords}
-            options={mapOptions}
-            routeMode={routeMode}
-          />
-        </section>
-      </section>
+          </section>
 
-      <section className="add-panel">
+          <section className="map-panel">
+            <div className="section-heading">
+              <MapPinned size={20} aria-hidden="true" />
+              <div>
+                <p className="eyebrow">Mapa operativo</p>
+                <h2>{currentMapCity.city}: opciones y planes</h2>
+              </div>
+            </div>
+            <div className="route-mode-control" aria-label="Modo de ruta">
+              {Object.entries(routeModes).map(([mode, config]) => {
+                const Icon = config.icon
+                return (
+                  <button
+                    className={routeMode === mode ? 'active' : ''}
+                    key={mode}
+                    onClick={() => setRouteMode(mode)}
+                    type="button"
+                  >
+                    <Icon size={16} aria-hidden="true" />
+                    {config.label}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="map-status">
+              <strong>{currentMapCity.city}</strong>
+              <span>
+                Centro: {currentMapCity.coords
+                  ? `${currentMapCity.coords.lat.toFixed(3)}, ${currentMapCity.coords.lng.toFixed(3)}`
+                  : 'por definir'}
+              </span>
+              <span>{mapOptions.length} opciones visibles</span>
+            </div>
+            <MadridMap
+              city={currentMapCity.city}
+              destinationCoords={currentMapCity.coords}
+              options={mapOptions}
+              routeMode={routeMode}
+            />
+          </section>
+        </section>
+      ) : null}
+
+      {showOptionWorkspace ? (
+        <section className="add-panel">
         <div className="section-heading">
           <Plus size={20} aria-hidden="true" />
           <div>
@@ -1937,9 +1996,11 @@ function App() {
             </div>
           </div>
         ) : null}
-      </section>
+        </section>
+      ) : null}
 
-      <section className="search-panel">
+      {showOptionWorkspace ? (
+        <section className="search-panel">
         <div className="section-heading">
           <Search size={20} aria-hidden="true" />
           <div>
@@ -2202,93 +2263,9 @@ function App() {
             ))}
           </div>
         ) : null}
-      </section>
+        </section>
+      ) : null}
 
-      <section className="future-cities">
-        <div className="section-heading">
-          <CalendarDays size={20} aria-hidden="true" />
-          <div>
-            <p className="eyebrow">14-24 septiembre</p>
-            <h2>Ciudades candidatas</h2>
-          </div>
-        </div>
-        <div className="city-grid">
-          {activeTravelCities.map((idea) => (
-            <article key={idea.id}>
-              <span>{idea.country}</span>
-              <h3>{idea.city}</h3>
-              <p>{idea.angle}</p>
-              <p className="transfer-line">{idea.transfer}</p>
-              <div className="progress">
-                <i style={{ width: `${idea.readiness}%` }} />
-              </div>
-              <strong>{idea.dates}</strong>
-              <button onClick={() => removeCity(idea.id)} type="button">
-                <Trash2 size={15} aria-hidden="true" />
-                Quitar ciudad
-              </button>
-            </article>
-          ))}
-        </div>
-        <form className="city-form" onSubmit={addCity}>
-          <label>
-            <span>Ciudad</span>
-            <input
-              list="city-suggestions"
-              onChange={(event) => updateCityDraft('city', event.target.value)}
-              placeholder="Lisboa, Bilbao..."
-              required
-              type="text"
-              value={cityDraft.city}
-            />
-            <datalist id="city-suggestions">
-              {citySuggestionNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-          </label>
-          <label>
-            <span>País</span>
-            <input
-              onChange={(event) => updateCityDraft('country', event.target.value)}
-              placeholder="Portugal, España..."
-              type="text"
-              value={cityDraft.country}
-            />
-          </label>
-          <label>
-            <span>Fechas</span>
-            <input
-              onChange={(event) => updateCityDraft('dates', event.target.value)}
-              placeholder="19-24 sep"
-              type="text"
-              value={cityDraft.dates}
-            />
-          </label>
-          <label>
-            <span>Traslado</span>
-            <input
-              onChange={(event) => updateCityDraft('transfer', event.target.value)}
-              placeholder="Tren, vuelo, coche..."
-              type="text"
-              value={cityDraft.transfer}
-            />
-          </label>
-          <label className="wide">
-            <span>Idea del plan</span>
-            <input
-              onChange={(event) => updateCityDraft('angle', event.target.value)}
-              placeholder="Por qué puede funcionar para todos"
-              type="text"
-              value={cityDraft.angle}
-            />
-          </label>
-          <button className="primary-button compact" type="submit">
-            <Plus size={18} aria-hidden="true" />
-            Agregar ciudad
-          </button>
-        </form>
-      </section>
     </main>
   )
 }
@@ -2571,6 +2548,197 @@ function ConceptMap({ city, mapOptions, note }) {
       ))}
       {note ? <span className="map-note">{note}</span> : null}
     </div>
+  )
+}
+
+function readinessText(value) {
+  if (value >= 70) return 'Lista para decidir'
+  if (value >= 45) return 'Comparar esta semana'
+  if (value >= 30) return 'Idea prometedora'
+  return 'Idea inicial'
+}
+
+function NextCitiesPanel({
+  activeCity,
+  addCity,
+  cities,
+  cityDraft,
+  citySuggestionNames,
+  currentTravelGroup,
+  onOpenMap,
+  onPrepareLodging,
+  onPrepareTransfer,
+  onRemoveCity,
+  updateCityDraft,
+}) {
+  const topCity = [...cities].sort((a, b) => b.readiness - a.readiness)[0]
+  const undecidedCount = cities.filter((city) => city.readiness < 50).length
+
+  return (
+    <section className="next-cities-panel">
+      <div className="next-city-hero">
+        <div>
+          <p className="eyebrow">Después de Madrid · 14-24 septiembre</p>
+          <h2>Elegir la siguiente base del viaje</h2>
+          <p>
+            Esta sección queda para una sola decisión: qué ciudad vale la pena
+            investigar, qué falta cerrar y cuál es el siguiente paso concreto.
+          </p>
+        </div>
+        <div className="next-city-kpis" aria-label="Estado de decisión">
+          <article>
+            <span>Candidatas</span>
+            <strong>{cities.length}</strong>
+          </article>
+          <article>
+            <span>Más avanzada</span>
+            <strong>{topCity?.city || 'Por definir'}</strong>
+          </article>
+          <article>
+            <span>Por madurar</span>
+            <strong>{undecidedCount}</strong>
+          </article>
+        </div>
+      </div>
+
+      <div className="decision-roadmap">
+        <article>
+          <span>1</span>
+          <strong>Ciudad base</strong>
+          <p>Reducir a 1 o 2 candidatas reales.</p>
+        </article>
+        <article>
+          <span>2</span>
+          <strong>Traslado</strong>
+          <p>Comparar tren, bus y avión en Omio.</p>
+        </article>
+        <article>
+          <span>3</span>
+          <strong>Hospedaje</strong>
+          <p>Buscar opciones para {groupSummary(currentTravelGroup)}.</p>
+        </article>
+        <article>
+          <span>4</span>
+          <strong>Plan familiar</strong>
+          <p>Definir 2-3 planes que funcionen con niños.</p>
+        </article>
+      </div>
+
+      <div className="next-city-grid">
+        {cities.map((city) => (
+          <article className={activeCity === city.city ? 'selected' : ''} key={city.id}>
+            <div className="next-city-card-head">
+              <div>
+                <span>{city.country}</span>
+                <h3>{city.city}</h3>
+              </div>
+              <strong>{readinessText(city.readiness)}</strong>
+            </div>
+            <p>{city.angle}</p>
+            <div className="next-city-facts">
+              <span>
+                <CalendarDays size={14} aria-hidden="true" />
+                {city.dates}
+              </span>
+              <span>
+                <TrainFront size={14} aria-hidden="true" />
+                {city.transfer}
+              </span>
+            </div>
+            <div className="progress">
+              <i style={{ width: `${city.readiness}%` }} />
+            </div>
+            <div className="next-city-actions">
+              <button onClick={() => onOpenMap(city.city)} type="button">
+                <MapPinned size={15} aria-hidden="true" />
+                Ver mapa
+              </button>
+              <button onClick={() => onPrepareLodging(city)} type="button">
+                <Hotel size={15} aria-hidden="true" />
+                Hospedaje
+              </button>
+              <button onClick={() => onPrepareTransfer(city)} type="button">
+                <TrainFront size={15} aria-hidden="true" />
+                Omio
+              </button>
+              <button className="danger" onClick={() => onRemoveCity(city.id)} type="button">
+                <Trash2 size={15} aria-hidden="true" />
+                Quitar
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="next-city-add">
+        <div>
+          <p className="eyebrow">Nueva ciudad candidata</p>
+          <h2>Agregar ciudad con intención</h2>
+          <p>
+            Lo importante no es llenar una lista: es guardar por qué esa ciudad
+            podría funcionar y qué traslado habría que revisar.
+          </p>
+        </div>
+        <form className="city-form" onSubmit={addCity}>
+          <label>
+            <span>Ciudad</span>
+            <input
+              list="city-suggestions"
+              onChange={(event) => updateCityDraft('city', event.target.value)}
+              placeholder="Lisboa, Bilbao..."
+              required
+              type="text"
+              value={cityDraft.city}
+            />
+            <datalist id="city-suggestions">
+              {citySuggestionNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </label>
+          <label>
+            <span>País</span>
+            <input
+              onChange={(event) => updateCityDraft('country', event.target.value)}
+              placeholder="Portugal, España..."
+              type="text"
+              value={cityDraft.country}
+            />
+          </label>
+          <label>
+            <span>Fechas</span>
+            <input
+              onChange={(event) => updateCityDraft('dates', event.target.value)}
+              placeholder="19-24 sep"
+              type="text"
+              value={cityDraft.dates}
+            />
+          </label>
+          <label>
+            <span>Traslado</span>
+            <input
+              onChange={(event) => updateCityDraft('transfer', event.target.value)}
+              placeholder="Tren, vuelo, coche..."
+              type="text"
+              value={cityDraft.transfer}
+            />
+          </label>
+          <label className="wide">
+            <span>Idea del plan</span>
+            <input
+              onChange={(event) => updateCityDraft('angle', event.target.value)}
+              placeholder="Por qué puede funcionar para todos"
+              type="text"
+              value={cityDraft.angle}
+            />
+          </label>
+          <button className="primary-button compact" type="submit">
+            <Plus size={18} aria-hidden="true" />
+            Agregar ciudad
+          </button>
+        </form>
+      </div>
+    </section>
   )
 }
 

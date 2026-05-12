@@ -168,6 +168,11 @@ export const categoryConfig = {
     shortLabel: 'Traslado',
     tone: '#0d9488',
   },
+  cities: {
+    label: 'Después',
+    shortLabel: 'Ciudad',
+    tone: '#8aa388',
+  },
   itinerary: {
     label: 'Itinerario',
     shortLabel: 'Ruta',
