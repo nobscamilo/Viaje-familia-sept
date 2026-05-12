@@ -15,6 +15,12 @@ export async function analyzeOptionWithAI(payload) {
   return result.data
 }
 
+export async function verifyAvailabilityWithAI(payload) {
+  const run = callable('verifyTripOptionAvailability')
+  const result = await run(payload)
+  return result.data
+}
+
 export async function suggestLodgingWithAI(payload) {
   const run = callable('suggestLodgingSearch')
   const result = await run(payload)

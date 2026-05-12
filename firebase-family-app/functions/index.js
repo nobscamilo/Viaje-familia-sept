@@ -488,6 +488,7 @@ async function extractMetadata(url) {
     const visiblePriceText = opaquePlatform
       ? ''
       : $('body').text().replace(/\s+/g, ' ').slice(0, 80_000)
+    const availabilityText = $('body').text().replace(/\s+/g, ' ').slice(0, 30_000)
     const priceCandidates = [
       ...structuredPriceCandidates,
       ...extractPriceCandidates(visiblePriceText),
@@ -503,6 +504,7 @@ async function extractMetadata(url) {
       structuredPriceCandidates: [...new Set(structuredPriceCandidates.filter(Boolean))].slice(0, 10),
       priceCandidates: [...new Set(priceCandidates.filter(Boolean))].slice(0, 10),
       priceCandidateSource: opaquePlatform ? 'structured-only' : 'page-visible',
+      availabilityText: cleanText(`${title} ${description} ${availabilityText}`),
       sourceStatus: response.status,
     }
   } catch (error) {
@@ -512,6 +514,118 @@ async function extractMetadata(url) {
       sourceStatus: 'unavailable',
       sourceNote: error.message,
     }
+  }
+}
+
+function availabilityCheckUrl(input, groupProfile) {
+  const rawUrl = cleanUrl(input.url)
+  if (!rawUrl) return ''
+
+  const dates = parseTripDates(input.dates)
+  const adults = groupProfile.adults
+  const children = groupProfile.childrenAges.length
+
+  try {
+    const parsed = new URL(rawUrl)
+    const host = parsed.hostname.toLowerCase()
+
+    if (dates.checkin && dates.checkout) {
+      parsed.searchParams.set('checkin', dates.checkin)
+      parsed.searchParams.set('checkout', dates.checkout)
+    }
+
+    if (host.includes('booking.')) {
+      parsed.searchParams.set('group_adults', String(adults))
+      parsed.searchParams.set('group_children', String(children))
+      parsed.searchParams.set('no_rooms', parsed.searchParams.get('no_rooms') || '1')
+      parsed.searchParams.set('selected_currency', 'EUR')
+      parsed.searchParams.delete('age')
+      groupProfile.childrenAges.forEach((age) => parsed.searchParams.append('age', String(age)))
+    }
+
+    if (host.includes('airbnb.')) {
+      parsed.searchParams.set('adults', String(adults))
+      parsed.searchParams.set('children', String(children))
+    }
+
+    return parsed.toString()
+  } catch {
+    return rawUrl
+  }
+}
+
+function availabilityFromMetadata(input, metadata, checkUrl) {
+  const checkedAt = new Date().toISOString()
+  const host = hostname(input.url)
+  const sourceText = cleanText(
+    `${metadata.title || ''} ${metadata.description || ''} ${metadata.availabilityText || ''} ${metadata.sourceNote || ''}`,
+  ).toLowerCase()
+  const opaquePlatform = isOpaqueTravelPlatform(input.url)
+  const negativeMatch = sourceText.match(
+    /sin disponibilidad|no disponible|no hay disponibilidad|agotad[oa]s?|no quedan|sold out|unavailable|not available|no availability|fully booked|no se puede reservar/i,
+  )
+  const positiveMatch = sourceText.match(
+    /disponible|ver disponibilidad|reservar|book now|reserve|available|availability/i,
+  )
+
+  if (negativeMatch) {
+    return {
+      status: 'unavailable',
+      label: 'Parece no disponible',
+      confidence: 'media',
+      checkedAt,
+      checkUrl,
+      source: host,
+      sourceStatus: metadata.sourceStatus || null,
+      summary:
+        'La página mostró señales de no disponibilidad. Conviene abrir el enlace con fechas para confirmar antes de descartarla.',
+      signals: [`Señal detectada: "${negativeMatch[0]}"`],
+    }
+  }
+
+  if (opaquePlatform) {
+    return {
+      status: 'unknown',
+      label: 'Confirmar en plataforma',
+      confidence: 'baja',
+      checkedAt,
+      checkUrl,
+      source: host,
+      sourceStatus: metadata.sourceStatus || null,
+      summary:
+        'La plataforma no permite confirmar disponibilidad de forma fiable desde la app. Dejé el enlace con fechas, grupo y moneda para revisarlo en un clic.',
+      signals: positiveMatch
+        ? [`La página respondió, pero la señal "${positiveMatch[0]}" no confirma stock real.`]
+        : ['La página respondió, pero no entregó disponibilidad verificable.'],
+    }
+  }
+
+  if (positiveMatch && metadata.sourceStatus === 200) {
+    return {
+      status: 'available',
+      label: 'Parece disponible',
+      confidence: 'media',
+      checkedAt,
+      checkUrl,
+      source: host,
+      sourceStatus: metadata.sourceStatus || null,
+      summary:
+        'La página respondió correctamente y mostró señales de reserva/disponibilidad. Aun así, confirma precio final antes de decidir.',
+      signals: [`Señal detectada: "${positiveMatch[0]}"`],
+    }
+  }
+
+  return {
+    status: 'unknown',
+    label: 'No se pudo confirmar',
+    confidence: 'baja',
+    checkedAt,
+    checkUrl,
+    source: host,
+    sourceStatus: metadata.sourceStatus || null,
+    summary:
+      'No encontré señales suficientes para confirmar disponibilidad automática. Usa el enlace con fechas para revisarlo manualmente.',
+    signals: metadata.sourceNote ? [metadata.sourceNote] : ['Sin señal concluyente en la página.'],
   }
 }
 
@@ -1010,6 +1124,41 @@ ${JSON.stringify({ input, metadata, place, routes })}
   )
 
   return stripUndefined({ jobId: jobRef.id, option, analysis, metadata, routes })
+})
+
+export const verifyTripOptionAvailability = onCall(functionOptions, async (request) => {
+  const user = requireAuth(request)
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
+  const input = {
+    optionId: cleanText(request.data?.optionId),
+    title: cleanText(request.data?.title),
+    url: cleanUrl(request.data?.url),
+    city: cleanText(request.data?.city, 'Madrid'),
+    dates: cleanText(request.data?.dates, '10-14 sep 2026'),
+  }
+
+  if (!input.url) {
+    throw new HttpsError('invalid-argument', 'La opción no tiene un link válido para verificar.')
+  }
+
+  const checkUrl = availabilityCheckUrl(input, groupProfile)
+  const metadata = await extractMetadata(checkUrl || input.url)
+  const availability = stripUndefined(
+    availabilityFromMetadata(input, metadata, checkUrl || input.url),
+  )
+
+  if (input.optionId) {
+    await db.collection('tripOptions').doc(input.optionId).set(
+      {
+        availability,
+        updatedBy: user.uid,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+  }
+
+  return availability
 })
 
 export const suggestLodgingSearch = onCall(functionOptions, async (request) => {

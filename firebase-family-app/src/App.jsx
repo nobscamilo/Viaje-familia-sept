@@ -48,6 +48,7 @@ import {
   suggestTransferWithAI,
   suggestFoodWithAI,
   suggestLodgingWithAI,
+  verifyAvailabilityWithAI,
 } from './services/aiFunctions'
 import {
   canUseFirestore,
@@ -390,6 +391,26 @@ function buildFamilyProfileDraft(draft) {
   }
 }
 
+function availabilityTone(status) {
+  if (status === 'available') return 'ready'
+  if (status === 'unavailable') return 'blocked'
+  return 'unknown'
+}
+
+function formatAvailabilityDate(value) {
+  if (!value) return ''
+  try {
+    return new Intl.DateTimeFormat('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value))
+  } catch {
+    return ''
+  }
+}
+
 function parseTripDates(value) {
   const text = String(value || '').toLowerCase()
   const year = text.match(/\b(20\d{2})\b/)?.[1] || '2026'
@@ -667,6 +688,7 @@ function App() {
   const [externalPriceTotal, setExternalPriceTotal] = useState('')
   const [externalPriceNight, setExternalPriceNight] = useState('')
   const [externalBusy, setExternalBusy] = useState(false)
+  const [availabilityBusyId, setAvailabilityBusyId] = useState('')
   const [budgetOptionIds, setBudgetOptionIds] = useState(['lodging-m'])
   const [transferDraft, setTransferDraft] = useState({
     origin: 'Madrid',
@@ -1156,6 +1178,12 @@ function App() {
     setActiveTab('lodging')
   }
 
+  function datesForOptionCity(cityName) {
+    if (cityName === 'Madrid') return '10-14 sep 2026'
+    const city = activeTravelCities.find((item) => item.city === cityName)
+    return city?.dates || searchDraft.dates || '14-24 sep 2026'
+  }
+
   async function addTravelGroup(event) {
     event.preventDefault()
     if (!familyProfileDraft.name.trim()) return
@@ -1328,6 +1356,56 @@ function App() {
 
     if (canSync) {
       await saveTripOption(option, currentUser)
+    }
+  }
+
+  async function verifyAvailability(option) {
+    if (!option.url) return
+
+    if (!canSync) {
+      setAiFeedback({
+        tone: 'warning',
+        title: 'Inicia sesión para verificar',
+        detail: 'La verificación usa Cloud Functions y guarda el resultado para toda la familia.',
+      })
+      return
+    }
+
+    setAvailabilityBusyId(option.id)
+    setAiFeedback({
+      tone: 'working',
+      title: 'Verificando disponibilidad',
+      detail: `Estoy revisando ${option.title} con fechas y grupo actual.`,
+    })
+
+    try {
+      const availability = await verifyAvailabilityWithAI({
+        optionId: option.id,
+        title: option.title,
+        url: option.url,
+        city: option.city,
+        dates: datesForOptionCity(option.city),
+        groupProfile: currentTravelGroup,
+      })
+
+      setOptions((current) =>
+        current.map((item) =>
+          item.id === option.id ? { ...item, availability } : item,
+        ),
+      )
+      setAiFeedback({
+        tone: availability.status === 'unavailable' ? 'warning' : 'ready',
+        title: availability.label || 'Disponibilidad revisada',
+        detail: availability.summary || 'Resultado guardado en la tarjeta.',
+      })
+    } catch (error) {
+      setAiFeedback({
+        tone: 'warning',
+        title: 'No pude verificar',
+        detail: error.message,
+      })
+    } finally {
+      setAvailabilityBusyId('')
     }
   }
 
@@ -1962,9 +2040,11 @@ function App() {
             <OptionGrid
               activeCategory={activeCategory}
               activeMember={activeMember}
+              availabilityBusyId={availabilityBusyId}
               onRemove={removeOption}
               onRestore={restoreOption}
               onToggleBudget={toggleBudgetOption}
+              onVerifyAvailability={verifyAvailability}
               onVote={toggleVote}
               options={visibleOptions}
               budgetOptionIds={budgetOptionIds}
@@ -3127,11 +3207,13 @@ function TransportPanel({
 function OptionGrid({
   activeCategory,
   activeMember,
+  availabilityBusyId = '',
   budgetOptionIds,
   nights,
   onRemove,
   onRestore,
   onToggleBudget,
+  onVerifyAvailability,
   onVote,
   options,
   votes,
@@ -3192,6 +3274,21 @@ function OptionGrid({
                 <span>{option.rating}</span>
               </div>
 
+              {option.category === 'lodging' && option.availability ? (
+                <div className={`availability-card ${availabilityTone(option.availability.status)}`}>
+                  <strong>{option.availability.label || 'Disponibilidad revisada'}</strong>
+                  <span>
+                    {formatAvailabilityDate(option.availability.checkedAt)
+                      ? `Revisado ${formatAvailabilityDate(option.availability.checkedAt)}`
+                      : 'Revisión guardada'}
+                    {option.availability.confidence
+                      ? ` · confianza ${option.availability.confidence}`
+                      : ''}
+                  </span>
+                  <p>{option.availability.summary}</p>
+                </div>
+              ) : null}
+
               <ul className="signal-list">
                 {option.highlights.slice(0, 2).map((highlight) => (
                   <li key={highlight}>{highlight}</li>
@@ -3210,6 +3307,26 @@ function OptionGrid({
                 {option.url ? (
                   <a href={option.url} rel="noreferrer" target="_blank">
                     Ver link
+                  </a>
+                ) : null}
+                {option.category === 'lodging' && option.url && onVerifyAvailability ? (
+                  <button
+                    className="availability-action"
+                    disabled={availabilityBusyId === option.id}
+                    onClick={() => onVerifyAvailability(option)}
+                    type="button"
+                  >
+                    {availabilityBusyId === option.id ? (
+                      <Loader2 size={16} aria-hidden="true" />
+                    ) : (
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                    )}
+                    Verificar disponibilidad
+                  </button>
+                ) : null}
+                {option.category === 'lodging' && option.availability?.checkUrl ? (
+                  <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
+                    Confirmar fechas
                   </a>
                 ) : null}
                 <button
