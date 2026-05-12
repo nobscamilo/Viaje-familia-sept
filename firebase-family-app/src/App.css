@@ -556,6 +556,24 @@
   margin: 16px 0;
 }
 
+.city-context {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.city-context h2 {
+  margin: 2px 0 4px;
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
+.city-context span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .city-filter {
   flex-wrap: wrap;
 }
@@ -928,7 +946,7 @@
 
 .decision-map-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   margin-top: 18px;
 }
@@ -1046,6 +1064,25 @@
 .map-status span {
   color: #334155;
   background: #f1f5f9;
+}
+
+.map-empty-callout {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(75, 50, 35, 0.1);
+  border-radius: 16px;
+}
+
+.map-empty-callout strong {
+  color: var(--ink);
+}
+
+.map-empty-callout span {
+  line-height: 1.4;
 }
 
 .real-map-wrap {
@@ -2320,6 +2357,13 @@
 
 .controls-row {
   align-items: flex-start;
+}
+
+.city-context {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 20px;
 }
 
 .city-chip button:first-child,

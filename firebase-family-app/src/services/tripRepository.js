@@ -64,10 +64,12 @@ export async function seedInitialTravelCities(user) {
   if (!canUseFirestore() || !user) return
 
   const snapshot = await getDocs(collection(firestoreDb, citiesCollection))
-  if (!snapshot.empty) return
+  const existingIds = new Set(snapshot.docs.map((item) => item.id))
+  const missingCities = cityIdeas.filter((city) => !existingIds.has(city.id))
+  if (!missingCities.length) return
 
   await Promise.all(
-    cityIdeas.map((city) =>
+    missingCities.map((city) =>
       setDoc(doc(firestoreDb, citiesCollection, city.id), {
         ...city,
         createdBy: user.uid,

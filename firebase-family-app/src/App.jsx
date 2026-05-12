@@ -33,7 +33,6 @@ import {
   familyProfiles,
   initialOptions,
   itineraryDraft,
-  tripSegments,
 } from './data/trip'
 import {
   firebaseAuth,
@@ -806,15 +805,6 @@ function App() {
       .sort((a, b) => b.aiScore - a.aiScore)
   }, [activeTab, effectiveSelectedCity, options, showRemoved])
 
-  const bestOptions = useMemo(
-    () =>
-      options
-        .filter((option) => option.status !== 'removed')
-        .sort((a, b) => b.aiScore - a.aiScore)
-        .slice(0, 4),
-    [options],
-  )
-
   const mapOptions = useMemo(
     () =>
       options.filter(
@@ -827,6 +817,10 @@ function App() {
     [effectiveSelectedCity, options],
   )
   const currentMapCity = cityCenter(effectiveSelectedCity, activeTravelCities)
+  const activeCityHelp =
+    effectiveSelectedCity === 'Todas'
+      ? 'Ves todas las tarjetas; el mapa usa Madrid como referencia inicial.'
+      : `Lista, mapa y búsquedas quedan filtradas a ${effectiveSelectedCity}.`
 
   function updateDraft(field, value) {
     setDraft((current) => ({ ...current, [field]: value }))
@@ -1558,7 +1552,7 @@ function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Viaje familiar septiembre 2026</p>
-          <h1>Madrid nos espera.</h1>
+          <h1>Plan familiar septiembre 2026.</h1>
         </div>
         <div className="status-stack">
           <div className={`firebase-pill ${firebaseStatus.ready ? 'ready' : ''}`}>
@@ -1595,26 +1589,6 @@ function App() {
           )}
         </div>
       </header>
-
-      <section className="summary-grid" aria-label="Resumen del viaje">
-        {tripSegments.map((segment) => (
-          <article className="segment-card" key={segment.id}>
-            <div className="segment-dot" style={{ background: segment.color }} />
-            <p>{segment.dates}</p>
-            <h2>
-              {segment.city}, {segment.country}
-            </h2>
-            <span>{segment.focus}</span>
-            <strong>{segment.status}</strong>
-          </article>
-        ))}
-        <article className="family-card">
-          <Users size={22} aria-hidden="true" />
-          <p>Grupo completo</p>
-          <h2>9 viajeros</h2>
-          <span>{f1Crew.length} van a F1, {familyCrew.length} necesitan planes alternos</span>
-        </article>
-      </section>
 
       <section className="collab-strip" aria-label="Estado de colaboración">
         <div>
@@ -1733,17 +1707,24 @@ function App() {
 
           {activeTab !== 'cities' ? (
             <div className="controls-row">
-              <div className="city-filter" aria-label="Filtro por ciudad">
-                {cityFilters.map((city) => (
-                  <CityFilterChip
-                    active={effectiveSelectedCity === city}
-                    city={city}
-                    key={city}
-                    onRemove={removeCityByName}
-                    onSelect={selectCityFilter}
-                    removable={city !== 'Todas' && city !== 'Madrid'}
-                  />
-                ))}
+              <div className="city-context">
+                <div>
+                  <p className="eyebrow">Ciudad activa</p>
+                  <h2>{effectiveSelectedCity === 'Todas' ? 'Todas las ciudades' : effectiveSelectedCity}</h2>
+                  <span>{activeCityHelp}</span>
+                </div>
+                <div className="city-filter" aria-label="Cambiar ciudad activa">
+                  {cityFilters.map((city) => (
+                    <CityFilterChip
+                      active={effectiveSelectedCity === city}
+                      city={city}
+                      key={city}
+                      onRemove={removeCityByName}
+                      onSelect={selectCityFilter}
+                      removable={city !== 'Todas' && city !== 'Madrid'}
+                    />
+                  ))}
+                </div>
               </div>
               <button
                 className="ghost-button"
@@ -1821,36 +1802,12 @@ function App() {
 
       {showOptionWorkspace ? (
         <section className="decision-map-grid">
-          <section className="analysis-panel">
-            <div className="section-heading">
-              <Sparkles size={20} aria-hidden="true" />
-              <div>
-                <p className="eyebrow">Análisis IA</p>
-                <h2>Mejor equilibrio familiar ahora</h2>
-              </div>
-            </div>
-            <div className="ranking-list">
-              {bestOptions.map((option, index) => (
-                <article key={option.id}>
-                  <strong>{index + 1}</strong>
-                  <div>
-                    <h3>{option.title}</h3>
-                    <p>
-                      {categoryConfig[option.category].shortLabel} · {targetLabels[option.targetGroup]}
-                    </p>
-                  </div>
-                  <span>{option.aiScore}/100</span>
-                </article>
-              ))}
-            </div>
-          </section>
-
           <section className="map-panel">
             <div className="section-heading">
               <MapPinned size={20} aria-hidden="true" />
               <div>
-                <p className="eyebrow">Mapa operativo</p>
-                <h2>{currentMapCity.city}: opciones y planes</h2>
+                <p className="eyebrow">Mapa de la ciudad activa</p>
+                <h2>{currentMapCity.city}: {mapOptions.length ? 'opciones ubicadas' : 'sin opciones guardadas todavía'}</h2>
               </div>
             </div>
             <div className="route-mode-control" aria-label="Modo de ruta">
@@ -1878,6 +1835,15 @@ function App() {
               </span>
               <span>{mapOptions.length} opciones visibles</span>
             </div>
+            {mapOptions.length === 0 ? (
+              <div className="map-empty-callout">
+                <strong>{currentMapCity.city} ya puede mostrarse en el mapa.</strong>
+                <span>
+                  Falta agregar hospedajes, comida o planes de esta ciudad para que aparezcan
+                  marcadores y tiempos de desplazamiento.
+                </span>
+              </div>
+            ) : null}
             <MadridMap
               city={currentMapCity.city}
               destinationCoords={currentMapCity.coords}
@@ -2296,7 +2262,7 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
       <section className="login-hero">
         <div className="login-copy">
           <p className="eyebrow">Viaje familiar septiembre 2026</p>
-          <h1>Entrar para planear juntos Madrid.</h1>
+          <h1>Entrar para planear juntos.</h1>
           <p>
             La app guarda votos, sugerencias, hospedajes, comidas, ciudades e
             itinerarios. Para que cada cambio quede sincronizado, primero entra
@@ -2326,8 +2292,8 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
           </article>
           <article>
             <MapPinned size={22} aria-hidden="true" />
-            <h2>Rutas reales</h2>
-            <p>Mapa con transporte público, caminando o en coche hacia IFEMA.</p>
+            <h2>Mapa por ciudad</h2>
+            <p>Madrid usa IFEMA como referencia; París y las demás ciudades usan su centro.</p>
           </article>
           <article>
             <Sparkles size={22} aria-hidden="true" />
@@ -2389,99 +2355,104 @@ function MadridMap({ city, destinationCoords, options, routeMode }) {
         mapItems.push(destinationMarker)
         bounds.extend(destinationPosition)
 
-        options
-          .filter((option) => option.coords)
-          .forEach((option) => {
-            const position = new google.maps.LatLng(option.coords.lat, option.coords.lng)
-            const marker = new google.maps.Marker({
-              map,
-              position,
+        const locatedOptions = options.filter((option) => option.coords)
+
+        locatedOptions.forEach((option) => {
+          const position = new google.maps.LatLng(option.coords.lat, option.coords.lng)
+          const marker = new google.maps.Marker({
+            map,
+            position,
+            title: option.title,
+            label: option.code,
+          })
+          const fallbackLine = new google.maps.Polyline({
+            map,
+            path: [position, destinationPosition],
+            geodesic: true,
+            strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
+            strokeOpacity: 0.55,
+            strokeWeight: 3,
+          })
+
+          const routeLabel = routeModes[routeMode]?.label || 'Ruta'
+          marker.routeStatus = option.transit
+          setRouteSummaries((current) => ({
+            ...current,
+            [option.id]: {
               title: option.title,
-              label: option.code,
-            })
-            const fallbackLine = new google.maps.Polyline({
-              map,
-              path: [position, destinationPosition],
-              geodesic: true,
-              strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
-              strokeOpacity: 0.55,
-              strokeWeight: 3,
-            })
+              code: option.code,
+              status: option.id === 'f1-madring' ? 'Destino de referencia' : 'Calculando...',
+            },
+          }))
 
-            const routeLabel = routeModes[routeMode]?.label || 'Ruta'
-            marker.routeStatus = option.transit
-            setRouteSummaries((current) => ({
-              ...current,
-              [option.id]: {
-                title: option.title,
-                code: option.code,
-                status: option.id === 'f1-madring' || !isMadrid ? 'Destino de referencia' : 'Calculando...',
+          marker.addListener('click', () => {
+            infoWindow.setContent(
+              `<strong>${option.title}</strong><br>${routeLabel}<br>${marker.routeStatus || option.transit}<br>${option.aiScore}/100`,
+            )
+            infoWindow.open({ anchor: marker, map })
+          })
+
+          if (option.id !== 'f1-madring') {
+            directionsService.route(
+              {
+                origin: position,
+                destination: destinationPosition,
+                travelMode: google.maps.TravelMode[routeMode],
               },
-            }))
-
-            marker.addListener('click', () => {
-              infoWindow.setContent(
-                `<strong>${option.title}</strong><br>${routeLabel}<br>${marker.routeStatus || option.transit}<br>${option.aiScore}/100`,
-              )
-              infoWindow.open({ anchor: marker, map })
-            })
-
-            if (option.id !== 'f1-madring') {
-              directionsService.route(
-                {
-                  origin: position,
-                  destination: destinationPosition,
-                  travelMode: google.maps.TravelMode[routeMode],
-                },
-                (result, status) => {
-                  if (status !== google.maps.DirectionsStatus.OK || !result) {
-                    marker.routeStatus = 'Sin tiempo disponible'
-                    setRouteSummaries((current) => ({
-                      ...current,
-                      [option.id]: {
-                        title: option.title,
-                        code: option.code,
-                        status: 'Sin tiempo disponible',
-                      },
-                    }))
-                    return
-                  }
-                  const leg = result.routes?.[0]?.legs?.[0]
-                  const duration = leg?.duration?.text || 'Tiempo no disponible'
-                  const distance = leg?.distance?.text || ''
-                  marker.routeStatus = `${duration}${distance ? ` · ${distance}` : ''}`
+              (result, status) => {
+                if (status !== google.maps.DirectionsStatus.OK || !result) {
+                  marker.routeStatus = 'Sin tiempo disponible'
                   setRouteSummaries((current) => ({
                     ...current,
                     [option.id]: {
                       title: option.title,
                       code: option.code,
-                      duration,
-                      distance,
-                      status: `${duration}${distance ? ` · ${distance}` : ''}`,
+                      status: 'Sin tiempo disponible',
                     },
                   }))
-                  fallbackLine.setMap(null)
-                  const renderer = new google.maps.DirectionsRenderer({
-                    directions: result,
-                    map,
-                    preserveViewport: true,
-                    suppressMarkers: true,
-                    polylineOptions: {
-                      strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
-                      strokeOpacity: 0.72,
-                      strokeWeight: 4,
-                    },
-                  })
-                  mapItems.push(renderer)
-                },
-              )
-            }
+                  return
+                }
+                const leg = result.routes?.[0]?.legs?.[0]
+                const duration = leg?.duration?.text || 'Tiempo no disponible'
+                const distance = leg?.distance?.text || ''
+                marker.routeStatus = `${duration}${distance ? ` · ${distance}` : ''}`
+                setRouteSummaries((current) => ({
+                  ...current,
+                  [option.id]: {
+                    title: option.title,
+                    code: option.code,
+                    duration,
+                    distance,
+                    status: `${duration}${distance ? ` · ${distance}` : ''}`,
+                  },
+                }))
+                fallbackLine.setMap(null)
+                const renderer = new google.maps.DirectionsRenderer({
+                  directions: result,
+                  map,
+                  preserveViewport: true,
+                  suppressMarkers: true,
+                  polylineOptions: {
+                    strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
+                    strokeOpacity: 0.72,
+                    strokeWeight: 4,
+                  },
+                })
+                mapItems.push(renderer)
+              },
+            )
+          }
 
-            mapItems.push(marker, fallbackLine)
-            bounds.extend(position)
-          })
+          mapItems.push(marker, fallbackLine)
+          bounds.extend(position)
+        })
 
-        map.fitBounds(bounds, 42)
+        if (locatedOptions.length) {
+          map.fitBounds(bounds, 42)
+        } else {
+          map.setCenter(destinationCoords)
+          map.setZoom(isMadrid ? 11 : 12)
+        }
       })
       .catch((error) => {
         if (!cancelled) setMapError(error.message)
