@@ -180,6 +180,39 @@ const routeModes = {
   },
 }
 
+const smartSuggestionTypes = [
+  {
+    id: 'food',
+    label: 'Comida',
+    actionLabel: 'Agregar a comida',
+    budgetLabel: 'Comida + presupuesto',
+    category: 'food',
+    icon: Utensils,
+    notes:
+      'restaurantes familiares bien valorados, con muchas reseñas, reserva fácil y comida flexible para niños',
+  },
+  {
+    id: 'activities',
+    label: 'Actividades',
+    actionLabel: 'Agregar a planes',
+    budgetLabel: 'Plan + presupuesto',
+    category: 'activities',
+    icon: Landmark,
+    notes:
+      'actividades familiares bien valoradas, museos, miradores, parques y sitios fáciles de visitar en grupo',
+  },
+  {
+    id: 'kids',
+    label: 'Con niños',
+    actionLabel: 'Agregar a planes',
+    budgetLabel: 'Plan + presupuesto',
+    category: 'activities',
+    icon: Users,
+    notes:
+      'planes bien valorados para niños de 5 y 9 años, con poca fricción logística y buena puntuación en Google Maps',
+  },
+]
+
 const fallbackImages = {
   lodging:
     'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80',
@@ -623,6 +656,9 @@ function App() {
   const [searchResult, setSearchResult] = useState(null)
   const [places, setPlaces] = useState([])
   const [placesBusy, setPlacesBusy] = useState(false)
+  const [smartSuggestionType, setSmartSuggestionType] = useState('food')
+  const [smartSuggestions, setSmartSuggestions] = useState(null)
+  const [smartSuggestionsBusy, setSmartSuggestionsBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiFeedback, setAiFeedback] = useState(null)
   const [itineraryBusy, setItineraryBusy] = useState(false)
@@ -821,7 +857,6 @@ function App() {
     effectiveSelectedCity === 'Todas'
       ? 'Ves todas las tarjetas; el mapa usa Madrid como referencia inicial.'
       : `Lista, mapa y búsquedas quedan filtradas a ${effectiveSelectedCity}.`
-
   function updateDraft(field, value) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
@@ -1378,20 +1413,125 @@ function App() {
     }
   }
 
-  async function addPlaceOption(place) {
+  async function findSmartSuggestions(type = smartSuggestionType) {
+    const config =
+      smartSuggestionTypes.find((item) => item.id === type) || smartSuggestionTypes[0]
+    const city = currentMapCity.city || searchDraft.city || 'Madrid'
+    setSmartSuggestionType(config.id)
+    setSmartSuggestionsBusy(true)
+    setSmartSuggestions({
+      id: `smart-${Date.now()}`,
+      city,
+      type: config.id,
+      status: 'working',
+      places: [],
+      analysis: {
+        summary: `Buscando ${config.label.toLowerCase()} en Google Maps para ${city}.`,
+      },
+    })
+
+    if (canSync) {
+      try {
+        const result = await suggestFoodWithAI({
+          city,
+          dates: searchDraft.dates,
+          kind: config.label,
+          notes: config.notes,
+          groupProfile: currentTravelGroup,
+        })
+        setSmartSuggestions({
+          ...result,
+          type: config.id,
+          category: config.category,
+          places: (result.places || []).slice(0, 3),
+        })
+        setSmartSuggestionsBusy(false)
+        return
+      } catch (error) {
+        setSmartSuggestions({
+          id: `smart-${Date.now()}`,
+          city,
+          type: config.id,
+          status: 'error',
+          places: [],
+          analysis: {
+            summary: `${error.message}. Intento con Google Maps del navegador.`,
+          },
+        })
+      }
+    }
+
+    try {
+      const google = await loadGoogleMaps()
+      const service = new google.maps.places.PlacesService(document.createElement('div'))
+      service.textSearch(
+        {
+          query: `${config.notes} en ${city}`,
+          ...(city === 'Madrid' ? { region: 'es' } : {}),
+        },
+        (results, status) => {
+          setSmartSuggestionsBusy(false)
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
+            setSmartSuggestions({
+              id: `smart-${Date.now()}`,
+              city,
+              type: config.id,
+              status: 'error',
+              places: [],
+              analysis: { summary: `Google Places respondió: ${status}` },
+            })
+            return
+          }
+
+          setSmartSuggestions({
+            id: `smart-${Date.now()}`,
+            city,
+            type: config.id,
+            category: config.category,
+            status: 'ready',
+            places: results.slice(0, 3),
+            analysis: {
+              summary: `Top ${Math.min(results.length, 3)} sugerencias de Google Maps para ${city}.`,
+            },
+          })
+        },
+      )
+    } catch (error) {
+      setSmartSuggestionsBusy(false)
+      setSmartSuggestions({
+        id: `smart-${Date.now()}`,
+        city,
+        type: config.id,
+        status: 'error',
+        places: [],
+        analysis: { summary: error.message },
+      })
+    }
+  }
+
+  async function addPlaceOption(
+    place,
+    category = 'food',
+    cityOverride = searchDraft.city || 'Madrid',
+    includeBudget = false,
+  ) {
     const name = getPlaceName(place)
     const placeId = getPlaceId(place)
+    const placeSlug = citySlug(placeId).slice(0, 56) || Date.now()
     const address = getPlaceAddress(place)
     const location = getPlaceLocation(place)
     const reviews = getPlaceReviews(place)
     const photo = place.photos?.[0]?.getUrl?.({ maxWidth: 1200, maxHeight: 800 }) || ''
+    const categoryCount = options.filter((option) => option.category === category).length + 1
+    const visualIndex = options.length % 8
+    const isFood = category === 'food'
     const option = {
-      id: `food-${placeId || Date.now()}`,
-      code: 'GM',
-      category: 'food',
+      id: `${category}-${placeSlug}`,
+      code: `${isFood ? 'C' : 'P'}${categoryCount}`,
+      category,
       title: name,
       source: 'Google Maps',
-      city: searchDraft.city || 'Madrid',
+      city: cityOverride,
       status: activeContributorIsAdult ? 'active' : 'pending',
       url: getPlaceUrl(place),
       image: photo,
@@ -1399,18 +1539,36 @@ function App() {
       priceTotal: null,
       rating: place.rating ? `${place.rating}/5` : 'Sin rating',
       reviews: reviews || null,
-      capacity: 'Por validar reserva para grupo',
+      capacity: isFood ? 'Por validar reserva para grupo' : 'Plan familiar por validar',
       transit: 'Ruta por calcular',
       targetGroup: 'family',
       aiScore: place.score || Math.min(92, Math.round((place.rating || 4) * 18)),
-      map: { x: 50, y: 58 },
+      map: {
+        x: 42 + (visualIndex % 4) * 8,
+        y: 44 + Math.floor(visualIndex / 4) * 10,
+      },
       coords: location,
-      highlights: [address || 'Dirección pendiente', place.why || 'Sugerido con Google Maps Places'],
-      cautions: [place.caution || 'Verificar reserva, precio y comodidad para niños'],
+      highlights: [
+        address || 'Dirección pendiente',
+        place.rating ? `${place.rating}/5 en Google Maps · ${reviews || 0} reseñas` : 'Sugerido con Google Maps Places',
+        place.why || 'Recomendado por IA para revisar en familia',
+      ],
+      cautions: [
+        place.caution ||
+          (isFood
+            ? 'Verificar reserva, precio y comodidad para niños'
+            : 'Verificar horarios, entradas y ritmo para el grupo'),
+      ],
     }
 
     setOptions((current) => mergeOption(current, option))
-    setActiveTab('food')
+    selectCityFilter(cityOverride)
+    if (includeBudget) {
+      setBudgetOptionIds((current) => [...new Set([...current, option.id])])
+      setActiveTab('budget')
+    } else {
+      setActiveTab(category)
+    }
 
     if (canSync) {
       await saveTripOption(option, currentUser)
@@ -1735,6 +1893,23 @@ function App() {
                 {showRemoved ? 'Ocultar retiradas' : 'Ver retiradas'}
               </button>
             </div>
+          ) : null}
+
+          {showOptionWorkspace ? (
+            <SmartSuggestionsBanner
+              activeCity={currentMapCity.city}
+              busy={smartSuggestionsBusy}
+              currentType={smartSuggestionType}
+              onAddToBudget={(place, category, city) =>
+                addPlaceOption(place, category, city, true)
+              }
+              onAddToMap={(place, category, city) =>
+                addPlaceOption(place, category, city, false)
+              }
+              onChangeType={setSmartSuggestionType}
+              onRefresh={findSmartSuggestions}
+              result={smartSuggestions}
+            />
           ) : null}
 
           {activeTab === 'budget' ? (
@@ -2253,6 +2428,116 @@ function CityFilterChip({ active, city, onRemove, onSelect, removable }) {
         </button>
       ) : null}
     </span>
+  )
+}
+
+function SmartSuggestionsBanner({
+  activeCity,
+  busy,
+  currentType,
+  onAddToBudget,
+  onAddToMap,
+  onChangeType,
+  onRefresh,
+  result,
+}) {
+  const activeConfig =
+    smartSuggestionTypes.find((item) => item.id === currentType) ||
+    smartSuggestionTypes[0]
+  const resultConfig =
+    smartSuggestionTypes.find((item) => item.id === result?.type) || activeConfig
+  const resultMatchesCity = result?.city === activeCity
+  const places = resultMatchesCity ? result?.places || [] : []
+  const hasPlaces = places.length > 0
+
+  return (
+    <section className="smart-suggestion-banner">
+      <div className="smart-suggestion-copy">
+        <div className="section-heading">
+          <Sparkles size={20} aria-hidden="true" />
+          <div>
+            <p className="eyebrow">IA + Google Maps</p>
+            <h2>Sugerencias para {activeCity}</h2>
+          </div>
+        </div>
+        <p>
+          Pide recomendaciones con buena puntuación y suficientes reseñas; luego
+          agrégalas al mapa, al análisis o también al presupuesto.
+        </p>
+      </div>
+
+      <div className="smart-suggestion-actions">
+        <div className="smart-type-tabs" aria-label="Tipo de sugerencia">
+          {smartSuggestionTypes.map((type) => {
+            const Icon = type.icon
+            return (
+              <button
+                className={currentType === type.id ? 'active' : ''}
+                key={type.id}
+                onClick={() => {
+                  onChangeType(type.id)
+                  onRefresh(type.id)
+                }}
+                type="button"
+              >
+                <Icon size={16} aria-hidden="true" />
+                {type.label}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          className="primary-button compact"
+          disabled={busy}
+          onClick={() => onRefresh(currentType)}
+          type="button"
+        >
+          {busy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
+          Sugerir ahora
+        </button>
+      </div>
+
+      {resultMatchesCity && result?.analysis?.summary ? (
+        <p className={`smart-summary ${result.status === 'error' ? 'warning' : ''}`}>
+          {result.analysis.summary}
+        </p>
+      ) : null}
+
+      {hasPlaces ? (
+        <div className="smart-place-row">
+          {places.map((place) => (
+            <article key={getPlaceId(place)}>
+              <div>
+                <h3>{getPlaceName(place)}</h3>
+                <span>
+                  {place.rating ? `${place.rating}/5` : 'Sin rating'} · {getPlaceReviews(place)} reseñas
+                </span>
+              </div>
+              <p>{place.why || getPlaceAddress(place) || 'Recomendación de Google Maps'}</p>
+              <div className="smart-place-actions">
+                <a href={getPlaceUrl(place)} rel="noreferrer" target="_blank">
+                  Maps
+                </a>
+                <button
+                  onClick={() => onAddToMap(place, resultConfig.category, result?.city || activeCity)}
+                  type="button"
+                >
+                  <MapPinned size={15} aria-hidden="true" />
+                  Mapa
+                </button>
+                <button
+                  onClick={() => onAddToBudget(place, resultConfig.category, result?.city || activeCity)}
+                  type="button"
+                >
+                  <CircleDollarSign size={15} aria-hidden="true" />
+                  Presupuesto
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
   )
 }
 

@@ -1085,6 +1085,7 @@ Responde SOLO JSON según el esquema. No inventes disponibilidad exacta.
 export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
   const city = cleanText(request.data?.city, 'Madrid')
+  const kind = cleanText(request.data?.kind, 'Comida')
   const notes = cleanText(request.data?.notes, 'restaurantes familiares bien valorados')
   const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
   const rawPlaces = await searchPlaces(`${notes} en ${city}`, 8).catch((error) => {
@@ -1092,7 +1093,7 @@ export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
   })
   const places = rawPlaces.map(normalizePlace)
   const fallback = {
-    summary: `Encontré ${places.length} lugares candidatos en ${city}; ordenar por rating, reseñas y facilidad para grupo.`,
+    summary: `Encontré ${places.length} candidatos de ${kind.toLowerCase()} en ${city}; ordenar por rating, reseñas y facilidad para grupo.`,
     rankedPlaces: places.map((place) => ({
       placeId: place.placeId,
       name: place.name,
@@ -1102,8 +1103,8 @@ export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
     })),
   }
   const prompt = `
-Ordena estas opciones de comida para ${groupProfile.name}: ${groupProfile.totalTravelers} personas en ${city}.
-Niños: ${groupProfile.childrenAges.join(', ') || 'ninguno'}. Prioriza reservas fáciles, comida flexible, buena ubicación y reseñas.
+Ordena estas opciones de ${kind.toLowerCase()} para ${groupProfile.name}: ${groupProfile.totalTravelers} personas en ${city}.
+Niños: ${groupProfile.childrenAges.join(', ') || 'ninguno'}. Prioriza rating de Google Maps, número de reseñas, facilidad logística, ubicación y que funcione para un grupo familiar.
 Lugares de Google Places:
 ${JSON.stringify(places)}
 Responde SOLO JSON según el esquema.

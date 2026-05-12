@@ -1432,6 +1432,104 @@
   box-shadow: var(--shadow);
 }
 
+.smart-suggestion-banner {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.smart-suggestion-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.smart-suggestion-copy > p,
+.smart-summary,
+.smart-place-row p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.smart-suggestion-actions,
+.smart-type-tabs,
+.smart-place-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.smart-type-tabs button,
+.smart-place-actions button,
+.smart-place-actions a {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.smart-type-tabs button.active {
+  color: #0d3f91;
+  background: #eaf2ff;
+  border-color: #9bbcff;
+}
+
+.smart-summary {
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.smart-summary.warning {
+  color: #7c2d12;
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.smart-place-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.smart-place-row article {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.smart-place-row h3 {
+  margin: 0 0 5px;
+  font-size: 0.98rem;
+}
+
+.smart-place-row span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
 .search-result {
   margin-top: 14px;
   padding: 14px;
@@ -1989,7 +2087,8 @@
     grid-column: span 2;
   }
 
-  .places-grid {
+  .places-grid,
+  .smart-place-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2027,6 +2126,7 @@
   .search-form,
   .city-form,
   .places-grid,
+  .smart-place-row,
   .login-hero,
   .external-import,
   .route-summary-list,
@@ -2162,11 +2262,13 @@
 .map-panel,
 .add-panel,
 .search-panel,
+.smart-suggestion-banner,
 .future-cities,
 .empty-state,
 .budget-summary article,
 .budget-list article,
 .ranking-list article,
+.smart-place-row article,
 .search-result,
 .search-tips,
 .places-grid article,
@@ -2369,6 +2471,9 @@
 .city-chip button:first-child,
 .ghost-button,
 .route-mode-control button,
+.smart-type-tabs button,
+.smart-place-actions button,
+.smart-place-actions a,
 .card-actions button,
 .card-actions a,
 .platform-links a,
@@ -2379,7 +2484,8 @@
 }
 
 .city-chip.active button:first-child,
-.route-mode-control button.active {
+.route-mode-control button.active,
+.smart-type-tabs button.active {
   color: #a8482e;
   background: rgba(224, 122, 95, 0.14);
   border-color: rgba(224, 122, 95, 0.32);
@@ -2471,6 +2577,7 @@
 .budget-list article,
 .ranking-list article,
 .route-summary-list article,
+.smart-place-row article,
 .places-grid article,
 .city-grid article,
 .itinerary-panel article {
