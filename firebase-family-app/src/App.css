@@ -574,6 +574,37 @@
   font-weight: 800;
 }
 
+.quick-city-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.quick-city-form label {
+  display: grid;
+  gap: 5px;
+}
+
+.quick-city-form label span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.quick-city-form input {
+  width: 100%;
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+
 .city-filter {
   flex-wrap: wrap;
 }
@@ -2454,6 +2485,7 @@
 .groups div,
 .travel-group select,
 .mini-group-form input,
+.quick-city-form input,
 .suggestion-form input,
 .suggestion-form select,
 .suggestion-form textarea,
@@ -2751,17 +2783,22 @@
 
 @media (max-width: 760px) {
   .app-shell {
-    padding: 14px 12px 96px;
+    padding: 10px 8px 86px;
   }
 
   .topbar {
-    padding: 16px;
+    gap: 10px;
+    padding: 12px;
   }
 
-  .topbar h1,
+  .topbar h1 {
+    font-size: 1.75rem;
+    line-height: 1;
+  }
+
   .login-copy h1,
   .login-panel h1 {
-    font-size: 2.6rem;
+    font-size: 2.1rem;
   }
 
   .summary-grid {
@@ -2778,26 +2815,26 @@
   }
 
   .main-panel {
-    padding: 12px;
+    padding: 10px;
   }
 
   .tabbar {
     position: fixed;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
     top: auto;
     z-index: 30;
     width: auto;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     margin: 0;
-    padding: 7px;
+    padding: 6px;
   }
 
   .tabbar button {
-    min-height: 52px;
+    min-height: 46px;
     padding: 0;
-    border-radius: 18px;
+    border-radius: 14px;
   }
 
   .tabbar button span {
@@ -2805,7 +2842,23 @@
   }
 
   .controls-row {
-    margin: 12px 0;
+    margin: 10px 0;
+  }
+
+  .city-context {
+    gap: 8px;
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .city-context .eyebrow,
+  .city-context > div:first-child span {
+    display: none;
+  }
+
+  .city-context h2 {
+    margin: 0;
+    font-size: 0.98rem;
   }
 
   .city-filter {
@@ -2820,40 +2873,126 @@
 
   .city-chip button {
     width: auto;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+  }
+
+  .quick-city-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .quick-city-form label span {
+    display: none;
+  }
+
+  .quick-city-form input {
+    min-height: 36px;
+    font-size: 0.86rem;
   }
 
   .option-card {
-    grid-template-columns: 118px minmax(0, 1fr);
-    min-height: 178px;
+    grid-template-columns: 78px minmax(0, 1fr);
+    min-height: auto;
+    border-radius: 16px;
   }
 
   .option-media {
-    margin: 10px 0 10px 10px;
+    height: 104px;
+    margin: 8px 0 8px 8px;
+    border-radius: 12px;
   }
 
   .option-media img,
   .missing-photo {
-    min-height: 158px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
   }
 
   .option-body {
-    gap: 10px;
-    padding: 12px;
+    gap: 6px;
+    padding: 8px;
   }
 
   .code-badge {
-    width: 34px;
-    height: 34px;
-    flex-basis: 34px;
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    font-size: 0.78rem;
+  }
+
+  .score-badge {
+    top: 6px;
+    right: 6px;
+    padding: 4px 6px;
+    font-size: 0.7rem;
+  }
+
+  .option-title-row {
+    gap: 7px;
+  }
+
+  .option-title-row p {
+    font-size: 0.7rem;
+  }
+
+  .option-title-row h2 {
+    display: -webkit-box;
+    margin-top: 2px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 0.92rem;
+    line-height: 1.12;
   }
 
   .metric-row > span {
-    min-height: 30px;
-    font-size: 0.76rem;
+    min-height: 26px;
+    gap: 5px;
+    padding: 4px 6px;
+    font-size: 0.68rem;
+  }
+
+  .metric-row svg,
+  .card-actions svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .tag-row {
+    display: none;
+  }
+
+  .availability-card {
+    gap: 2px;
+    padding: 7px 8px;
+    border-radius: 10px;
+  }
+
+  .availability-card span {
+    font-size: 0.68rem;
+  }
+
+  .availability-card p {
+    display: none;
   }
 
   .signal-list {
     display: none;
+  }
+
+  .card-actions {
+    gap: 5px;
+  }
+
+  .card-actions button,
+  .card-actions a {
+    min-height: 30px;
+    padding: 0 7px;
+    border-radius: 10px;
+    font-size: 0.72rem;
   }
 
   .suggestion-form,

@@ -138,6 +138,41 @@ const obviousCityDefaults = {
     angle: 'Guggenheim, comida y ciudad caminable',
     coords: { lat: 43.263, lng: -2.935 },
   },
+  leon: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'Tren desde Madrid',
+    angle: 'Catedral, casco histórico y plan tranquilo en familia',
+    coords: { lat: 42.5987, lng: -5.5671 },
+  },
+  valladolid: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'Tren desde Madrid',
+    angle: 'Ciudad cómoda, comida castellana y paseo fácil',
+    coords: { lat: 41.6523, lng: -4.7245 },
+  },
+  santander: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'Tren, bus o coche desde Madrid',
+    angle: 'Mar, paseos suaves y buen ritmo con niños',
+    coords: { lat: 43.4623, lng: -3.8099 },
+  },
+  zaragoza: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE desde Madrid',
+    angle: 'Parada cómoda entre Madrid y Barcelona',
+    coords: { lat: 41.6488, lng: -0.8891 },
+  },
+  cordoba: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'AVE desde Madrid',
+    angle: 'Centro histórico, patios y plan cultural caminable',
+    coords: { lat: 37.8882, lng: -4.7794 },
+  },
   granada: {
     country: 'España',
     dates: 'Flexible',
@@ -162,6 +197,11 @@ const citySuggestionNames = [
   'París',
   'Lisboa',
   'Bilbao',
+  'León',
+  'Valladolid',
+  'Santander',
+  'Zaragoza',
+  'Córdoba',
   'Granada',
   'Málaga',
 ]
@@ -339,6 +379,35 @@ function cityCenter(city, travelCities) {
       fromTravel?.coords ||
       obviousCityDefaults[cityKey(city)]?.coords ||
       (city === 'Madrid' ? ifemaCoords : null),
+  }
+}
+
+async function resolveCityCoords(city) {
+  if (city.coords || !hasMapsKey()) return city
+
+  try {
+    const google = await loadGoogleMaps()
+    const geocoder = new google.maps.Geocoder()
+    const address = [city.city, city.country === 'Por definir' ? '' : city.country]
+      .filter(Boolean)
+      .join(', ')
+    const results = await new Promise((resolve) => {
+      geocoder.geocode({ address }, (items, status) => {
+        resolve(status === google.maps.GeocoderStatus.OK ? items || [] : [])
+      })
+    })
+    const location = results[0]?.geometry?.location
+    if (!location) return city
+
+    return {
+      ...city,
+      coords: {
+        lat: location.lat(),
+        lng: location.lng(),
+      },
+    }
+  } catch {
+    return city
   }
 }
 
@@ -1086,7 +1155,7 @@ function App() {
     event.preventDefault()
     if (!cityDraft.city.trim()) return
 
-    const city = buildCityDraft(cityDraft)
+    const city = await resolveCityCoords(buildCityDraft(cityDraft))
     setTravelCities((current) => [city, ...current])
     setSelectedCity(city.city)
     setDraft((current) => ({ ...current, city: city.city }))
@@ -1961,6 +2030,12 @@ function App() {
                     />
                   ))}
                 </div>
+                <QuickCityAdd
+                  addCity={addCity}
+                  cityDraft={cityDraft}
+                  citySuggestionNames={citySuggestionNames}
+                  updateCityDraft={updateCityDraft}
+                />
               </div>
               <button
                 className="ghost-button"
@@ -1973,7 +2048,7 @@ function App() {
             </div>
           ) : null}
 
-          {showOptionWorkspace ? (
+          {['activities', 'food'].includes(activeTab) ? (
             <SmartSuggestionsBanner
               activeCity={currentMapCity.city}
               busy={smartSuggestionsBusy}
@@ -2508,6 +2583,32 @@ function CityFilterChip({ active, city, onRemove, onSelect, removable }) {
         </button>
       ) : null}
     </span>
+  )
+}
+
+function QuickCityAdd({ addCity, cityDraft, citySuggestionNames, updateCityDraft }) {
+  return (
+    <form className="quick-city-form" onSubmit={addCity}>
+      <label>
+        <span>Agregar ciudad</span>
+        <input
+          list="quick-city-suggestions"
+          onChange={(event) => updateCityDraft('city', event.target.value)}
+          placeholder="León, Valladolid, la que quieras..."
+          type="text"
+          value={cityDraft.city}
+        />
+        <datalist id="quick-city-suggestions">
+          {citySuggestionNames.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
+      </label>
+      <button className="secondary-button compact" type="submit">
+        <Plus size={16} aria-hidden="true" />
+        Agregar
+      </button>
+    </form>
   )
 }
 
@@ -3321,7 +3422,7 @@ function OptionGrid({
                     ) : (
                       <CheckCircle2 size={16} aria-hidden="true" />
                     )}
-                    Verificar disponibilidad
+                    Disponible?
                   </button>
                 ) : null}
                 {option.category === 'lodging' && option.availability?.checkUrl ? (

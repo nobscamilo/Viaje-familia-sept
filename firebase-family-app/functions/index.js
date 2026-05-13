@@ -25,6 +25,11 @@ const cityCenters = {
   paris: { latitude: 48.8566, longitude: 2.3522 },
   lisboa: { latitude: 38.7223, longitude: -9.1393 },
   bilbao: { latitude: 43.263, longitude: -2.935 },
+  leon: { latitude: 42.5987, longitude: -5.5671 },
+  valladolid: { latitude: 41.6523, longitude: -4.7245 },
+  santander: { latitude: 43.4623, longitude: -3.8099 },
+  zaragoza: { latitude: 41.6488, longitude: -0.8891 },
+  cordoba: { latitude: 37.8882, longitude: -4.7794 },
   granada: { latitude: 37.1773, longitude: -3.5986 },
   malaga: { latitude: 36.7213, longitude: -4.4214 },
 }
