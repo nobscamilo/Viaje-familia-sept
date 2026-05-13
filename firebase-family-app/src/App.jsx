@@ -663,6 +663,17 @@ function getPlaceReviews(place) {
   return place.userRatingCount || place.user_ratings_total || 0
 }
 
+function getPlacePhoto(place) {
+  if (place.photoUri || place.image) return place.photoUri || place.image
+  return place.photos?.[0]?.getUrl?.({ maxWidth: 1200, maxHeight: 800 }) || ''
+}
+
+function getPlacePhotoCredit(place) {
+  if (place.photoCredit || place.imageCredit) return place.photoCredit || place.imageCredit
+  const attribution = place.photos?.[0]?.authorAttributions?.[0]
+  return attribution?.displayName ? `Foto: ${attribution.displayName}` : ''
+}
+
 function getPlaceLocation(place) {
   if (place.location?.lat && place.location?.lng) return place.location
   if (place.location?.latitude && place.location?.longitude) {
@@ -689,6 +700,18 @@ function getPlaceUrl(place) {
 
 function mergeOption(current, option) {
   return [option, ...current.filter((item) => item.id !== option.id)]
+}
+
+function aiScoreLabel(score) {
+  if (!score || score <= 30) return 'Por revisar'
+  return `IA ${score}`
+}
+
+function aiScoreTitle(score) {
+  if (!score || score <= 30) {
+    return 'La IA todavía no tiene datos suficientes para puntuar esta opción.'
+  }
+  return 'Encaje IA: mezcla precio, ubicación, logística familiar, capacidad y datos disponibles.'
 }
 
 function App() {
@@ -769,10 +792,18 @@ function App() {
   const [transferResult, setTransferResult] = useState(null)
   const [transferBusy, setTransferBusy] = useState(false)
 
+  const previewMode =
+    import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') === '1'
   const firebaseStatus = getFirebaseStatus()
   const canSync = Boolean(currentUser && canUseFirestore())
-  const displayedSyncStatus = currentUser
-    ? syncStatus
+  const displayedSyncStatus = currentUser || previewMode
+    ? previewMode && !currentUser
+      ? {
+          label: 'Vista local',
+          detail: 'Vista previa local: los cambios no se guardan en Firebase.',
+          online: false,
+        }
+      : syncStatus
     : {
         label: isFirebaseConfigured ? 'Sin sesión' : 'Modo local',
         detail: isFirebaseConfigured
@@ -782,7 +813,6 @@ function App() {
       }
   const activeCategory = categoryConfig[activeTab]
   const f1Crew = familyMembers.filter((member) => member.group === 'f1')
-  const familyCrew = familyMembers.filter((member) => member.group !== 'f1')
   const activeContributorIsAdult = isAdultMember(activeMember)
   const showOptionWorkspace = optionWorkspaceTabs.includes(activeTab)
   const currentTravelGroup = useMemo(
@@ -1668,7 +1698,8 @@ function App() {
     const address = getPlaceAddress(place)
     const location = getPlaceLocation(place)
     const reviews = getPlaceReviews(place)
-    const photo = place.photos?.[0]?.getUrl?.({ maxWidth: 1200, maxHeight: 800 }) || ''
+    const photo = getPlacePhoto(place)
+    const photoCredit = getPlacePhotoCredit(place)
     const categoryCount = options.filter((option) => option.category === category).length + 1
     const visualIndex = options.length % 8
     const isFood = category === 'food'
@@ -1682,6 +1713,7 @@ function App() {
       status: activeContributorIsAdult ? 'active' : 'pending',
       url: getPlaceUrl(place),
       image: photo,
+      imageCredit: photoCredit,
       priceNight: null,
       priceTotal: null,
       rating: place.rating ? `${place.rating}/5` : 'Sin rating',
@@ -1842,7 +1874,7 @@ function App() {
     )
   }
 
-  if (!currentUser) {
+  if (!currentUser && !previewMode) {
     return (
       <LoginScreen
         canLogin={isFirebaseConfigured}
@@ -1901,67 +1933,35 @@ function App() {
           <h2>{displayedSyncStatus.detail}</h2>
         </div>
         <div className="collab-actions">
-          <span>{currentUser ? currentUser.displayName || currentUser.email : 'Sin sesión'}</span>
-          <strong>
-            {memberName(activeMember)} · {activeContributorIsAdult ? 'agrega directo' : 'requiere revisión'}
-          </strong>
-        </div>
-      </section>
-
-      <section className="workspace">
-        <aside className="side-panel" aria-label="Familia y filtros">
-          <div className="panel-block">
-            <div className="panel-title">
-              <Users size={18} aria-hidden="true" />
-              <h2>Familia</h2>
-            </div>
-            <div className="member-list">
+          <label className="compact-select">
+            <span>Quién opina</span>
+            <select onChange={(event) => setActiveMember(event.target.value)} value={activeMember}>
               {familyMembers.map((member) => (
-                <button
-                  className={`member-button ${activeMember === member.id ? 'active' : ''}`}
-                  key={member.id}
-                  onClick={() => setActiveMember(member.id)}
-                  type="button"
-                >
-                  <span>{member.name}</span>
-                </button>
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
               ))}
-            </div>
-          </div>
-
-          <div className="panel-block groups">
-            <h2>Grupos</h2>
-            <div>
-              <span>F1</span>
-              <strong>{f1Crew.map((member) => member.name).join(', ')}</strong>
-            </div>
-            <div>
-              <span>Planes alternos</span>
-              <strong>{familyCrew.map((member) => member.name).join(', ')}</strong>
-            </div>
-          </div>
-
-          <div className="panel-block travel-group">
-            <h2>Grupo de viaje</h2>
-            <label>
-              <span>Perfil activo</span>
-              <select
-                onChange={(event) => setActiveTravelGroupId(event.target.value)}
-                value={currentTravelGroup.id}
-              >
-                {travelGroups.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>{groupSummary(currentTravelGroup)}</p>
-            <small>{currentTravelGroup.note}</small>
+            </select>
+          </label>
+          <label className="compact-select">
+            <span>Grupo</span>
+            <select
+              onChange={(event) => setActiveTravelGroupId(event.target.value)}
+              value={currentTravelGroup.id}
+            >
+              {travelGroups.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <details className="new-group-menu">
+            <summary>Nuevo grupo</summary>
             <form className="mini-group-form" onSubmit={addTravelGroup}>
               <input
                 onChange={(event) => updateFamilyProfileDraft('name', event.target.value)}
-                placeholder="Nuevo grupo"
+                placeholder="Nombre"
                 type="text"
                 value={familyProfileDraft.name}
               />
@@ -1973,7 +1973,7 @@ function App() {
               />
               <input
                 onChange={(event) => updateFamilyProfileDraft('childrenAges', event.target.value)}
-                placeholder="Edades niños: 9, 5"
+                placeholder="Niños: 9, 5"
                 type="text"
                 value={familyProfileDraft.childrenAges}
               />
@@ -1988,9 +1988,14 @@ function App() {
                 Guardar
               </button>
             </form>
-          </div>
-        </aside>
+          </details>
+          <strong>
+            {memberName(activeMember)} · {activeContributorIsAdult ? 'Agrega directo' : 'Requiere revisión'}
+          </strong>
+        </div>
+      </section>
 
+      <section className="workspace">
         <section className="main-panel">
           <nav className="tabbar" aria-label="Secciones">
             {tabs.map((tab) => {
@@ -3340,7 +3345,13 @@ function OptionGrid({
           <article className={`option-card ${option.status}`} key={option.id}>
             <div className="option-media">
               <OptionImage option={option} />
-              <span className="score-badge">{option.aiScore}/100</span>
+              <span
+                className={`score-badge ${!option.aiScore || option.aiScore <= 30 ? 'pending' : ''}`}
+                title={aiScoreTitle(option.aiScore)}
+              >
+                {aiScoreLabel(option.aiScore)}
+              </span>
+              {option.imageCredit ? <span className="photo-credit">{option.imageCredit}</span> : null}
             </div>
             <div className="option-body">
               <div className="option-title-row">
@@ -3410,44 +3421,49 @@ function OptionGrid({
                     Ver link
                   </a>
                 ) : null}
-                {option.category === 'lodging' && option.url && onVerifyAvailability ? (
-                  <button
-                    className="availability-action"
-                    disabled={availabilityBusyId === option.id}
-                    onClick={() => onVerifyAvailability(option)}
-                    type="button"
-                  >
-                    {availabilityBusyId === option.id ? (
-                      <Loader2 size={16} aria-hidden="true" />
+                <details className="desktop-card-menu">
+                  <summary>Más</summary>
+                  <div>
+                    {option.category === 'lodging' && option.url && onVerifyAvailability ? (
+                      <button
+                        className="availability-action"
+                        disabled={availabilityBusyId === option.id}
+                        onClick={() => onVerifyAvailability(option)}
+                        type="button"
+                      >
+                        {availabilityBusyId === option.id ? (
+                          <Loader2 size={16} aria-hidden="true" />
+                        ) : (
+                          <CheckCircle2 size={16} aria-hidden="true" />
+                        )}
+                        Disponible?
+                      </button>
+                    ) : null}
+                    {option.category === 'lodging' && option.availability?.checkUrl ? (
+                      <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
+                        Confirmar fechas
+                      </a>
+                    ) : null}
+                    <button
+                      className={inBudget ? 'budgeted' : ''}
+                      onClick={() => onToggleBudget(option.id)}
+                      type="button"
+                    >
+                      <CircleDollarSign size={16} aria-hidden="true" />
+                      {inBudget ? 'En presupuesto' : 'Presupuesto'}
+                    </button>
+                    {option.status === 'removed' ? (
+                      <button onClick={() => onRestore(option.id)} type="button">
+                        Restaurar
+                      </button>
                     ) : (
-                      <CheckCircle2 size={16} aria-hidden="true" />
+                      <button onClick={() => onRemove(option.id)} type="button">
+                        <Trash2 size={16} aria-hidden="true" />
+                        Quitar
+                      </button>
                     )}
-                    Disponible?
-                  </button>
-                ) : null}
-                {option.category === 'lodging' && option.availability?.checkUrl ? (
-                  <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
-                    Confirmar fechas
-                  </a>
-                ) : null}
-                <button
-                  className={inBudget ? 'budgeted' : ''}
-                  onClick={() => onToggleBudget(option.id)}
-                  type="button"
-                >
-                  <CircleDollarSign size={16} aria-hidden="true" />
-                  {inBudget ? 'En presupuesto' : 'Presupuesto'}
-                </button>
-                {option.status === 'removed' ? (
-                  <button onClick={() => onRestore(option.id)} type="button">
-                    Restaurar
-                  </button>
-                ) : (
-                  <button onClick={() => onRemove(option.id)} type="button">
-                    <Trash2 size={16} aria-hidden="true" />
-                    Quitar
-                  </button>
-                )}
+                  </div>
+                </details>
               </div>
 
               <details className="mobile-card-menu">
@@ -3514,13 +3530,29 @@ function OptionGrid({
 }
 
 function OptionImage({ option }) {
-  const [imageFailed, setImageFailed] = useState(false)
-  const src = imageFailed || !option.image ? fallbackImage(option) : displayImage(option.image)
+  const [imageStatus, setImageStatus] = useState({ optionId: option.id, state: 'primary' })
+  const imageState = imageStatus.optionId === option.id ? imageStatus.state : 'primary'
+  const hasPrimaryImage = Boolean(option.image)
+  const hasAlternateImage = Boolean(option.alternateImage)
+  const src =
+    imageState === 'primary' && hasPrimaryImage
+      ? displayImage(option.image)
+      : imageState === 'alternate' && hasAlternateImage
+        ? displayImage(option.alternateImage)
+        : fallbackImage(option)
+
+  function handleImageError() {
+    setImageStatus((current) =>
+      current.optionId === option.id && current.state === 'primary' && hasAlternateImage
+        ? { optionId: option.id, state: 'alternate' }
+        : { optionId: option.id, state: 'fallback' },
+    )
+  }
 
   return (
     <img
       alt={option.title}
-      onError={() => setImageFailed(true)}
+      onError={handleImageError}
       referrerPolicy="no-referrer"
       src={src}
     />

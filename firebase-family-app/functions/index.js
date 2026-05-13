@@ -644,7 +644,7 @@ async function searchPlaces(textQuery, maxResultCount = 5) {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': key,
       'X-Goog-FieldMask':
-        'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.googleMapsUri,places.priceLevel,places.types',
+        'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.googleMapsUri,places.priceLevel,places.types,places.photos',
     },
     body: JSON.stringify({
       textQuery,
@@ -663,6 +663,32 @@ async function searchPlaces(textQuery, maxResultCount = 5) {
   return data.places || []
 }
 
+function photoCredit(photo) {
+  const names = (photo?.authorAttributions || [])
+    .map((author) => cleanText(author.displayName))
+    .filter(Boolean)
+    .slice(0, 2)
+
+  return names.length ? `Foto: ${names.join(', ')}` : 'Foto: Google Maps'
+}
+
+async function getPlacePhotoUri(photoName) {
+  const key = getMapsKey()
+  if (!key || !photoName) return ''
+
+  const url = new URL(`https://places.googleapis.com/v1/${photoName}/media`)
+  url.searchParams.set('maxWidthPx', '1200')
+  url.searchParams.set('maxHeightPx', '800')
+  url.searchParams.set('skipHttpRedirect', 'true')
+  url.searchParams.set('key', key)
+
+  const response = await fetch(url, { signal: AbortSignal.timeout(7000) })
+  if (!response.ok) return ''
+
+  const data = await response.json().catch(() => ({}))
+  return data.photoUri || ''
+}
+
 function normalizePlace(place) {
   const name = place.displayName?.text || place.name || 'Lugar sugerido'
   const placeId = place.id || place.placeId || place.place_id || slug(name)
@@ -672,6 +698,8 @@ function normalizePlace(place) {
         lng: place.location.longitude,
       }
     : null
+
+  const photo = place.photos?.[0] || null
 
   return {
     placeId,
@@ -684,7 +712,18 @@ function normalizePlace(place) {
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`,
     location,
     types: place.types || [],
+    photoName: photo?.name || '',
+    photoCredit: photo ? photoCredit(photo) : '',
   }
+}
+
+async function normalizePlaceWithPhoto(place) {
+  const normalized = normalizePlace(place)
+  const photoUri = await getPlacePhotoUri(normalized.photoName).catch(() => '')
+  return stripUndefined({
+    ...normalized,
+    photoUri,
+  })
 }
 
 async function computeRoute(origin, travelMode, destination = ifemaCoords) {
@@ -917,7 +956,9 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user, code
     city: cleanText(analysis.city, input.city),
     status: input.isAdultContributor ? 'active' : 'pending',
     url: input.url,
-    image: metadata.image || '',
+    image: metadata.image || place?.photoUri || '',
+    alternateImage: metadata.image ? place?.photoUri || '' : '',
+    imageCredit: metadata.image ? '' : place?.photoCredit || '',
     priceNight: safePriceNight,
     priceTotal: safePriceTotal,
     priceConfidence: prices.confidence,
@@ -1080,7 +1121,7 @@ export const analyzeTripOption = onCall(functionOptions, async (request) => {
     .filter(Boolean)
     .join(' ')
   const rawPlaces = await searchPlaces(placeQuery, 1).catch(() => [])
-  const place = rawPlaces[0] ? normalizePlace(rawPlaces[0]) : null
+  const place = rawPlaces[0] ? await normalizePlaceWithPhoto(rawPlaces[0]) : null
   const routeDestination = destinationForCity(input.city)
   const routes = place?.location ? await computeRoutes(place.location, routeDestination) : {}
   const fallback = buildFallbackAnalysis(input, metadata, place, routes)
@@ -1245,7 +1286,7 @@ export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
   const rawPlaces = await searchPlaces(`${notes} en ${city}`, 8).catch((error) => {
     throw new HttpsError('unavailable', error.message)
   })
-  const places = rawPlaces.map(normalizePlace)
+  const places = await Promise.all(rawPlaces.map((place) => normalizePlaceWithPhoto(place)))
   const fallback = {
     summary: `Encontré ${places.length} candidatos de ${kind.toLowerCase()} en ${city}; ordenar por rating, reseñas y facilidad para grupo.`,
     rankedPlaces: places.map((place) => ({
