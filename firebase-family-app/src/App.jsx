@@ -3396,7 +3396,7 @@ function OptionGrid({
                 ))}
               </ul>
 
-              <div className="card-actions">
+              <div className="card-actions desktop-actions">
                 <button
                   className={hasVote ? 'liked' : ''}
                   onClick={() => onVote(option.id)}
@@ -3449,6 +3449,62 @@ function OptionGrid({
                   </button>
                 )}
               </div>
+
+              <details className="mobile-card-menu">
+                <summary>Acciones</summary>
+                <div>
+                  <button
+                    className={hasVote ? 'liked' : ''}
+                    onClick={() => onVote(option.id)}
+                    type="button"
+                  >
+                    <Heart size={16} aria-hidden="true" />
+                    Favorito ({optionVotes.length})
+                  </button>
+                  {option.url ? (
+                    <a href={option.url} rel="noreferrer" target="_blank">
+                      Ver link
+                    </a>
+                  ) : null}
+                  {option.category === 'lodging' && option.url && onVerifyAvailability ? (
+                    <button
+                      disabled={availabilityBusyId === option.id}
+                      onClick={() => onVerifyAvailability(option)}
+                      type="button"
+                    >
+                      {availabilityBusyId === option.id ? (
+                        <Loader2 size={16} aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 size={16} aria-hidden="true" />
+                      )}
+                      Disponibilidad
+                    </button>
+                  ) : null}
+                  {option.category === 'lodging' && option.availability?.checkUrl ? (
+                    <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
+                      Confirmar fechas
+                    </a>
+                  ) : null}
+                  <button
+                    className={inBudget ? 'budgeted' : ''}
+                    onClick={() => onToggleBudget(option.id)}
+                    type="button"
+                  >
+                    <CircleDollarSign size={16} aria-hidden="true" />
+                    {inBudget ? 'En presupuesto' : 'Presupuesto'}
+                  </button>
+                  {option.status === 'removed' ? (
+                    <button onClick={() => onRestore(option.id)} type="button">
+                      Restaurar
+                    </button>
+                  ) : (
+                    <button onClick={() => onRemove(option.id)} type="button">
+                      <Trash2 size={16} aria-hidden="true" />
+                      Quitar
+                    </button>
+                  )}
+                </div>
+              </details>
             </div>
           </article>
         )

@@ -844,6 +844,10 @@
   margin-top: auto;
 }
 
+.mobile-card-menu {
+  display: none;
+}
+
 .card-actions button,
 .card-actions a {
   min-height: 38px;
@@ -2783,7 +2787,11 @@
 
 @media (max-width: 760px) {
   .app-shell {
+    width: 100%;
+    max-width: 100vw;
+    margin: 0;
     padding: 10px 8px 86px;
+    overflow-x: hidden;
   }
 
   .topbar {
@@ -2810,11 +2818,16 @@
     gap: 14px;
   }
 
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .side-panel {
     display: none;
   }
 
   .main-panel {
+    width: 100%;
     padding: 10px;
   }
 
@@ -2843,6 +2856,14 @@
 
   .controls-row {
     margin: 10px 0;
+  }
+
+  .controls-row > .ghost-button {
+    width: auto;
+    min-height: 32px;
+    align-self: flex-start;
+    padding: 0 10px;
+    font-size: 0.78rem;
   }
 
   .city-context {
@@ -2893,13 +2914,13 @@
   }
 
   .option-card {
-    grid-template-columns: 78px minmax(0, 1fr);
+    grid-template-columns: 96px minmax(0, 1fr);
     min-height: auto;
     border-radius: 16px;
   }
 
   .option-media {
-    height: 104px;
+    height: 112px;
     margin: 8px 0 8px 8px;
     border-radius: 12px;
   }
@@ -2955,6 +2976,10 @@
     font-size: 0.68rem;
   }
 
+  .metric-row > span:nth-child(2) {
+    display: none;
+  }
+
   .metric-row svg,
   .card-actions svg {
     width: 13px;
@@ -2983,16 +3008,71 @@
     display: none;
   }
 
-  .card-actions {
-    gap: 5px;
+  .desktop-actions {
+    display: none;
   }
 
-  .card-actions button,
-  .card-actions a {
+  .mobile-card-menu {
+    display: block;
+    margin-top: auto;
+  }
+
+  .mobile-card-menu summary {
+    display: inline-flex;
     min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
     padding: 0 7px;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(75, 50, 35, 0.12);
     border-radius: 10px;
     font-size: 0.72rem;
+    font-weight: 900;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .mobile-card-menu summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-card-menu > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .mobile-card-menu button,
+  .mobile-card-menu a {
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0 7px;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(75, 50, 35, 0.12);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-decoration: none;
+  }
+
+  .mobile-card-menu button.liked {
+    color: #a8482e;
+    background: rgba(224, 122, 95, 0.16);
+    border-color: rgba(224, 122, 95, 0.34);
+  }
+
+  .mobile-card-menu button.budgeted {
+    color: #436a40;
+    background: rgba(138, 163, 136, 0.18);
+    border-color: rgba(138, 163, 136, 0.35);
   }
 
   .suggestion-form,
