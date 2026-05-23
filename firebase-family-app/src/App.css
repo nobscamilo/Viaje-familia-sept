@@ -9928,7 +9928,281 @@ table, tr, td, th {
   color: var(--green) !important;
 }
 
+/* ── SMART SUGGESTIONS BANNER, TABS & CARDS DARK OVERRIDES ── */
+.smart-suggestion-banner {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
 
+.smart-type-tabs button {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+}
 
+.smart-type-tabs button:hover:not(.active) {
+  background: var(--surface-input) !important;
+  color: var(--ink) !important;
+  border-color: var(--border) !important;
+}
 
+.smart-type-tabs button.active {
+  background: var(--accent-pale) !important;
+  color: var(--violet) !important;
+  border-color: var(--violet) !important;
+}
 
+.smart-locked-type {
+  color: var(--violet) !important;
+  background: var(--accent-pale) !important;
+  border: 1px solid rgba(167, 139, 250, 0.3) !important;
+}
+
+.smart-summary {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.smart-summary.warning {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  color: #fca5a5 !important;
+}
+
+.smart-booking-links {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.smart-booking-label {
+  color: var(--muted) !important;
+}
+
+.smart-booking-btn {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.smart-booking-btn:hover {
+  background: var(--surface-soft) !important;
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+}
+
+/* AI Place Card Overrides */
+.ai-place-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.ai-place-card:hover {
+  transform: translateY(-3px) !important;
+  border-color: var(--violet) !important;
+  box-shadow: 0 8px 24px rgba(167, 139, 250, 0.1) !important;
+}
+
+/* Photo and gallery */
+.ai-place-photo {
+  background: var(--surface-soft) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.ai-place-photo-missing {
+  background: linear-gradient(135deg, var(--surface-soft), rgba(167, 139, 250, 0.1)) !important;
+  color: var(--muted) !important;
+}
+
+/* Category/type chip and AI score badge */
+.ai-place-type-chip {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--violet) !important;
+}
+
+.ai-place-score-badge {
+  background: rgba(167, 139, 250, 0.15) !important;
+  border: 1px solid rgba(167, 139, 250, 0.3) !important;
+  color: var(--violet) !important;
+}
+
+/* Photo Navigation gallery controls */
+.ai-photo-nav {
+  background: rgba(9, 9, 11, 0.6) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.ai-photo-nav:hover {
+  background: var(--violet) !important;
+  color: #09090b !important;
+  border-color: var(--violet) !important;
+}
+
+.ai-photo-dot {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+
+.ai-photo-dot.active {
+  background: var(--violet) !important;
+}
+
+/* AI why highlighted block */
+.ai-place-why {
+  border-left: 3px solid var(--violet) !important;
+  background: var(--surface-input) !important;
+  padding: 8px 11px !important;
+  border-radius: 6px !important;
+}
+
+.ai-place-why-icon-wrap {
+  background: rgba(167, 139, 250, 0.15) !important;
+  color: var(--violet) !important;
+}
+
+.ai-place-why span {
+  color: var(--ink) !important;
+}
+
+/* Score breakdown grid */
+.ai-place-breakdown {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.ai-place-breakdown-label {
+  color: var(--muted) !important;
+}
+
+.ai-breakdown-dim {
+  color: var(--muted) !important;
+}
+
+.ai-breakdown-bar-track {
+  background: var(--surface-input) !important;
+}
+
+.ai-breakdown-bar-fill {
+  background: var(--violet) !important;
+}
+
+.ai-breakdown-val {
+  color: var(--ink) !important;
+}
+
+/* Tags and Pricing estimated tag */
+.ai-place-tag {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.ai-place-price-tag {
+  background: rgba(52, 211, 153, 0.1) !important;
+  border: 1px solid rgba(52, 211, 153, 0.25) !important;
+  color: var(--green) !important;
+}
+
+.ai-price-est-label {
+  color: var(--green) !important;
+  opacity: 0.8 !important;
+}
+
+/* Rating, reviews, and caution rules */
+.ai-place-rating {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.ai-place-reviews {
+  color: var(--muted) !important;
+}
+
+.ai-place-caution {
+  color: #fca5a5 !important;
+}
+
+/* Action button overrides inside AI Place Card */
+.ai-place-actions-row button.smart-add-primary {
+  background: var(--violet) !important;
+  border: 1px solid var(--violet) !important;
+  color: #09090b !important;
+  font-weight: 900 !important;
+}
+
+.ai-place-actions-row button.smart-add-primary:hover {
+  background: #c084fc !important;
+  border-color: #c084fc !important;
+}
+
+.ai-place-actions-row button.smart-add-budget {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--violet) !important;
+  font-weight: 900 !important;
+}
+
+.ai-place-actions-row button.smart-add-budget:hover {
+  background: var(--accent-pale) !important;
+  border-color: var(--violet) !important;
+}
+
+/* Maps and external links button */
+.ai-place-maps-btn {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.ai-place-maps-btn:hover {
+  background: var(--surface-input) !important;
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+}
+
+/* Smart Links bottom row */
+.ai-place-smart-links {
+  border-top: 1px solid var(--border) !important;
+}
+
+.ai-place-smart-link {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.ai-place-smart-link:hover {
+  background: var(--surface-input) !important;
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+}
+
+/* Pagination Control overrides */
+.pagination-control {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.pagination-control button {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.pagination-control button:hover:not(:disabled):not(.active) {
+  background: var(--surface-input) !important;
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+}
+
+.pagination-control button.active {
+  background: var(--violet) !important;
+  color: #09090b !important;
+  border-color: var(--violet) !important;
+}
