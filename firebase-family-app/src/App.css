@@ -9400,4 +9400,359 @@ table, tr, td, th {
 }
 
 
+/* ──────────────────────────────────────────────────────────────
+   Obsidian High-Contrast Dark Sidebar, Topbar, Rail & Chat Overrides
+   ────────────────────────────────────────────────────────────── */
+
+/* ── LEFT SIDEBAR DARK OVERRIDES ── */
+.left-sidebar {
+  background: var(--surface-soft) !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+.sidebar-header {
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.sidebar-trip-name {
+  color: var(--ink) !important;
+}
+
+.sidebar-trip-meta {
+  color: var(--muted) !important;
+}
+
+.sidebar-nav-item {
+  color: var(--muted) !important;
+}
+
+.sidebar-nav-item:hover {
+  background: var(--surface-input) !important;
+  color: var(--ink) !important;
+}
+
+.sidebar-nav-item.active {
+  background: var(--accent-pale) !important;
+  color: var(--violet) !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-nav-item.active svg {
+  color: var(--violet) !important;
+}
+
+.sidebar-nav-count {
+  background: var(--violet) !important;
+  color: #09090b !important;
+}
+
+.sidebar-ai-item {
+  color: var(--violet) !important;
+}
+
+.sidebar-ai-item:hover {
+  background: var(--accent-pale) !important;
+}
+
+.sidebar-section-head {
+  color: var(--muted) !important;
+}
+
+.sidebar-subgroup-item {
+  color: var(--muted) !important;
+}
+
+.sidebar-subgroup-item:hover {
+  background: var(--surface-soft) !important;
+  color: var(--ink) !important;
+}
+
+.sidebar-subgroup-item.active {
+  background: var(--surface-input) !important;
+  color: var(--violet) !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-subgroup-count {
+  color: var(--muted) !important;
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--border) !important;
+}
+
+.sidebar-footer-btn {
+  color: var(--muted) !important;
+}
+
+.sidebar-footer-btn:hover {
+  background: var(--surface-soft) !important;
+  color: var(--ink) !important;
+}
+
+.sidebar-footer-btn.primary {
+  color: var(--violet) !important;
+}
+
+.sidebar-footer-btn.primary:hover {
+  background: var(--accent-pale) !important;
+}
+
+/* ── TOPBAR DARK OVERRIDES ── */
+.topbar-v2 {
+  background: rgba(9, 9, 11, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.city-tab-pill {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+}
+
+.city-tab-pill:hover {
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+}
+
+.city-tab-pill.active {
+  background: var(--violet) !important;
+  color: #09090b !important;
+  border-color: var(--violet) !important;
+}
+
+.city-tab-pill.active .city-tab-count {
+  background: rgba(0, 0, 0, 0.15) !important;
+  color: #09090b !important;
+}
+
+.city-tab-add {
+  border: 1px dashed var(--border) !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+}
+
+.city-tab-add:hover {
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+  background: var(--surface-soft) !important;
+}
+
+.topbar-ai-input {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.topbar-ai-input:hover {
+  background: var(--surface-soft) !important;
+  border-color: var(--violet) !important;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.12) !important;
+}
+
+.topbar-ai-input svg {
+  color: var(--violet) !important;
+}
+
+.topbar-ai-placeholder {
+  color: var(--muted) !important;
+}
+
+.topbar-ai-input kbd {
+  background: var(--surface) !important;
+  color: var(--muted) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.member-avatar-pill {
+  border: 2px solid var(--bg) !important;
+  background: var(--surface-soft) !important;
+  color: var(--ink) !important;
+}
+
+.member-avatar-pill.active {
+  background: var(--violet) !important;
+  color: #09090b !important;
+  border-color: var(--violet) !important;
+}
+
+.member-avatar-overflow {
+  color: var(--muted) !important;
+}
+
+.topbar-group-select {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.topbar-group-select select {
+  color: var(--ink) !important;
+}
+
+/* ── RIGHT RAIL DARK OVERRIDES ── */
+.right-rail {
+  background: var(--surface-soft) !important;
+  border-left: 1px solid var(--border) !important;
+}
+
+.rail-section-title {
+  color: var(--ink) !important;
+}
+
+.rail-ai-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+
+.rail-ai-score {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--violet) !important;
+}
+
+.rail-ai-name {
+  color: var(--ink) !important;
+}
+
+.rail-ai-why {
+  color: var(--muted) !important;
+}
+
+.rail-score-label {
+  color: var(--muted) !important;
+}
+
+.rail-score-bar-track {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.rail-score-bar-fill {
+  background: var(--violet) !important;
+}
+
+.rail-score-val {
+  color: var(--ink) !important;
+}
+
+.rail-add-btn {
+  background: var(--violet) !important;
+  border: 1.5px solid var(--violet) !important;
+  color: #09090b !important;
+}
+
+.rail-add-btn:hover {
+  background: #c084fc !important;
+  border-color: #c084fc !important;
+  color: #09090b !important;
+}
+
+.rail-platform-link {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.rail-platform-link:hover {
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+}
+
+.rail-platform-link svg {
+  color: var(--violet) !important;
+}
+
+/* ── CHAT PANEL DARK OVERRIDES ── */
+.topbar-chat-overlay {
+  background: rgba(9, 9, 11, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.topbar-chat-panel {
+  background: rgba(18, 18, 20, 0.98) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+}
+
+.topbar-chat-head {
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.topbar-chat-head svg {
+  color: var(--violet) !important;
+}
+
+.topbar-chat-close:hover {
+  background: var(--surface-soft) !important;
+  color: var(--violet) !important;
+}
+
+.topbar-chat-msg.user p {
+  background: var(--violet) !important;
+  color: #09090b !important;
+}
+
+.topbar-chat-msg.assistant p {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.topbar-chat-input-row {
+  border-top: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+}
+
+.topbar-chat-input-row input {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.topbar-chat-input-row input:focus {
+  border-color: var(--violet) !important;
+}
+
+.topbar-chat-input-row button {
+  background: var(--violet) !important;
+  color: #09090b !important;
+}
+
+.topbar-chat-input-row button:disabled {
+  background: var(--border) !important;
+  color: var(--muted) !important;
+  opacity: 0.5 !important;
+}
+
+/* ── COMPARATOR DARK OVERRIDES ── */
+.comparator-section {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+
+.comparator-table th {
+  color: var(--muted) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.comparator-table td {
+  color: var(--ink) !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+.comparator-table tr:hover td {
+  background: var(--surface-soft) !important;
+}
+
+
+
 
