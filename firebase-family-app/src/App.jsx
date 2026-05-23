@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -12,10 +13,12 @@ import {
   Home,
   Hotel,
   Landmark,
+  Layers,
   Loader2,
   LogIn,
   LogOut,
   MapPinned,
+  Menu,
   MessageCircle,
   Plane,
   Plus,
@@ -56,6 +59,7 @@ import {
   suggestTransferWithAI,
   suggestFoodWithAI,
   suggestLodgingWithAI,
+  suggestLodgingPlacesWithAI,
   verifyAvailabilityWithAI,
 } from './services/aiFunctions'
 import {
@@ -78,6 +82,7 @@ import {
   MADRID_F1_TRIP_ID,
 } from './services/tripRepository'
 import {
+  deleteTrip,
   isTripAdmin,
   seedMadridF1Trip,
   subscribeUserTrips,
@@ -110,8 +115,8 @@ const tabs = [
 ]
 
 const optionWorkspaceTabs = ['lodging', 'activities', 'food']
-const placeSuggestionLimit = 50
-const suggestionPageSize = 10
+const placeSuggestionLimit = 20
+const suggestionPageSize = 5
 
 const targetLabels = {
   family: 'Toda la familia',
@@ -266,6 +271,16 @@ const obviousCityDefaults = {
 }
 
 const smartSuggestionTypes = [
+  {
+    id: 'lodging',
+    label: 'Hospedaje',
+    actionLabel: 'Agregar a hospedaje',
+    budgetLabel: 'Hospedaje + presupuesto',
+    category: 'lodging',
+    icon: Hotel,
+    notes:
+      'apartamentos o hoteles para familia con niños, bien valorados, ubicación central y capacidad suficiente para el grupo',
+  },
   {
     id: 'food',
     label: 'Comida',
@@ -625,6 +640,207 @@ function isPlanningGroup(profile = {}) {
   )
 }
 
+function getDaysList(startStr, endStr) {
+  const list = []
+  if (!startStr) return list
+  const start = new Date(`${startStr}T00:00:00Z`)
+  const end = endStr ? new Date(`${endStr}T00:00:00Z`) : new Date(start.getTime() + 12 * 24 * 3600000)
+  
+  let current = new Date(start.getTime())
+  let limit = 0
+  while (current <= end && limit < 100) {
+    list.push(new Date(current.getTime()))
+    current.setUTCDate(current.getUTCDate() + 1)
+    limit++
+  }
+  return list
+}
+
+function parseCityDateRange(rangeStr, defaultYear = 2026) {
+  if (!rangeStr) return null
+  const str = rangeStr.toLowerCase()
+  const numbers = str.match(/\d+/g)
+  if (!numbers || numbers.length < 2) return null
+  
+  let startDay = parseInt(numbers[0], 10)
+  let endDay = parseInt(numbers[1], 10)
+  
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  const monthsFull = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+  
+  let monthIndex = 8 // default: Sep
+  for (let i = 0; i < 12; i++) {
+    if (str.includes(months[i]) || str.includes(monthsFull[i])) {
+      monthIndex = i
+      break
+    }
+  }
+  
+  let year = defaultYear
+  if (numbers.length >= 3) {
+    const potentialYear = parseInt(numbers[2], 10)
+    if (potentialYear >= 2020 && potentialYear <= 2030) {
+      year = potentialYear
+    }
+  }
+  
+  return {
+    startDay,
+    endDay,
+    monthIndex,
+    year,
+  }
+}
+
+function isDateInCityRange(date, range) {
+  if (!range) return false
+  const dYear = date.getUTCFullYear()
+  const dMonth = date.getUTCMonth()
+  const dDay = date.getUTCDate()
+  
+  if (dYear !== range.year) return false
+  if (dMonth !== range.monthIndex) return false
+  return dDay >= range.startDay && dDay <= range.endDay
+}
+
+function matchCityForDate(date, activeTravelCities, activeTrip) {
+  const mainStart = activeTrip?.startDate || '2026-09-10'
+  const mainEnd = activeTrip?.endDate || '2026-09-14'
+  const dStr = date.toISOString().split('T')[0]
+  
+  if (dStr >= mainStart && dStr <= mainEnd) {
+    return 'Madrid'
+  }
+  
+  // Try matching active travel cities
+  for (const city of activeTravelCities) {
+    const range = parseCityDateRange(city.dates)
+    if (range && isDateInCityRange(date, range)) {
+      return city.city
+    }
+  }
+  
+  if (dStr < mainStart) {
+    return 'Madrid'
+  }
+  return 'Por decidir'
+}
+
+function formatItineraryDayLabel(date) {
+  const daysShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+  const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  const d = date.getUTCDate()
+  const dayName = daysShort[date.getUTCDay()]
+  const monthName = monthsShort[date.getUTCMonth()]
+  return `${dayName} ${d} ${monthName}`
+}
+
+function getGuardoPrepopulatedPlan(date) {
+  const d = date.getUTCDate()
+  if (d === 19) {
+    return {
+      title: 'Excursión a Comillas (El Capricho de Gaudí)',
+      familyPlan: 'Viaje en coche desde Guardo a Comillas (~1h 50m). Visita guiada a El Capricho de Gaudí (maravilla modernista ideal para niños y adultos), paseo por el pintoresco casco de Comillas y almuerzo frente al mar Cantábrico.',
+      f1Plan: 'Acompaña al grupo familiar en la excursión costera y visita cultural.',
+      foodIdea: 'Marisquería o raciones en el puerto de Comillas.',
+      routeNotes: 'Ruta Guardo -> Comillas por carretera escénica. Retorno por la tarde.',
+      backup: 'Palacio de Sobrellano en Comillas o visita guiada a la Cueva de El Soplao.',
+      energyLevel: 'alta',
+    }
+  } else if (d === 20) {
+    return {
+      title: 'Excursión a Santander (La Magdalena y Bahía)',
+      familyPlan: 'Desplazamiento a Santander (~2h). Paseo por la Península de la Magdalena (visita al palacio real, minizoo exterior de animales marinos y trenecito "Magdaleno"). Tarde de paseo suave por El Sardinero y la bahía.',
+      f1Plan: 'Paseo marítimo y disfrute familiar en la capital cántabra.',
+      foodIdea: 'Rabas de calamar y pescados frescos frente al mar.',
+      routeNotes: 'Guardo -> Santander en coche. Parking recomendado en La Magdalena.',
+      backup: 'Visita interactiva al Centro Botín o al Museo Marítimo del Cantábrico.',
+      energyLevel: 'media',
+    }
+  } else if (d === 21) {
+    return {
+      title: 'Naturaleza en Guardo y Montaña Palentina',
+      familyPlan: 'Día tranquilo y de descanso en Guardo. Senda suave por la naturaleza de la Montaña Palentina o miradores locales. Tarde de juegos comunes y asado en el alojamiento familiar.',
+      f1Plan: 'Descanso de conducción, asado y relax familiar en la base de Guardo.',
+      foodIdea: 'Asado campestre en la casa base o cordero local.',
+      routeNotes: 'Trayectos locales cortos en coche.',
+      backup: 'Visita techada a la espectacular Villa Romana de La Olmeda.',
+      energyLevel: 'suave',
+    }
+  } else if (d === 22) {
+    return {
+      title: 'Despedida de Guardo y Retorno',
+      familyPlan: 'Check-out tranquilo por la mañana. Almuerzo tradicional y viaje de regreso de los grupos de conexión.',
+      f1Plan: 'Regreso y fin del segmento norte.',
+      foodIdea: 'Menú tradicional de cocina castellana en ruta.',
+      routeNotes: 'Guardo -> Madrid u otro destino de conexión en coche.',
+      backup: 'Parada intermedia en León o Palencia para descansar en interiores.',
+      energyLevel: 'media',
+    }
+  }
+  return null
+}
+
+function generateFallbackItinerary(activeTrip, activeTravelCities, travelGroups) {
+  const startStr = activeTrip?.startDate || '2026-09-10'
+  const endStr = activeTrip?.returnDate || activeTrip?.endDate || '2026-09-22'
+  const daysList = getDaysList(startStr, endStr)
+  
+  return daysList.map((date, index) => {
+    const dateLabel = formatItineraryDayLabel(date)
+    const city = matchCityForDate(date, activeTravelCities, activeTrip)
+    
+    let title = 'Día de viaje'
+    let familyPlan = 'Paseo libre, exploración y actividades familiares según el ritmo del grupo.'
+    let f1Plan = ''
+    let foodIdea = ''
+    let routeNotes = ''
+    let backup = ''
+    let energyLevel = 'media'
+    
+    if (city === 'Madrid') {
+      const draftIndex = index < 5 ? index : -1
+      if (draftIndex !== -1 && itineraryDraft[draftIndex]) {
+        const item = itineraryDraft[draftIndex]
+        title = item.title
+        familyPlan = item.family
+        f1Plan = item.f1 || ''
+      } else {
+        title = 'Exploración de Madrid'
+        familyPlan = 'Día libre en Madrid para visitar museos, parques o realizar compras.'
+        f1Plan = 'Plan flexible libre en Madrid.'
+      }
+    } else if (city === 'Guardo') {
+      const guardoPlan = getGuardoPrepopulatedPlan(date)
+      if (guardoPlan) {
+        title = guardoPlan.title
+        familyPlan = guardoPlan.familyPlan
+        f1Plan = guardoPlan.f1Plan
+        foodIdea = guardoPlan.foodIdea
+        routeNotes = guardoPlan.routeNotes
+        backup = guardoPlan.backup
+        energyLevel = guardoPlan.energyLevel
+      }
+    } else {
+      title = `Estancia en ${city}`
+      familyPlan = `Día para recorrer ${city}, pasear en familia y disfrutar del ritmo local.`
+      f1Plan = `Plan libre en ${city}.`
+    }
+    
+    return {
+      date: dateLabel,
+      city,
+      title,
+      familyPlan,
+      f1Plan,
+      foodIdea,
+      routeNotes,
+      backup,
+      energyLevel,
+    }
+  })
+}
+
 function defaultSubgroupDraftForTrip(trip) {
   return {
     name: '',
@@ -740,7 +956,7 @@ function FrontendUpdatePanel({
       .slice()
       .sort((a, b) => (voteCount(b) - voteCount(a)) || (b.aiScore || 0) - (a.aiScore || 0))
       .slice(0, 2)
-  const [primary, secondary] = fallbackCandidates
+  const [primary] = fallbackCandidates
   const decisionVoters = new Set(
     fallbackCandidates.flatMap((option) => votes[option.id] || []),
   )
@@ -751,100 +967,63 @@ function FrontendUpdatePanel({
   const leadingOption = liveOptions
     .slice()
     .sort((a, b) => (voteCount(b) - voteCount(a)) || (b.aiScore || 0) - (a.aiScore || 0))[0]
-  const activeGroupTotal =
-    (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0)
-  const activityItems = [
-    leadingOption
-      ? {
-          label: 'Votos',
-          title: `${leadingOption.code} va primero`,
-          detail: `${voteCount(leadingOption)} voto${voteCount(leadingOption) === 1 ? '' : 's'} · ${categoryConfig[leadingOption.category]?.shortLabel || leadingOption.category}`,
-        }
-      : null,
-    budgetOptions[0]
-      ? {
-          label: 'Presupuesto',
-          title: `${budgetOptions.length} opción${budgetOptions.length === 1 ? '' : 'es'} en presupuesto`,
-          detail: budgetOptions[0].priceNight ? `Desde ${currency(budgetOptions[0].priceNight)}` : 'Listas para revisar por persona',
-        }
-      : null,
-    {
-      label: 'Subgrupos',
-      title: 'F1, niños y familia completa',
-      detail: `${activeGroupTotal || 9} viajeros con carriles de decisión separados`,
-    },
-  ].filter(Boolean)
 
   return (
-    <section className="family-command-grid" aria-label="Actualización familiar">
-      <article className="paste-detector-card">
-        <div>
-          <p className="eyebrow">Atajo rápido</p>
-          <h2>Pega un link y lo convierto en opción.</h2>
-          <span>Booking, Airbnb, Google Maps o restaurantes.</span>
-        </div>
-        <div className="paste-detector-actions">
-          <button onClick={onPasteLink} type="button">
-            <ExternalLink size={16} aria-hidden="true" />
-            Pegar link
-          </button>
-          <button onClick={onAddOption} type="button">
-            <Plus size={16} aria-hidden="true" />
-            Manual
-          </button>
-        </div>
-      </article>
+    <div className="quick-action-bar" role="toolbar" aria-label="Acciones rápidas">
+      {/* ── Añadir opciones ── */}
+      <div className="qab-group">
+        <button className="qab-btn qab-btn-primary" onClick={onPasteLink} type="button">
+          <ExternalLink size={13} aria-hidden="true" />
+          Pegar link
+        </button>
+        <button className="qab-btn" onClick={onAddOption} type="button">
+          <Plus size={13} aria-hidden="true" />
+          Manual
+        </button>
+      </div>
 
-      <article className="active-decision-card">
-        <div className="active-decision-copy">
-          <p className="eyebrow">Tu turno de votar</p>
-          <h2>
-            {primary && secondary
-              ? `${primary.code} o ${secondary.code}: decidir hospedaje`
-              : 'Elige la mejor opción del viaje'}
-          </h2>
-          <span>
-            {decisionVoters.size} de {familyMembers.length} han votado
+      <div className="qab-sep" aria-hidden="true" />
+
+      {/* ── Votación ── */}
+      <div className="qab-group">
+        {decisionVoters.size > 0 && (
+          <span className="qab-meta">
+            {decisionVoters.size}/{familyMembers.length} votaron
           </span>
-        </div>
-        <div className="decision-avatar-row" aria-label="Estado de votos">
-          {familyMembers.map((member) => (
-            <MiniAvatar
-              active={decisionVoters.has(member.id) || member.id === activeMember}
-              key={member.id}
-              member={member}
-            />
-          ))}
-        </div>
-        <div className="decision-actions">
-          <button disabled={!primary} onClick={() => primary && onVote(primary.id)} type="button">
-            <Heart size={15} aria-hidden="true" />
-            {currentMemberVotedPrimary ? 'Quitar voto' : `Votar ${primary?.code || ''}`}
-          </button>
-          <button onClick={() => onOpenDecision(primary?.category || 'lodging')} type="button">
-            Comparar
-          </button>
-        </div>
-      </article>
+        )}
+        <button
+          className={`qab-btn ${currentMemberVotedPrimary ? 'qab-btn-voted' : 'qab-btn-vote'}`}
+          disabled={!primary}
+          onClick={() => primary && onVote(primary.id)}
+          title={primary ? `Votar por ${primary.title}` : 'Sin candidatos aún'}
+          type="button"
+        >
+          <Heart size={13} aria-hidden="true" />
+          {currentMemberVotedPrimary ? 'Quitar voto' : (primary ? `Votar ${primary.code}` : 'Votar')}
+        </button>
+        <button
+          className="qab-btn"
+          onClick={() => onOpenDecision(primary?.category || 'lodging')}
+          type="button"
+        >
+          Comparar
+        </button>
+      </div>
 
-      <article className="family-activity-card">
-        <div className="activity-head">
-          <p className="eyebrow">Qué cambió</p>
-          <span>vista rápida</span>
-        </div>
-        <div className="activity-list">
-          {activityItems.map((item) => (
-            <div className="activity-row" key={`${item.label}-${item.title}`}>
-              <strong>{item.label}</strong>
-              <div>
-                <span>{item.title}</span>
-                <small>{item.detail}</small>
-              </div>
-            </div>
-          ))}
-        </div>
-      </article>
-    </section>
+      {/* ── Mini stats ── */}
+      <div className="qab-stats">
+        {leadingOption && voteCount(leadingOption) > 0 && (
+          <span className="qab-stat" title={`${leadingOption.title} lidera con votos`}>
+            🏆 {leadingOption.code} · {voteCount(leadingOption)}v
+          </span>
+        )}
+        {budgetOptions.length > 0 && (
+          <span className="qab-stat">
+            💰 {budgetOptions.length} en presupuesto
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -963,7 +1142,8 @@ function optionBudget(option, profile, f1Count, nights) {
 }
 
 function getPlaceName(place) {
-  return place.name || place.displayName?.text || 'Lugar sugerido'
+  // place.name = legacy PlaceResult | place.displayName = string (new Place class) | .text = REST API
+  return place.name || (typeof place.displayName === 'string' ? place.displayName : place.displayName?.text) || 'Lugar sugerido'
 }
 
 function getPlaceId(place) {
@@ -980,7 +1160,12 @@ function getPlaceReviews(place) {
 
 function getPlacePhoto(place) {
   if (place.photoUri || place.image) return place.photoUri || place.image
-  return place.photos?.[0]?.getUrl?.({ maxWidth: 1200, maxHeight: 800 }) || ''
+  const photo = place.photos?.[0]
+  if (!photo) return ''
+  // New Places API uses getURI(), legacy uses getUrl()
+  if (photo.getURI) return photo.getURI({ maxWidth: 1200 })
+  if (photo.getUrl) return photo.getUrl({ maxWidth: 1200, maxHeight: 800 })
+  return ''
 }
 
 function getPlacePhotoCredit(place) {
@@ -1013,6 +1198,65 @@ function getPlaceUrl(place) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`
 }
 
+function parseDatesForBooking(datesText) {
+  if (!datesText) return { checkin: '', checkout: '' }
+  const text = datesText.toLowerCase()
+  const year = text.match(/\b(20\d{2})\b/)?.[1] || '2026'
+  const monthMap = {
+    ene: '01', enero: '01', feb: '02', febrero: '02',
+    mar: '03', marzo: '03', abr: '04', abril: '04',
+    may: '05', mayo: '05', jun: '06', junio: '06',
+    jul: '07', julio: '07', ago: '08', agosto: '08',
+    sep: '09', septiembre: '09', oct: '10', octubre: '10',
+    nov: '11', noviembre: '11', dic: '12', diciembre: '12',
+  }
+  const monthKey = Object.keys(monthMap).find((key) => text.includes(key))
+  const days = [...text.matchAll(/\b(\d{1,2})\b/g)].map((m) => Number(m[1])).filter((d) => d >= 1 && d <= 31)
+  if (!monthKey || days.length < 2) return { checkin: '', checkout: '' }
+  return {
+    checkin: `${year}-${monthMap[monthKey]}-${String(days[0]).padStart(2, '0')}`,
+    checkout: `${year}-${monthMap[monthKey]}-${String(days[1]).padStart(2, '0')}`,
+  }
+}
+
+function placeSmartLinks(place, resultType, dates, groupProfile) {
+  const name = getPlaceName(place)
+  const encodedName = encodeURIComponent(name)
+  const city = place.formattedAddress
+    ? encodeURIComponent(place.formattedAddress.split(',').slice(-2, -1)[0]?.trim() || '')
+    : ''
+  const q = encodeURIComponent(`${name} ${city ? decodeURIComponent(city) : ''}`.trim())
+
+  if (resultType === 'lodging') {
+    const parsed = parseDatesForBooking(dates)
+    const adults = groupProfile?.adults || 2
+    const children = (groupProfile?.childrenAges || []).length
+    const ages = (groupProfile?.childrenAges || []).map((age) => `&age=${age}`).join('')
+    const bookingDates = parsed.checkin ? `&checkin=${parsed.checkin}&checkout=${parsed.checkout}` : ''
+    return [
+      {
+        label: 'Booking',
+        url: `https://www.booking.com/searchresults.es.html?ss=${encodedName}+${city}${bookingDates}&group_adults=${adults}&group_children=${children}${ages}&no_rooms=1`,
+      },
+      {
+        label: 'Airbnb',
+        url: `https://www.airbnb.com/s/${encodedName}-${city}/homes?adults=${adults}&children=${children}${parsed.checkin ? `&checkin=${parsed.checkin}&checkout=${parsed.checkout}` : ''}`,
+      },
+    ]
+  }
+  if (resultType === 'food') {
+    return [
+      { label: 'Google Maps', url: `https://www.google.com/maps/search/${q}` },
+      { label: 'TripAdvisor', url: `https://www.tripadvisor.es/Search?q=${q}` },
+    ]
+  }
+  // activities / kids
+  return [
+    { label: 'GetYourGuide', url: `https://www.getyourguide.com/s/?q=${q}` },
+    { label: 'Google Maps', url: `https://www.google.com/maps/search/${q}` },
+  ]
+}
+
 function smartSuggestionQueries(label, notes, city) {
   return [
     `${notes} en ${city}`,
@@ -1022,46 +1266,32 @@ function smartSuggestionQueries(label, notes, city) {
   ].filter((query, index, list) => query && list.indexOf(query) === index)
 }
 
-function textSearchPlaces(service, google, request, placesLibrary = google.maps.places) {
-  return new Promise((resolve) => {
-    service.textSearch(request, (results, status) => {
-      if (status !== placesLibrary.PlacesServiceStatus.OK || !results) {
-        resolve({ results: [], status })
-        return
-      }
-      resolve({ results, status })
-    })
-  })
-}
-
-async function searchBrowserPlaces(service, google, queries, limit, requestBase = {}, placesLibrary) {
+// Uses the new Places API (Place.searchByText) — replaces legacy PlacesService.textSearch
+async function searchBrowserPlacesNew(Place, queries, limit, requestBase = {}) {
   const seen = new Set()
   const places = []
-  const statusCodes = placesLibrary || google.maps.places
-  let lastStatus = statusCodes.PlacesServiceStatus.ZERO_RESULTS
 
   for (const queryText of queries) {
     if (places.length >= limit) break
-    const { results, status } = await textSearchPlaces(
-      service,
-      google,
-      {
+    try {
+      const response = await Place.searchByText({
+        textQuery: queryText,
+        fields: ['id', 'displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount', 'photos', 'googleMapsUri', 'businessStatus'],
+        maxResultCount: Math.min(limit - places.length, 20),
         ...requestBase,
-        query: queryText,
-      },
-      statusCodes,
-    )
-    lastStatus = status
-    for (const place of results) {
-      const id = getPlaceId(place)
-      if (seen.has(id)) continue
-      seen.add(id)
-      places.push(place)
-      if (places.length >= limit) break
+      })
+      for (const place of (response?.places || [])) {
+        if (!place.id || seen.has(place.id)) continue
+        seen.add(place.id)
+        places.push(place)
+        if (places.length >= limit) break
+      }
+    } catch {
+      // Continue to next query on error
     }
   }
 
-  return { places, status: places.length ? statusCodes.PlacesServiceStatus.OK : lastStatus }
+  return places
 }
 
 function mergeOption(current, option) {
@@ -1089,7 +1319,7 @@ function aiScoreTitle(score) {
 
 function App() {
   const previewMode = readPreviewMode()
-  const [activeTab, setActiveTab] = useState('lodging')
+  const [activeTab, setActiveTab] = useState('overview')
   const [selectedCity, setSelectedCity] = useState('Todas')
   const [activeMember, setActiveMember] = useState('camilo')
   const [showRemoved, setShowRemoved] = useState(false)
@@ -1141,6 +1371,35 @@ function App() {
   const [transferResult, setTransferResult] = useState(null)
   const [transferBusy, setTransferBusy] = useState(false)
   const [subgroupDraft, setSubgroupDraft] = useState(() => defaultSubgroupDraftForTrip(null))
+
+  // ── Topbar AI chat ──────────────────────────────────────────────────
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showTopbarChat, setShowTopbarChat] = useState(false)
+  const [topbarChatInput, setTopbarChatInput] = useState('')
+  const [topbarChatHistory, setTopbarChatHistory] = useState([])
+  const [topbarChatBusy, setTopbarChatBusy] = useState(false)
+  const topbarChatEndRef = useRef(null)
+
+  async function handleTopbarChat(e) {
+    if (e) e.preventDefault()
+    const text = topbarChatInput.trim()
+    if (!text || topbarChatBusy) return
+    const newHistory = [...topbarChatHistory, { role: 'user', content: text }]
+    setTopbarChatHistory(newHistory)
+    setTopbarChatInput('')
+    setTopbarChatBusy(true)
+    try {
+      const result = await chatPlanner(text, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...newHistory, { role: 'assistant', content: result.reply }])
+      }
+    } catch {
+      setTopbarChatHistory([...newHistory, { role: 'assistant', content: 'Error al conectar con el planificador.' }])
+    } finally {
+      setTopbarChatBusy(false)
+      topbarChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   // ── Phase 1: multi-trip state ───────────────────────────────────────
   const [activeTripId, setActiveTripId] = useState(() => {
@@ -1231,7 +1490,9 @@ function App() {
   const activeSearchMeta = searchMetaForType(activeSearchType)
   const smartSuggestionTypeForTab = activeTab === 'activities' || activeTab === 'food'
     ? activeSearchType
-    : smartSuggestionType
+    : activeTab === 'lodging'
+      ? 'lodging'
+      : smartSuggestionType
 
   const budgetTotalPerPerson = useMemo(() => {
     if (!budgetOptions.length) return null
@@ -1422,6 +1683,20 @@ function App() {
     }
   }, [activeTripId])
 
+  // Custom Itinerary: load from localStorage on activeTripId change
+  useEffect(() => {
+    if (activeTripId) {
+      try {
+        const saved = window.localStorage.getItem(`custom_itinerary_${activeTripId}`)
+        if (saved) {
+          setGeneratedItinerary(JSON.parse(saved))
+        }
+      } catch (e) {
+        console.error('Error loading custom itinerary:', e)
+      }
+    }
+  }, [activeTripId])
+
   useEffect(() => {
     if (!activeTrip || defaultedTripRef.current === activeTrip.id) return
     applyTripDefaults(activeTrip)
@@ -1449,9 +1724,10 @@ function App() {
           option.status !== 'removed' &&
           option.city === (effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity) &&
           option.map &&
-          option.category !== 'itinerary',
+          option.category !== 'itinerary' &&
+          (budgetOptionIds.includes(option.id) || (votes[option.id]?.length || 0) > 0),
       ),
-    [effectiveSelectedCity, options],
+    [budgetOptionIds, effectiveSelectedCity, options, votes],
 	  )
 	  const currentMapCity = cityCenter(effectiveSelectedCity, activeTravelCities)
 	  function updateDraft(field, value) {
@@ -1665,6 +1941,16 @@ function App() {
     upsertTravelGroup({ ...existing, ...patch })
   }
 
+  function deleteTravelGroup(groupId) {
+    setTravelGroups((current) => {
+      const source = current.length ? current : normalizedTravelGroups
+      return source.filter((item) => item.id !== groupId)
+    })
+    if (activeTravelGroupId === groupId) {
+      setActiveTravelGroupId(null)
+    }
+  }
+
   function toggleSubgroupBudgetOption(optionId) {
     const currentIds = currentTravelGroup.budgetOptionIds || []
     const nextIds = currentIds.includes(optionId)
@@ -1728,6 +2014,15 @@ function App() {
   function handleDismissJoinModal() {
     setPendingJoinCode(null)
     cleanJoinFromUrl()
+  }
+
+  async function handleDeleteTrip(tripId) {
+    await deleteTrip(tripId, currentUser)
+    // If the deleted trip was active, go back to dashboard
+    if (activeTripId === tripId) {
+      setActiveTripId(null)
+      defaultedTripRef.current = ''
+    }
   }
 
   async function handleSignIn() {
@@ -2078,10 +2373,17 @@ function App() {
   async function assessPlan() {
     if (!canSync) return null
     try {
+      const tripContext = {
+        mainCity: primaryTripCity(activeTrip),
+        mainStart: activeTrip?.startDate || '',
+        mainEnd: activeTrip?.endDate || '',
+        returnDate: activeTrip?.returnDate || '',
+      }
       return await assessTripPlanWithAI({
         tripId: activeTripId,
         groupProfile: currentTravelGroup,
         subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
+        tripContext,
       })
     } catch (err) {
       console.error('assessPlan error', err)
@@ -2092,12 +2394,19 @@ function App() {
   async function chatPlanner(message, history) {
     if (!canSync || !message.trim()) return null
     try {
+      const tripContext = {
+        mainCity: primaryTripCity(activeTrip),
+        mainStart: activeTrip?.startDate || '',
+        mainEnd: activeTrip?.endDate || '',
+        returnDate: activeTrip?.returnDate || '',
+      }
       return await chatWithPlannerAI({
         tripId: activeTripId,
         groupProfile: currentTravelGroup,
         subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
         message,
         history,
+        tripContext,
       })
     } catch (err) {
       console.error('chatPlanner error', err)
@@ -2406,15 +2715,13 @@ function App() {
     }
 
     try {
-      const { google, libraries } = await loadGoogleMapsLibraries(['places'])
-      const service = new libraries.places.PlacesService(document.createElement('div'))
-      const { places: browserPlaces, status } = await searchBrowserPlaces(
-        service,
-        google,
+      const { libraries } = await loadGoogleMapsLibraries(['places'])
+      const Place = libraries.places.Place
+      const browserPlaces = await searchBrowserPlacesNew(
+        Place,
         smartSuggestionQueries(config.label, notes, city),
         placeSuggestionLimit,
         { region: 'es' },
-        libraries.places,
       )
       setPlacesBusy(false)
       if (!browserPlaces.length) {
@@ -2423,7 +2730,7 @@ function App() {
           type: 'food',
           city: searchDraft.city,
           status: 'error',
-          notes: `Google Places respondió: ${status}`,
+          notes: 'Google Places no encontró resultados.',
           links: [],
         })
         return
@@ -2469,49 +2776,67 @@ function App() {
       },
     })
 
-    if (canSync) {
-      try {
-        const result = await suggestFoodWithAI({
-          tripId: activeTripId,
-          city,
-          dates: searchDraft.dates,
-          kind: config.label,
-          notes: config.notes,
-          limit: placeSuggestionLimit,
-          groupProfile: currentTravelGroup,
-        })
-        setSmartSuggestions({
-          ...result,
-          type: config.id,
-          category: config.category,
-          places: (result.places || []).slice(0, placeSuggestionLimit),
-        })
-        setSmartSuggestionsBusy(false)
-        return
-      } catch (error) {
-        setSmartSuggestions({
-          id: `smart-${Date.now()}`,
-          city,
-          type: config.id,
-          status: 'error',
-          places: [],
-          analysis: {
-            summary: `${error.message}. Intento con Google Maps del navegador.`,
-          },
-        })
-      }
-    }
+    // Safety: always unblock after 25s regardless of what happens
+    const safetyTimer = setTimeout(() => {
+      setSmartSuggestionsBusy(false)
+      setSmartSuggestions((prev) => prev?.status === 'working'
+        ? { ...prev, status: 'error', analysis: { summary: 'La búsqueda tardó demasiado. Intenta de nuevo.' } }
+        : prev
+      )
+    }, 25000)
 
     try {
-      const { google, libraries } = await loadGoogleMapsLibraries(['places'])
-      const service = new libraries.places.PlacesService(document.createElement('div'))
-      const { places: browserPlaces, status } = await searchBrowserPlaces(
-        service,
-        google,
+      if (canSync) {
+        try {
+          const isLodging = config.id === 'lodging'
+          const result = isLodging
+            ? await suggestLodgingPlacesWithAI({
+                tripId: activeTripId,
+                city,
+                dates: datesForOptionCity(city),
+                limit: placeSuggestionLimit,
+                groupProfile: currentTravelGroup,
+                subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
+              })
+            : await suggestFoodWithAI({
+                tripId: activeTripId,
+                city,
+                dates: searchDraft.dates,
+                kind: config.label,
+                notes: config.notes,
+                limit: placeSuggestionLimit,
+                groupProfile: currentTravelGroup,
+              })
+          setSmartSuggestions({
+            ...result,
+            type: config.id,
+            category: config.category,
+            places: (result.places || []).slice(0, placeSuggestionLimit),
+          })
+          setSmartSuggestionsBusy(false)
+          return
+        } catch (error) {
+          // Cloud Function failed — fall through to browser Maps
+          setSmartSuggestions({
+            id: `smart-${Date.now()}`,
+            city,
+            type: config.id,
+            status: 'working',
+            places: [],
+            analysis: {
+              summary: `Buscando en Google Maps del navegador para ${city}...`,
+            },
+          })
+        }
+      }
+
+      const { libraries } = await loadGoogleMapsLibraries(['places'])
+      const Place = libraries.places.Place
+      const browserPlaces = await searchBrowserPlacesNew(
+        Place,
         smartSuggestionQueries(config.label, config.notes, city),
         placeSuggestionLimit,
         city === 'Madrid' ? { region: 'es' } : {},
-        libraries.places,
       )
       setSmartSuggestionsBusy(false)
       if (!browserPlaces.length) {
@@ -2521,11 +2846,10 @@ function App() {
           type: config.id,
           status: 'error',
           places: [],
-          analysis: { summary: `Google Places respondió: ${status}` },
+          analysis: { summary: 'Google Places no encontró resultados.' },
         })
         return
       }
-
       setSmartSuggestions({
         id: `smart-${Date.now()}`,
         city,
@@ -2545,8 +2869,10 @@ function App() {
         type: config.id,
         status: 'error',
         places: [],
-        analysis: { summary: error.message },
+        analysis: { summary: error.message || 'Error al buscar sugerencias.' },
       })
+    } finally {
+      clearTimeout(safetyTimer)
     }
   }
 
@@ -2731,69 +3057,149 @@ function App() {
       .map((profile) => itinerarySubgroupPayload(profile, options, budgetNights, f1Crew.length))
 
     if (!canSync) {
-      setGeneratedItinerary({
+      const fallbackDays = generateFallbackItinerary(activeTrip, activeTravelCities, normalizedTravelGroups)
+      const formattedFallbackDays = fallbackDays.map((day) => ({
+        ...day,
+        subgroupPlans: itinerarySubgroups
+          .filter((group) => {
+            if (!group.date) return false
+            try {
+              const gDate = new Date(`${group.date}T00:00:00Z`)
+              return formatItineraryDayLabel(gDate) === day.date
+            } catch {
+              return false
+            }
+          })
+          .map((group) => ({
+            groupId: group.id,
+            groupName: group.name,
+            timeWindow: [group.startTime, group.endTime].filter(Boolean).join('-'),
+            plan: group.focus || 'Plan paralelo por concretar',
+            budgetNote: group.budgetOptions.length
+              ? `${group.budgetOptions.length} partidas en subpresupuesto`
+              : 'Sin subpresupuesto todavía',
+          })),
+      }))
+
+      const newItinerary = {
         title: 'Itinerario base',
-        summary: 'Inicia sesión con Firebase activo para generar itinerarios con IA.',
+        summary: 'Inicia sesión con Firebase activo para generar itinerarios con IA o edítalo a continuación.',
         subgroups: itinerarySubgroups,
-        days: itineraryDraft.map((item) => ({
-          date: item.day,
-          city: item.city,
-          title: item.title,
-          familyPlan: item.family,
-          f1Plan: item.f1,
-          foodIdea: 'Por definir',
-          routeNotes: 'Por calcular',
-          backup: 'Mantener plan flexible',
-          energyLevel: 'Media',
-          subgroupPlans: itinerarySubgroups
-            .filter((group) => group.date)
-            .slice(0, 3)
-            .map((group) => ({
-              groupId: group.id,
-              groupName: group.name,
-              timeWindow: [group.startTime, group.endTime].filter(Boolean).join('-'),
-              plan: group.focus || 'Plan paralelo por concretar',
-              budgetNote: group.budgetOptions.length
-                ? `${group.budgetOptions.length} partidas en subpresupuesto`
-                : 'Sin subpresupuesto todavía',
-            })),
-        })),
+        days: formattedFallbackDays,
         openQuestions: ['Conectar IA para recalcular con opciones actuales'],
-      })
+      }
+      setGeneratedItinerary(newItinerary)
+      try {
+        window.localStorage.setItem(`custom_itinerary_${activeTripId}`, JSON.stringify(newItinerary))
+      } catch (e) {
+        console.error('Error saving offline itinerary:', e)
+      }
       return
     }
 
     setItineraryBusy(true)
     try {
-	      const result = await generateItineraryWithAI({
-	        tripId: activeTripId,
-	        city: effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity,
-        dates: searchDraft.dates,
+      const fullTripDates = tripDatesForSearch(activeTrip)
+      // Build city schedule from activeTravelCities so AI can assign each day to the right city
+      const citySchedule = activeTravelCities
+        .filter((c) => c.status !== 'removed')
+        .map((c) => ({
+          city: c.city,
+          dates: c.dates || '',
+          notes: c.notes || '',
+          isBase: c.isBase || false,
+        }))
+      // Fallback city for single-city trips or when no cities are configured
+      const primaryCity =
+        citySchedule.length === 1
+          ? citySchedule[0].city
+          : effectiveSelectedCity !== 'Todas'
+          ? effectiveSelectedCity
+          : 'Madrid'
+      const result = await generateItineraryWithAI({
+        tripId: activeTripId,
+        city: primaryCity,
+        dates: fullTripDates || searchDraft.dates,
+        tripTotalDates: fullTripDates,
+        citySchedule,
         routeMode,
         groupProfile: currentTravelGroup,
         subgroups: itinerarySubgroups,
       })
       setGeneratedItinerary(result)
+      try {
+        window.localStorage.setItem(`custom_itinerary_${activeTripId}`, JSON.stringify(result))
+      } catch (e) {
+        console.error('Error saving AI itinerary:', e)
+      }
       setActiveTab('itinerary')
     } catch (error) {
-      setGeneratedItinerary({
+      const fallbackDays = generateFallbackItinerary(activeTrip, activeTravelCities, normalizedTravelGroups)
+      const formattedFallbackDays = fallbackDays.map((day) => ({
+        ...day,
+        subgroupPlans: itinerarySubgroups
+          .filter((group) => {
+            if (!group.date) return false
+            try {
+              const gDate = new Date(`${group.date}T00:00:00Z`)
+              return formatItineraryDayLabel(gDate) === day.date
+            } catch {
+              return false
+            }
+          })
+          .map((group) => ({
+            groupId: group.id,
+            groupName: group.name,
+            timeWindow: [group.startTime, group.endTime].filter(Boolean).join('-'),
+            plan: group.focus || 'Plan paralelo por concretar',
+            budgetNote: group.budgetOptions.length
+              ? `${group.budgetOptions.length} partidas en subpresupuesto`
+              : 'Sin subpresupuesto todavía',
+          })),
+      }))
+
+      const errorItinerary = {
         title: 'Itinerario pendiente',
         summary: error.message,
-        days: itineraryDraft.map((item) => ({
-          date: item.day,
-          city: item.city,
-          title: item.title,
-          familyPlan: item.family,
-          f1Plan: item.f1,
-          foodIdea: 'Por definir',
-          routeNotes: 'Por calcular',
-          backup: 'Mantener plan flexible',
-          energyLevel: 'Media',
-        })),
+        days: formattedFallbackDays,
         openQuestions: ['Reintentar cuando Functions/Vertex AI esté disponible'],
-      })
+      }
+      setGeneratedItinerary(errorItinerary)
+      try {
+        window.localStorage.setItem(`custom_itinerary_${activeTripId}`, JSON.stringify(errorItinerary))
+      } catch (e) {
+        console.error('Error saving error itinerary:', e)
+      }
     } finally {
       setItineraryBusy(false)
+    }
+  }
+
+  const handleUpdateItineraryDay = (dayIndex, patch) => {
+    if (!activeTripId) return
+
+    const currentDays = generatedItinerary?.days?.length
+      ? [...generatedItinerary.days]
+      : generateFallbackItinerary(activeTrip, activeTravelCities, normalizedTravelGroups)
+
+    if (dayIndex >= 0 && dayIndex < currentDays.length) {
+      currentDays[dayIndex] = {
+        ...currentDays[dayIndex],
+        ...patch,
+      }
+    }
+
+    const newItinerary = {
+      ...generatedItinerary,
+      title: generatedItinerary?.title || `${currentDays.length} días, varios planes en paralelo`,
+      days: currentDays,
+    }
+
+    setGeneratedItinerary(newItinerary)
+    try {
+      window.localStorage.setItem(`custom_itinerary_${activeTripId}`, JSON.stringify(newItinerary))
+    } catch (e) {
+      console.error('Error saving itinerary to localStorage:', e)
     }
   }
 
@@ -2842,6 +3248,7 @@ function App() {
           userTrips={userTrips}
           tripsLoading={tripsLoading}
           onEnterTrip={handleEnterTrip}
+          onDeleteTrip={handleDeleteTrip}
           onSignOut={handleSignOut}
         />
         {pendingJoinCode && (
@@ -2856,94 +3263,285 @@ function App() {
     )
   }
 
+  // sidebar helpers
+  const sidebarTravelers = (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0) || currentTravelGroup.totalTravelers || familyMembers.length
+  const sidebarSubgroups = normalizedTravelGroups.filter((g) => g.kind === 'subgroup')
+  const sidebarNavItems = [
+    { id: 'overview', label: 'Resumen', icon: Home },
+    { id: 'lodging', label: 'Hospedajes', icon: Hotel },
+    { id: 'food', label: 'Comida', icon: Utensils },
+    { id: 'activities', label: 'Planes', icon: Landmark },
+    { id: 'transport', label: 'Transporte', icon: TrainFront },
+    { id: 'itinerary', label: 'Itinerario', icon: Route },
+    { id: 'budget', label: 'Presupuesto', icon: CircleDollarSign },
+    { id: 'cities', label: 'Ciudades', icon: MapPinned },
+  ]
+
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">
-            {activeTrip
-              ? [activeTrip.destination, activeTrip.startDate ? `${activeTrip.startDate}${activeTrip.endDate ? ` → ${activeTrip.endDate}` : ''}` : null].filter(Boolean).join(' · ')
-              : 'Viaje familiar · septiembre 2026'}
-          </p>
-          <h1>
-            {activeTrip ? `${activeTrip.emoji || '✈️'} ${activeTrip.name}` : 'Plan familiar septiembre 2026.'}
-          </h1>
-        </div>
 
-        <div className="topbar-controls">
-          <label className="topbar-select-wrap" aria-label="Quién opina">
-            <Users size={14} aria-hidden="true" />
-            <select onChange={(event) => setActiveMember(event.target.value)} value={activeMember}>
-              {familyMembers.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="topbar-select-wrap" aria-label="Grupo activo">
-            <Heart size={14} aria-hidden="true" />
-            <select
-              onChange={(event) => setActiveTravelGroupId(event.target.value)}
-              value={currentTravelGroup.id}
-            >
-	              {normalizedTravelGroups.map((profile) => (
-	                <option key={profile.id} value={profile.id}>{profile.name}</option>
-	              ))}
-            </select>
-          </label>
-          {budgetTotalPerPerson ? (
-            <span className="budget-topbar-pill" title="Presupuesto estimado por persona (selecciones actuales)">
-              <CircleDollarSign size={14} aria-hidden="true" />
-              ~{currency(budgetTotalPerPerson)}/persona
+      {/* ── LEFT SIDEBAR ──────────────────────────────────────────── */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+      <aside className={`left-sidebar${sidebarOpen ? ' open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-logo-mark">{activeTrip?.emoji || '✈️'}</div>
+          <div className="sidebar-header-text">
+            <span className="sidebar-trip-name">{activeTrip ? activeTrip.name : 'Viaje Familia'}</span>
+            <span className="sidebar-trip-meta">
+              SEPT 2026 · {sidebarTravelers} PERSONAS
             </span>
-          ) : null}
+          </div>
         </div>
 
-        <div className="status-stack">
-          <div className={`sync-pill ${displayedSyncStatus.online ? 'ready' : ''}`}>
-            {displayedSyncStatus.online ? (
-              <CheckCircle2 size={18} aria-hidden="true" />
-            ) : (
-              <CloudOff size={18} aria-hidden="true" />
-            )}
-            <span>{displayedSyncStatus.label}</span>
+        <nav className="sidebar-nav" aria-label="Navegación principal">
+          {sidebarNavItems.map(({ id, label, icon: Icon }) => {
+            const count = ['lodging', 'food', 'activities', 'transport'].includes(id)
+              ? options.filter((o) => o.category === id && o.status !== 'removed').length
+              : 0
+            return (
+              <button
+                key={id}
+                className={`sidebar-nav-item ${activeTab === id ? 'active' : ''}`}
+                onClick={() => { switchTab(id); setSidebarOpen(false) }}
+                type="button"
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{label}</span>
+                {count > 0 && <span className="sidebar-nav-count">{count}</span>}
+              </button>
+            )
+          })}
+          <button
+            className="sidebar-nav-item sidebar-ai-item"
+            onClick={() => {
+              const searchTabs = ['lodging', 'food', 'activities']
+              if (searchTabs.includes(activeTab)) {
+                // Already on a searchable tab — run suggestions for that tab
+                findSmartSuggestions(smartSuggestionTypeForTab)
+              } else {
+                // Navigate to lodging first, then trigger suggestions
+                switchTab('lodging')
+                setTimeout(() => findSmartSuggestions('lodging'), 150)
+              }
+              setSidebarOpen(false)
+            }}
+            type="button"
+          >
+            <Sparkles size={16} aria-hidden="true" />
+            <span>IA sugiere</span>
+          </button>
+        </nav>
+
+        {sidebarSubgroups.length > 0 && (
+          <div className="sidebar-subgroups">
+            <div className="sidebar-section-head">
+              <span>SUBGRUPOS</span>
+            </div>
+            {sidebarSubgroups.map((g, i) => (
+              <button
+                key={g.id}
+                className={`sidebar-subgroup-item ${activeTravelGroupId === g.id ? 'active' : ''}`}
+                onClick={() => setActiveTravelGroupId(g.id)}
+                type="button"
+              >
+                <span
+                  className="sidebar-subgroup-dot"
+                  style={{ background: GANTT_COLORS[i % GANTT_COLORS.length].border }}
+                />
+                <span className="sidebar-subgroup-name">{g.name}</span>
+                <span className="sidebar-subgroup-count">
+                  {g.memberIds?.length || g.totalTravelers || ''}
+                </span>
+              </button>
+            ))}
           </div>
-          {currentUser && userTrips.length >= 2 && (
-            <button
-              className="auth-button"
-              onClick={handleBackToDashboard}
-              type="button"
-              title="Volver al listado de viajes"
-            >
-              <ChevronLeft size={17} aria-hidden="true" />
+        )}
+
+        <div className="sidebar-footer">
+          <div
+            className={`sidebar-sync-dot ${displayedSyncStatus.online ? 'online' : ''}`}
+            title={displayedSyncStatus.label}
+          />
+          {currentUser && (
+            <button className="sidebar-footer-btn" onClick={handleBackToDashboard} type="button">
+              <ChevronLeft size={13} />
               Mis viajes
             </button>
           )}
           {currentUser ? (
-            <button className="auth-button" onClick={handleSignOut} type="button">
-              <LogOut size={17} aria-hidden="true" />
+            <button className="sidebar-footer-btn" onClick={handleSignOut} type="button">
+              <LogOut size={13} />
               Salir
             </button>
           ) : (
             <button
-              className="auth-button primary"
+              className="sidebar-footer-btn primary"
               disabled={!authReady || !isFirebaseConfigured}
               onClick={handleSignIn}
               type="button"
             >
-              {authReady ? (
-                <LogIn size={17} aria-hidden="true" />
-              ) : (
-                <Loader2 size={17} aria-hidden="true" />
-              )}
-              Entrar con Google
+              {authReady ? <LogIn size={13} /> : <Loader2 size={13} />}
+              Entrar
             </button>
           )}
         </div>
-      </header>
+      </aside>
 
+      {/* ── APP MAIN ──────────────────────────────────────────────── */}
+      <div className="app-main">
 
-      <section className="workspace">
-        <section className="main-panel">
+        {/* AI BUSY BAR — sticky indicator visible regardless of scroll */}
+        {smartSuggestionsBusy && (
+          <div className="ai-busy-bar" role="status" aria-live="polite">
+            <Loader2 size={13} className="ai-busy-spinner" aria-hidden="true" />
+            <span>La IA está buscando sugerencias…</span>
+          </div>
+        )}
+
+        {/* TOPBAR V2 */}
+        <header className="topbar-v2">
+          <button
+            className="topbar-hamburger"
+            onClick={() => setSidebarOpen((v) => !v)}
+            type="button"
+            aria-label="Abrir menú"
+          >
+            <Menu size={20} aria-hidden="true" />
+          </button>
+          {/* Mobile-only: active tab label */}
+          <span className="topbar-mobile-tab-label">
+            {sidebarNavItems.find((n) => n.id === activeTab)?.label || activeTrip?.name || 'Viaje'}
+          </span>
+          <div className="topbar-city-tabs">
+            {cityFilters.map((city) => {
+              const cityCount = city !== 'Todas'
+                ? options.filter((o) => (o.city || '').toLowerCase() === city.toLowerCase() && o.status !== 'removed').length
+                : 0
+              return (
+                <button
+                  key={city}
+                  className={`city-tab-pill ${effectiveSelectedCity === city ? 'active' : ''}`}
+                  onClick={() => setSelectedCity(city)}
+                  type="button"
+                >
+                  {city}
+                  {cityCount > 0 && <span className="city-tab-count">{cityCount}</span>}
+                </button>
+              )
+            })}
+            <button
+              className="city-tab-add"
+              onClick={() => switchTab('cities')}
+              type="button"
+              title="Gestionar ciudades"
+            >
+              <Plus size={11} aria-hidden="true" />
+              ciudad
+            </button>
+          </div>
+
+          <button
+            className="topbar-ai-input"
+            onClick={() => setShowTopbarChat(true)}
+            type="button"
+          >
+            <Sparkles size={13} aria-hidden="true" />
+            <span className="topbar-ai-placeholder">Pregúntale al planificador...</span>
+            <kbd>⌘K</kbd>
+          </button>
+
+          <div className="topbar-v2-right">
+            <div className="topbar-member-avatars">
+              {familyMembers.slice(0, 4).map((m) => (
+                <button
+                  key={m.id}
+                  className={`member-avatar-pill ${activeMember === m.id ? 'active' : ''}`}
+                  onClick={() => setActiveMember(m.id)}
+                  title={m.name}
+                  type="button"
+                >
+                  {m.name.charAt(0)}
+                </button>
+              ))}
+              {familyMembers.length > 4 && (
+                <span className="member-avatar-overflow">+{familyMembers.length - 4}</span>
+              )}
+            </div>
+            <label className="topbar-group-select" title={groupSummary(currentTravelGroup)}>
+              <Heart size={12} aria-hidden="true" />
+              <select
+                onChange={(e) => setActiveTravelGroupId(e.target.value)}
+                value={currentTravelGroup.id}
+              >
+                {normalizedTravelGroups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </header>
+
+        {/* TOPBAR AI CHAT OVERLAY */}
+        {showTopbarChat && (
+          <div
+            className="topbar-chat-overlay"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowTopbarChat(false) }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chat con planificador IA"
+          >
+            <div className="topbar-chat-panel">
+              <div className="topbar-chat-head">
+                <Sparkles size={15} />
+                <span>Planificador IA</span>
+                <button
+                  className="topbar-chat-close"
+                  onClick={() => setShowTopbarChat(false)}
+                  type="button"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <div className="topbar-chat-messages">
+                {topbarChatHistory.length === 0 && (
+                  <p className="topbar-chat-empty">Pregúntame sobre fechas, presupuesto, lugares o cualquier duda del viaje.</p>
+                )}
+                {topbarChatHistory.map((msg, i) => (
+                  <div key={i} className={`topbar-chat-msg ${msg.role}`}>
+                    <p>{msg.content}</p>
+                  </div>
+                ))}
+                {topbarChatBusy && (
+                  <div className="topbar-chat-msg assistant">
+                    <Loader2 size={14} className="spin" />
+                  </div>
+                )}
+                <div ref={topbarChatEndRef} />
+              </div>
+              <form className="topbar-chat-input-row" onSubmit={handleTopbarChat}>
+                <input
+                  autoFocus
+                  disabled={topbarChatBusy || !canSync}
+                  onChange={(e) => setTopbarChatInput(e.target.value)}
+                  placeholder={canSync ? '¿Qué quieres planificar?' : 'Inicia sesión para chatear'}
+                  value={topbarChatInput}
+                />
+                <button
+                  type="submit"
+                  disabled={topbarChatBusy || !topbarChatInput.trim() || !canSync}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* WORKSPACE */}
+        <div className="workspace-v2">
+          <section className="main-panel">
           <div className="trip-status-bar" aria-label="Estado del viaje">
             <div className="trip-countdown">
               <strong>{daysUntilTrip}</strong>
@@ -3005,24 +3603,6 @@ function App() {
             votes={votes}
           />
 
-          <nav className="tabbar" aria-label="Secciones">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              const config = categoryConfig[tab.id]
-              return (
-                <button
-                  className={activeTab === tab.id ? 'active' : ''}
-                  key={tab.id}
-                  onClick={() => switchTab(tab.id)}
-                  type="button"
-                >
-                  <Icon size={18} aria-hidden="true" />
-                  <span>{config.label}</span>
-                </button>
-              )
-            })}
-          </nav>
-
           {activeTab !== 'cities' ? (
             <div className="controls-row">
               <div className="city-filter-row">
@@ -3059,7 +3639,7 @@ function App() {
             </div>
           ) : null}
 
-          {['activities', 'food'].includes(activeTab) ? (
+          {['activities', 'food', 'lodging'].includes(activeTab) ? (
             <SmartSuggestionsBanner
               activeCity={currentMapCity.city}
               availableTypes={[smartConfigForType(smartSuggestionTypeForTab)]}
@@ -3079,7 +3659,19 @@ function App() {
             />
           ) : null}
 
-          {activeTab === 'budget' ? (
+          {activeTab === 'overview' ? (
+            <TripOverviewPanel
+              activeTrip={activeTrip}
+              cities={activeTravelCities}
+              options={options}
+              familyMembers={familyMembers}
+              currentTravelGroup={currentTravelGroup}
+              budgetNights={budgetNights}
+              budgetOptionIds={budgetOptionIds}
+              votes={votes}
+              onGoTo={switchTab}
+            />
+          ) : activeTab === 'budget' ? (
             <BudgetPanel
               allOptions={options}
               budgetOptions={budgetOptions}
@@ -3089,19 +3681,26 @@ function App() {
               onRemove={toggleBudgetOption}
               onToggleSubgroupBudget={toggleSubgroupBudgetOption}
               subgroupBudgetOptions={subgroupBudgetOptions}
+              votes={votes}
+              onAdd={addOptionToBudget}
+              onRemoveOption={removeOptionFromBudget}
             />
           ) : activeTab === 'itinerary' ? (
             <ItineraryPanel
+              activeTrip={activeTrip}
+              activeTravelCities={activeTravelCities}
               availableOptions={options}
               busy={itineraryBusy}
               currentTravelGroup={currentTravelGroup}
               f1Count={f1Crew.length}
               nights={budgetNights}
               onCreateSubgroup={createSubgroup}
+              onDeleteGroup={deleteTravelGroup}
               onGenerate={generateSmartItinerary}
               onToggleDraftMember={toggleSubgroupDraftMember}
               onUpdateDraft={updateSubgroupDraft}
               onUpdateGroup={updateTravelGroup}
+              onUpdateDay={handleUpdateItineraryDay}
               plan={generatedItinerary}
               subgroupDraft={subgroupDraft}
               travelGroups={normalizedTravelGroups}
@@ -3168,24 +3767,120 @@ function App() {
               votes={votes}
             />
           )}
-        </section>
-      </section>
 
-      {showOptionWorkspace ? (
-        <section className="decision-map-grid">
-          <Suspense fallback={<div className="map-loading">Cargando mapa...</div>}>
-            <MapPanel
-              budgetOptionIds={budgetOptionIds}
-              city={currentMapCity.city}
-              destinationCoords={currentMapCity.coords}
-              onRouteModeChange={setRouteMode}
-              options={mapOptions}
-              routeMode={routeMode}
-              votes={votes}
-            />
-          </Suspense>
+          {/* ── MAP (inline, scrollable) ───────────────────────── */}
+          {showOptionWorkspace && (
+            <section className="decision-map-grid decision-map-inline">
+              <Suspense fallback={<div className="map-loading">Cargando mapa...</div>}>
+                <MapPanel
+                  budgetOptionIds={budgetOptionIds}
+                  city={currentMapCity.city}
+                  destinationCoords={currentMapCity.coords}
+                  onRouteModeChange={setRouteMode}
+                  options={mapOptions}
+                  routeMode={routeMode}
+                  votes={votes}
+                />
+              </Suspense>
+            </section>
+          )}
         </section>
-      ) : null}
+
+        {/* ── RIGHT RAIL ─────────────────────────────────────────── */}
+        {showOptionWorkspace && (
+          <aside className="right-rail">
+            {['lodging', 'activities', 'food'].includes(activeTab) && smartSuggestions?.places?.length > 0 && (
+              <div className="rail-section">
+                <p className="eyebrow rail-eyebrow">
+                  ✦ IA SUGIERE PARA {(effectiveSelectedCity === 'Todas' ? 'MADRID' : effectiveSelectedCity).toUpperCase()}
+                </p>
+                {smartSuggestions.places.slice(0, 1).map((place) => (
+                  <div key={place.id || getPlaceName(place)} className="rail-ai-card">
+                    {getPlacePhoto(place) && (
+                      <img
+                        src={getPlacePhoto(place)}
+                        alt={getPlaceName(place)}
+                        className="rail-ai-photo"
+                        loading="lazy"
+                      />
+                    )}
+                    {place.aiScore != null && <span className="rail-ai-score">AI {typeof place.aiScore === 'number' ? place.aiScore : (place.aiScore?.v ?? '')}</span>}
+                    <strong className="rail-ai-name">{getPlaceName(place)}</strong>
+                    {place.why && <p className="rail-ai-why">{place.why}</p>}
+                    {place.scoreBreakdown && (
+                      <div className="rail-score-rows">
+                        {(Array.isArray(place.scoreBreakdown)
+                          ? place.scoreBreakdown
+                          : Object.entries(place.scoreBreakdown).map(([k, val]) => ({
+                              label: k.charAt(0).toUpperCase() + k.slice(1),
+                              v: typeof val === 'number' ? val : (val?.v ?? 0),
+                              max: val?.max ?? 10,
+                            }))
+                        ).slice(0, 4).map((b) => (
+                          <div key={b.label} className="rail-score-row">
+                            <span className="rail-score-label">{b.label}</span>
+                            <div className="rail-score-bar-track">
+                              <div
+                                className="rail-score-bar-fill"
+                                style={{ width: `${(b.v / (b.max || 10)) * 100}%` }}
+                              />
+                            </div>
+                            <span className="rail-score-val">{b.v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      className="rail-add-btn"
+                      onClick={() => openPlaceOptionModal(place, activeCategory, effectiveSelectedCity, true)}
+                      type="button"
+                    >
+                      <Plus size={12} />
+                      Añadir a opciones
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {['lodging', 'activities', 'food'].includes(activeTab) && (
+              <div className="rail-section rail-platforms">
+                <p className="rail-section-title">Plataformas</p>
+                {[
+                  {
+                    name: 'Booking',
+                    url: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity)}`,
+                  },
+                  {
+                    name: 'Airbnb',
+                    url: `https://www.airbnb.com/s/${encodeURIComponent(effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity)}`,
+                  },
+                  {
+                    name: 'Google Travel',
+                    url: `https://www.google.com/travel/search?q=${encodeURIComponent(effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity)}`,
+                  },
+                  {
+                    name: 'Tripadvisor',
+                    url: `https://www.tripadvisor.com/Search?q=${encodeURIComponent(effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity)}`,
+                  },
+                ].map((p) => (
+                  <a
+                    key={p.name}
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rail-platform-link"
+                  >
+                    {p.name}
+                    <ExternalLink size={11} />
+                  </a>
+                ))}
+              </div>
+            )}
+          </aside>
+        )}
+      </div>
+      {/* end workspace-v2 */}
 
       {showOptionWorkspace ? (
         <button
@@ -3360,6 +4055,9 @@ function App() {
 
       {/* search-panel removed */}
 
+      </div>
+      {/* end app-main */}
+
     </main>
   )
 }
@@ -3381,6 +4079,217 @@ function CityFilterChip({ active, city, onRemove, onSelect, removable }) {
         </button>
       ) : null}
     </span>
+  )
+}
+
+function AIPlaceCard({ actionLabel, budgetLabel, city, dates, groupProfile, onAddToBudget, onAddToMap, place, resultConfig }) {
+  const name = getPlaceName(place)
+  // Build photo gallery: prefer photoUris array, fall back to single photoUri/image
+  const allPhotos = Array.isArray(place.photoUris) && place.photoUris.length > 0
+    ? place.photoUris
+    : (place.photoUri || place.image) ? [place.photoUri || place.image] : []
+  const [photoIdx, setPhotoIdx] = React.useState(0)
+  const photo = allPhotos[photoIdx] || ''
+  const hasGallery = allPhotos.length > 1
+  const address = getPlaceAddress(place)
+  const rating = place.rating ? `${place.rating}` : null
+  const reviews = getPlaceReviews(place)
+  const why = place.why || null
+  const rawScore = place.score || place.aiScore || null
+  const score = typeof rawScore === 'number' ? rawScore : (rawScore?.v ?? null)
+  const scoreGood = score && score > 30
+  const mapsUrl = getPlaceUrl(place)
+  // Normalize scoreBreakdown: accept both array [{label,v,max}] and object {key:number}
+  const scoreBreakdown = Array.isArray(place.scoreBreakdown)
+    ? place.scoreBreakdown
+    : place.scoreBreakdown
+      ? Object.entries(place.scoreBreakdown).map(([k, val]) => ({
+          label: k.charAt(0).toUpperCase() + k.slice(1),
+          v: typeof val === 'number' ? val : (val?.v ?? 0),
+          max: val?.max ?? 10,
+        }))
+      : []
+  const tags = place.tags || []
+  const caution = place.caution || null
+  const priceRange = place.estimatedPriceRange || null
+  const smartLinks = placeSmartLinks(place, resultConfig?.id, dates, groupProfile)
+
+  const categoryLabel = resultConfig?.id === 'food' ? 'Restaurante'
+    : resultConfig?.id === 'lodging' ? 'Hospedaje'
+    : resultConfig?.id === 'kids' ? 'Plan niños'
+    : 'Plan'
+
+  return (
+    <article className="ai-place-card">
+      {/* ── Hero foto con galería ─────────────────────────────── */}
+      <div className="ai-place-photo">
+        {photo
+          ? <img alt={`${name} — foto ${photoIdx + 1}`} key={photo} src={displayImage(photo)} />
+          : <div className="ai-place-photo-missing"><MapPinned size={28} /></div>
+        }
+        <div className="ai-place-photo-overlay" />
+
+        {/* Chips de tipo y score */}
+        <div className="ai-place-photo-top">
+          <span className="ai-place-type-chip">{categoryLabel}</span>
+          {scoreGood && (
+            <div className="ai-place-score-badge">
+              <Sparkles size={10} aria-hidden="true" />
+              IA {score}
+            </div>
+          )}
+        </div>
+
+        {/* Nombre y dirección */}
+        <div className="ai-place-photo-bottom">
+          <h3 className="ai-place-name-overlay">{name}</h3>
+          {address && (
+            <p className="ai-place-address-overlay">
+              <MapPinned size={10} aria-hidden="true" />
+              {address}
+            </p>
+          )}
+        </div>
+
+        {/* Controles galería */}
+        {hasGallery && (
+          <>
+            <button
+              aria-label="Foto anterior"
+              className="ai-photo-nav ai-photo-prev"
+              onClick={(e) => { e.stopPropagation(); setPhotoIdx((i) => (i - 1 + allPhotos.length) % allPhotos.length) }}
+              type="button"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              aria-label="Foto siguiente"
+              className="ai-photo-nav ai-photo-next"
+              onClick={(e) => { e.stopPropagation(); setPhotoIdx((i) => (i + 1) % allPhotos.length) }}
+              type="button"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <div className="ai-photo-dots" aria-hidden="true">
+              {allPhotos.map((_, i) => (
+                <button
+                  className={`ai-photo-dot${i === photoIdx ? ' active' : ''}`}
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); setPhotoIdx(i) }}
+                  type="button"
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {place.photoCredit || place.imageCredit ? (
+          <span className="ai-place-credit">{place.photoCredit || place.imageCredit}</span>
+        ) : null}
+      </div>
+
+      {/* ── Cuerpo ────────────────────────────────────────────── */}
+      <div className="ai-place-body">
+
+        {/* Por qué IA — bloque destacado con ícono plum */}
+        {why && (
+          <div className="ai-place-why">
+            <div className="ai-place-why-icon-wrap" aria-hidden="true">
+              <Sparkles size={11} />
+            </div>
+            <span>{why}</span>
+          </div>
+        )}
+
+        {/* Score breakdown — 2 columnas con barras coral */}
+        {scoreBreakdown.length > 0 && (
+          <div className="ai-place-breakdown">
+            <span className="ai-place-breakdown-label">Por qué IA {score}</span>
+            <div className="ai-place-breakdown-grid">
+              {scoreBreakdown.map((b) => (
+                <div className="ai-place-breakdown-row" key={b.label}>
+                  <span className="ai-breakdown-dim">{b.label}</span>
+                  <div className="ai-breakdown-bar-track">
+                    <div className="ai-breakdown-bar-fill" style={{ width: `${(b.v / (b.max || 10)) * 100}%` }} />
+                  </div>
+                  <strong className="ai-breakdown-val">{b.v}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tags chips + precio estimado */}
+        {(tags.length > 0 || priceRange) && (
+          <div className="ai-place-tags">
+            {tags.map((tag) => (
+              <span className="ai-place-tag" key={tag}>{tag}</span>
+            ))}
+            {priceRange && (
+              <span className="ai-place-tag ai-place-price-tag" title="Precio estimado por IA, no es el precio real">
+                ~{priceRange.label} <span className="ai-price-est-label">est.</span>
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Rating + reseñas + caution */}
+        <div className="ai-place-meta-row">
+          {(rating || reviews > 0) && (
+            <div className="ai-place-meta">
+              {rating && <span className="ai-place-rating">⭐ {rating}</span>}
+              {reviews > 0 && <span className="ai-place-reviews">{reviews.toLocaleString('es-ES')} reseñas</span>}
+            </div>
+          )}
+          {caution && (
+            <p className="ai-place-caution">{caution}</p>
+          )}
+        </div>
+
+        {/* Acciones */}
+        <div className="ai-place-actions-row">
+          <div className="ai-place-actions-left">
+            <button
+              className="smart-add-primary"
+              onClick={() => onAddToMap(place, resultConfig.category, city)}
+              type="button"
+            >
+              <Plus size={13} aria-hidden="true" />
+              {actionLabel}
+            </button>
+            <button
+              className="smart-add-budget"
+              onClick={() => onAddToBudget(place, resultConfig.category, city)}
+              type="button"
+            >
+              <CircleDollarSign size={13} aria-hidden="true" />
+              {budgetLabel}
+            </button>
+          </div>
+          <a className="ai-place-maps-btn" href={mapsUrl} rel="noreferrer" target="_blank" aria-label="Ver en Google Maps">
+            <MapPinned size={15} aria-hidden="true" />
+          </a>
+        </div>
+
+        {/* Links inteligentes pre-cargados */}
+        {smartLinks.length > 0 && (
+          <div className="ai-place-smart-links">
+            {smartLinks.map((link) => (
+              <a
+                className="ai-place-smart-link"
+                href={link.url}
+                key={link.label}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <ExternalLink size={11} aria-hidden="true" />
+                {link.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
   )
 }
 
@@ -3468,41 +4377,40 @@ function SmartSuggestionsBanner({
         </p>
       ) : null}
 
+      {resultMatchesCity && result?.links?.length > 0 ? (
+        <div className="smart-booking-links">
+          <span className="smart-booking-label">Buscar disponibilidad:</span>
+          {result.links.map((link) => (
+            <a
+              className="smart-booking-btn"
+              href={link.url}
+              key={link.label}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <ExternalLink size={13} aria-hidden="true" />
+              {link.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+
       {hasPlaces ? (
         <>
         <div className="smart-place-row">
           {paged.items.map((place) => (
-            <article key={getPlaceId(place)}>
-              <div>
-                <h3>{getPlaceName(place)}</h3>
-                <span>
-                  {place.rating ? `${place.rating}/5` : 'Sin rating'} · {getPlaceReviews(place)} reseñas
-                </span>
-              </div>
-              <p>{place.why || getPlaceAddress(place) || 'Recomendación de Google Maps'}</p>
-              <div className="smart-place-actions">
-                <button
-                  className="smart-add-primary"
-                  onClick={() => onAddToMap(place, resultConfig.category, result?.city || activeCity)}
-                  type="button"
-                >
-                  <Plus size={14} aria-hidden="true" />
-                  {resultConfig.actionLabel}
-                </button>
-                <button
-                  className="smart-add-budget"
-                  onClick={() => onAddToBudget(place, resultConfig.category, result?.city || activeCity)}
-                  type="button"
-                >
-                  <CircleDollarSign size={14} aria-hidden="true" />
-                  {resultConfig.budgetLabel}
-                </button>
-                <a className="smart-maps-link" href={getPlaceUrl(place)} rel="noreferrer" target="_blank">
-                  <MapPinned size={14} aria-hidden="true" />
-                  Ver en Maps
-                </a>
-              </div>
-            </article>
+            <AIPlaceCard
+              actionLabel={resultConfig.actionLabel}
+              budgetLabel={resultConfig.budgetLabel}
+              city={result?.city || activeCity}
+              dates={result?.dates}
+              groupProfile={result?.groupProfile}
+              key={getPlaceId(place)}
+              onAddToBudget={onAddToBudget}
+              onAddToMap={onAddToMap}
+              place={place}
+              resultConfig={resultConfig}
+            />
           ))}
         </div>
         <PaginationControl
@@ -3801,8 +4709,20 @@ function NextCitiesPanel({
             <p>{city.angle}</p>
             {!isBase && (
               <div className="next-city-facts">
-                <span><CalendarDays size={14} aria-hidden="true" />{city.dates}</span>
-                <span><TrainFront size={14} aria-hidden="true" />{city.transfer}</span>
+                {city.dates && city.dates !== 'Fechas por definir' ? (
+                  <span><CalendarDays size={14} aria-hidden="true" />{city.dates}</span>
+                ) : (
+                  <button
+                    className="city-ai-dates-btn"
+                    onClick={() => onChatPlanner?.(`Sugiere fechas concretas para ${city.city} (${city.country || ''}) dentro del itinerario del viaje de septiembre 2026. Ten en cuenta Madrid como base con el GP F1 del 5 al 7 sep, y optimiza el orden y duración de las ciudades candidatas.`, [])}
+                    type="button"
+                    title="La IA sugerirá fechas basadas en el itinerario general"
+                  >
+                    <Sparkles size={12} aria-hidden="true" />
+                    Ajustar fechas con IA
+                  </button>
+                )}
+                <span><TrainFront size={14} aria-hidden="true" />{city.transfer || 'Traslado por definir'}</span>
               </div>
             )}
           </>
@@ -3942,6 +4862,9 @@ function NextCitiesPanel({
           ) : assessment ? (
             <>
               {assessment.overview && <p className="assess-overview">{assessment.overview}</p>}
+              {assessment.aiFallbackReason && (
+                <p className="assess-error-detail">⚠️ Error técnico: {assessment.aiFallbackReason}</p>
+              )}
 
               {assessment.warnings?.length > 0 && (
                 <div className="assess-warnings">
@@ -4259,6 +5182,148 @@ function TransportPanel({
   )
 }
 
+// ── TRIP OVERVIEW DASHBOARD ────────────────────────────────────────────
+function TripOverviewPanel({
+  activeTrip,
+  cities = [],
+  options = [],
+  familyMembers = [],
+  currentTravelGroup,
+  budgetNights,
+  budgetOptionIds = [],
+  votes = {},
+  onGoTo,
+}) {
+  const categories = [
+    { id: 'lodging', label: 'Hospedajes', icon: Hotel, color: '#2563eb' },
+    { id: 'food', label: 'Comida', icon: Utensils, color: '#16a34a' },
+    { id: 'activities', label: 'Planes', icon: Landmark, color: '#7c3aed' },
+    { id: 'transport', label: 'Transporte', icon: TrainFront, color: '#ea580c' },
+  ]
+
+  const totalBudget = budgetOptionIds.reduce((sum, id) => {
+    const opt = options.find((o) => o.id === id)
+    return sum + (opt?.priceTotal || 0)
+  }, 0)
+
+  const totalVotes = Object.values(votes).reduce((sum, v) => sum + (v?.length || 0), 0)
+
+  return (
+    <div className="overview-panel">
+      {/* Hero header */}
+      <div className="overview-hero">
+        <div className="overview-hero-emoji">{activeTrip?.emoji || '✈️'}</div>
+        <div>
+          <h1 className="overview-hero-name">{activeTrip?.name || 'Viaje Familia'}</h1>
+          <p className="overview-hero-meta">
+            {cities.length > 0
+              ? cities.map((c) => c.city || c).join(' → ')
+              : 'Ciudades por definir'}
+            {' · '}
+            {(Number(currentTravelGroup?.adults) || familyMembers.length || 0)} viajeros
+            {budgetNights > 0 && ` · ${budgetNights} noches`}
+          </p>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="overview-stats-row">
+        <div className="overview-stat">
+          <span className="overview-stat-num">{options.filter((o) => o.status !== 'removed').length}</span>
+          <span className="overview-stat-label">opciones totales</span>
+        </div>
+        <div className="overview-stat">
+          <span className="overview-stat-num">{budgetOptionIds.length}</span>
+          <span className="overview-stat-label">en presupuesto</span>
+        </div>
+        <div className="overview-stat">
+          <span className="overview-stat-num">{totalVotes}</span>
+          <span className="overview-stat-label">votos</span>
+        </div>
+        {totalBudget > 0 && (
+          <div className="overview-stat">
+            <span className="overview-stat-num">{currency(totalBudget)}</span>
+            <span className="overview-stat-label">presup. total</span>
+          </div>
+        )}
+      </div>
+
+      {/* Category cards */}
+      <div className="overview-category-grid">
+        {categories.map(({ id, label, icon: Icon, color }) => {
+          const count = options.filter((o) => o.category === id && o.status !== 'removed').length
+          const inBudget = options.filter((o) => o.category === id && budgetOptionIds.includes(o.id)).length
+          const topOption = options
+            .filter((o) => o.category === id && o.status !== 'removed')
+            .sort((a, b) => (b.aiScore || 0) - (a.aiScore || 0))[0]
+          return (
+            <button
+              key={id}
+              className="overview-category-card"
+              onClick={() => onGoTo(id)}
+              type="button"
+              style={{ '--card-accent': color }}
+            >
+              <div className="overview-card-header">
+                <span className="overview-card-icon" style={{ background: `${color}18`, color }}>
+                  <Icon size={20} />
+                </span>
+                <span className="overview-card-count">{count} opción{count !== 1 ? 'es' : ''}</span>
+              </div>
+              <p className="overview-card-label">{label}</p>
+              {topOption && (
+                <p className="overview-card-top">
+                  ✦ {topOption.title.split(' ').slice(0, 4).join(' ')}
+                  {topOption.aiScore ? ` · AI ${topOption.aiScore}` : ''}
+                </p>
+              )}
+              {!topOption && (
+                <p className="overview-card-empty">Toca para buscar con IA</p>
+              )}
+              {inBudget > 0 && (
+                <span className="overview-card-budget-tag">{inBudget} en presupuesto</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Cities quick view */}
+      {cities.length > 0 && (
+        <div className="overview-cities-section">
+          <p className="eyebrow">CIUDADES DEL VIAJE</p>
+          <div className="overview-cities-list">
+            {cities.map((city, i) => (
+              <div key={city.id || i} className="overview-city-row">
+                <span className="overview-city-dot" />
+                <span className="overview-city-name">{city.city || city}</span>
+                <span className="overview-city-dates">
+                  {city.dates && city.dates !== 'Fechas por definir'
+                    ? city.dates
+                    : 'Fechas por definir'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="overview-actions">
+        <button className="overview-action-btn" onClick={() => onGoTo('itinerary')} type="button">
+          <Route size={16} /> Ver itinerario
+        </button>
+        <button className="overview-action-btn" onClick={() => onGoTo('budget')} type="button">
+          <CircleDollarSign size={16} /> Ver presupuesto
+        </button>
+        <button className="overview-action-btn" onClick={() => onGoTo('cities')} type="button">
+          <MapPinned size={16} /> Gestionar ciudades
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function OptionGrid({
   activeCategory,
   activeMember,
@@ -4280,6 +5345,7 @@ function OptionGrid({
 }) {
   const [selectedOption, setSelectedOption] = useState(null)
   const [reanalyzeBusy, setReanalyzeBusy] = useState(false)
+  const [expandedReasoning, setExpandedReasoning] = useState({})
 
   async function handleReanalyze(option) {
     if (!canSync || reanalyzeBusy) return
@@ -4349,6 +5415,11 @@ function OptionGrid({
                   {aiScoreLabel(option.aiScore)}
                 </span>
                 {inBudget ? <span className="budget-badge-overlay">💰</span> : null}
+                {options.indexOf(option) < 3 && (
+                  <span className="comparator-letter-badge">
+                    {String.fromCharCode(65 + options.indexOf(option))}
+                  </span>
+                )}
               </div>
               <div className="option-body">
                 <div className="option-title-row">
@@ -4386,12 +5457,126 @@ function OptionGrid({
                   <button className="detail-btn" onClick={() => setSelectedOption(option)} type="button">
                     Ver detalles
                   </button>
+                  <button
+                    className="card-remove-btn"
+                    onClick={() => onRemove(option.id)}
+                    type="button"
+                    title="Quitar opción"
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
                 </div>
+
+                {/* AI Reasoning Accordion */}
+                {option.aiThinkingProcess && (
+                  <div className="card-ai-reasoning" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="ai-reasoning-toggle"
+                      onClick={() => setExpandedReasoning(prev => ({ ...prev, [option.id]: !prev[option.id] }))}
+                      title="Ver el proceso intelectual de la IA para dar este puntaje y recomendación"
+                    >
+                      <Sparkles size={12} aria-hidden="true" />
+                      <span>{expandedReasoning[option.id] ? 'Ocultar pensamiento' : 'Ver razonamiento de la IA'}</span>
+                      <ChevronDown
+                        size={12}
+                        aria-hidden="true"
+                        style={{
+                          transform: expandedReasoning[option.id] ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.2s',
+                          marginLeft: 'auto'
+                        }}
+                      />
+                    </button>
+                    <div className={`ai-reasoning-container ${expandedReasoning[option.id] ? 'open' : ''}`}>
+                      <div className="ai-reasoning-content">
+                        {option.aiThinkingProcess.split('\n\n').filter(Boolean).map((para, i) => (
+                          <p key={i}>{para}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </article>
           )
         })}
       </div>
+
+      {/* ── COMPARADOR LADO A LADO ──────────────────────────────── */}
+      {options.length >= 1 && (
+        <div className="comparator-section">
+          <div className="comparator-header">
+            <span className="eyebrow">Comparar lado a lado</span>
+            {options.length < 2 && (
+              <span className="comparator-hint">Agrega más opciones para comparar</span>
+            )}
+          </div>
+          {options.length >= 2 ? (
+            <div className="comparator-table-wrap">
+              <table className="comparator-table">
+                <thead>
+                  <tr>
+                    <th className="comparator-row-label"></th>
+                    {options.slice(0, 3).map((opt, i) => (
+                      <th key={opt.id} className="comparator-col-head">
+                        <span className="comparator-col-letter">{String.fromCharCode(65 + i)}</span>
+                        <span className="comparator-col-name">
+                          {opt.code || opt.title.split(' ').slice(0, 2).join(' ')}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="comparator-row-label">Precio total</td>
+                    {options.slice(0, 3).map((opt) => {
+                      const p = priceBreakdown(opt, nights)
+                      return (
+                        <td key={opt.id}>
+                          {opt.priceTotal ? currency(opt.priceTotal) : p.secondary || '—'}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                  <tr>
+                    <td className="comparator-row-label">Por persona</td>
+                    {options.slice(0, 3).map((opt) => {
+                      const p = priceBreakdown(opt, nights)
+                      return <td key={opt.id}>{p.primary || '—'}</td>
+                    })}
+                  </tr>
+                  <tr className="comparator-highlighted">
+                    <td className="comparator-row-label">AI score</td>
+                    {options.slice(0, 3).map((opt) => (
+                      <td key={opt.id}><strong>{opt.aiScore || '—'}</strong></td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="comparator-row-label">Votos familia</td>
+                    {options.slice(0, 3).map((opt) => (
+                      <td key={opt.id}>{(votes[opt.id] || []).length}</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="comparator-row-label">En presupuesto</td>
+                    {options.slice(0, 3).map((opt) => (
+                      <td key={opt.id}>
+                        {budgetOptionIds.includes(opt.id) ? '✓' : '—'}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="comparator-empty-msg">
+              Solo hay 1 opción guardada. Agrega una segunda para activar la comparación.
+            </p>
+          )}
+        </div>
+      )}
 
       {sel ? (
         <OptionDetailModal
@@ -4527,7 +5712,7 @@ function OptionDetailModal({
           ) : null}
 
           {/* AI Analysis */}
-          {(option.aiSummary || option.cautions?.length > 0 || option.aiQuestions?.length > 0) ? (
+          {(option.aiSummary || option.cautions?.length > 0 || option.aiQuestions?.length > 0 || option.aiThinkingProcess) ? (
             <div className="ai-analysis-block ai-analysis-open">
               <div className="ai-analysis-label">
                 <span className="ai-chip">IA {option.aiScore || '—'}</span>
@@ -4551,6 +5736,19 @@ function OptionDetailModal({
                     <ul>
                       {option.aiQuestions.map((q) => <li key={q}>{q}</li>)}
                     </ul>
+                  </div>
+                ) : null}
+                {option.aiThinkingProcess ? (
+                  <div className="ai-analysis-section reasoning" style={{ marginTop: '14px', borderTop: '1px dashed var(--border)', paddingTop: '10px' }}>
+                    <strong style={{ color: 'var(--violet)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Sparkles size={13} aria-hidden="true" />
+                      Proceso de Razonamiento
+                    </strong>
+                    <div className="ai-reasoning-content" style={{ marginTop: '6px', fontSize: '0.78rem', background: 'var(--surface-soft)', borderLeft: '2.5px solid var(--violet)', padding: '10px 12px' }}>
+                      {option.aiThinkingProcess.split('\n\n').filter(Boolean).map((para, i) => (
+                        <p key={i} style={{ margin: '0 0 8px', lineHeight: '1.45' }}>{para}</p>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -4784,6 +5982,59 @@ function PhotoCarousel({ option }) {
   )
 }
 
+// ─── Donut Chart SVG ──────────────────────────────────────────────────────────
+function DonutChart({ segments, total }) {
+  const r = 52
+  const cx = 64
+  const cy = 64
+  const circ = 2 * Math.PI * r
+  const totalValue = segments.reduce((s, seg) => s + seg.value, 0)
+
+  // Purely calculate cumulative offsets using previous segments sum to avoid re-assignment during render
+  const segmentData = segments.map((seg, index) => {
+    const previousSum = segments.slice(0, index).reduce((s, prevSeg) => s + prevSeg.value, 0)
+    const pct = totalValue ? seg.value / totalValue : 0
+    const dash = pct * circ
+    const previousPct = totalValue ? previousSum / totalValue : 0
+    const offset = previousPct * circ
+    return { seg, dash, offset }
+  })
+
+  return (
+    <svg viewBox="0 0 128 128" className="donut-svg" aria-hidden="true">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--cream-2)" strokeWidth={18} />
+      {segmentData.map(({ seg, dash, offset }) => {
+        return (
+          <circle
+            key={seg.label}
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={18}
+            strokeDasharray={`${dash} ${circ - dash}`}
+            strokeDashoffset={-offset}
+            strokeLinecap="round"
+            style={{ transform: 'rotate(-90deg)', transformOrigin: '64px 64px' }}
+          />
+        )
+      })}
+      <text x="64" y="59" textAnchor="middle" fontSize="9" fill="var(--muted)" fontFamily="Inter,sans-serif">TOTAL</text>
+      <text x="64" y="76" textAnchor="middle" fontSize="14" fontWeight="800" fill="var(--ink)" fontFamily="Inter,sans-serif">
+        {total ? `€${Math.round(total / 1000 * 10) / 10}k` : '—'}
+      </text>
+    </svg>
+  )
+}
+
+// ─── Budget Panel (v2) ────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  lodging: '#2563eb',
+  activities: '#0d9488',
+  food: '#ea580c',
+  transport: '#7c3aed',
+  cities: '#8aa388',
+}
+
 function BudgetPanel({
   allOptions,
   budgetOptions,
@@ -4793,238 +6044,948 @@ function BudgetPanel({
   onRemove,
   onToggleSubgroupBudget,
   subgroupBudgetOptions,
+  votes = {},
+  onAdd,
+  onRemoveOption,
 }) {
+  const [budgetView, setBudgetView] = useState('categoria')
+
+  // Group all active options of category 'lodging' by city
+  const activeLodgings = allOptions.filter(
+    (o) => o.category === 'lodging' && o.status !== 'removed'
+  )
+  const citiesWithLodging = [...new Set(activeLodgings.map((o) => o.city || 'Madrid'))]
+
+  const projections = []
+
+  citiesWithLodging.forEach((city) => {
+    const cityOptions = activeLodgings.filter((o) => (o.city || 'Madrid') === city)
+    
+    // Find the one with highest votes
+    let favorite = null
+    let maxVotes = 0
+    cityOptions.forEach((opt) => {
+      const vCount = votes[opt.id]?.length || 0
+      if (vCount > maxVotes) {
+        maxVotes = vCount
+        favorite = opt
+      } else if (vCount === maxVotes && vCount > 0) {
+        if (!favorite || (opt.aiScore || 0) > (favorite.aiScore || 0)) {
+          favorite = opt
+        }
+      }
+    })
+
+    const current = budgetOptions.find(
+      (o) => o.category === 'lodging' && (o.city || 'Madrid') === city
+    )
+
+    if (favorite && (!current || current.id !== favorite.id)) {
+      projections.push({
+        city,
+        favorite,
+        current,
+        votesCount: maxVotes,
+      })
+    }
+  })
+
+  const handleApplyFavorite = (proj) => {
+    if (proj.current && onRemoveOption) {
+      onRemoveOption(proj.current.id)
+    }
+    if (onAdd) {
+      onAdd(proj.favorite.id)
+    }
+  }
+  const [showSettle, setShowSettle] = useState(false)
+  // paidBy: { [optionId]: memberId }
+  const [paidBy, setPaidBy] = useState({})
+  function setPayer(optionId, memberId) {
+    setPaidBy((prev) => ({ ...prev, [optionId]: memberId }))
+  }
+
   const rows = budgetOptions.map((option) => ({
     option,
     budget: optionBudget(option, currentTravelGroup, f1Count, nights),
   }))
-  const knownRows = rows.filter((row) => !row.budget.missing)
-  const total = knownRows.reduce((sum, row) => sum + (row.budget.total || 0), 0)
+  const knownRows = rows.filter((r) => !r.budget.missing)
+  const total = knownRows.reduce((s, r) => s + (r.budget.total || 0), 0)
   const travelers = currentTravelGroup.totalTravelers ||
     (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0)
   const perPerson = travelers ? total / travelers : 0
-  const subgroupRows = subgroupBudgetOptions.map((option) => ({
-    option,
-    budget: optionBudget(option, currentTravelGroup, f1Count, nights),
+  const budgetMeta = currentTravelGroup.budgetMeta || {}
+  const budgetGoal = budgetMeta.goal || 5000
+  const paidTotal = knownRows.reduce((s, r) => s + (r.option.priceTotal || r.budget.total || 0), 0)
+  const paidPct = total ? Math.round((paidTotal / total) * 100) : 0
+
+  // By-category segments for donut
+  const catTotals = {}
+  knownRows.forEach(({ option, budget }) => {
+    const cat = option.category || 'other'
+    catTotals[cat] = (catTotals[cat] || 0) + (budget.total || 0)
+  })
+  const donutSegments = Object.entries(catTotals).map(([cat, value]) => ({
+    label: categoryConfig[cat]?.shortLabel || cat,
+    value,
+    color: CAT_COLORS[cat] || '#94a3b8',
   }))
-  const subgroupKnownRows = subgroupRows.filter((row) => !row.budget.missing)
-  const subgroupTotal = subgroupKnownRows.reduce((sum, row) => sum + (row.budget.total || 0), 0)
-  const subgroupPerPerson = travelers && subgroupTotal ? subgroupTotal / travelers : 0
+
+  // By-day data for bar chart (allocate total across trip days)
+  const dayLabels = itineraryDraft.map((d) => d.day.split(' ').slice(0, 2).join(' '))
+  const dayBars = dayLabels.map((label, i) => {
+    // Distribute: lodging per night, activities on specific days, transport on first/last
+    let dayTotal = 0
+    knownRows.forEach(({ option, budget }) => {
+      const t = budget.total || 0
+      if (option.category === 'lodging') dayTotal += nights ? t / nights : 0
+      else if (option.category === 'transport') dayTotal += i === 0 || i === dayLabels.length - 1 ? t / 2 : 0
+      else dayTotal += t / dayLabels.length
+    })
+    return { label, value: Math.round(dayTotal) }
+  })
+  const maxDayBar = Math.max(...dayBars.map((d) => d.value), 1)
+
+  // "Quién pagó qué" — usar paidBy real. Cada miembro sumó lo que pagó
+  const paidByTotals = {}
+  knownRows.forEach(({ option, budget }) => {
+    const payer = paidBy[option.id]
+    if (payer) {
+      paidByTotals[payer] = (paidByTotals[payer] || 0) + (budget.total || 0)
+    }
+  })
+  const settleMembers = familyMembers.slice(0, 6)
+  const settleData = settleMembers.map((member) => {
+    const paid = paidByTotals[member.id] || 0
+    const share = perPerson
+    const balance = paid - share
+    return { id: member.id, name: member.name, paid, share, balance }
+  })
+
   const subgroupIds = new Set(currentTravelGroup.budgetOptionIds || [])
   const subgroupCandidates = allOptions
-    .filter((option) => option.status !== 'removed' && !subgroupIds.has(option.id))
-    .slice()
+    .filter((o) => o.status !== 'removed' && !subgroupIds.has(o.id))
     .sort((a, b) => (b.aiScore || 0) - (a.aiScore || 0))
-    .slice(0, 10)
+    .slice(0, 8)
 
-  return (
-    <div className="budget-panel">
-      {budgetOptions.length ? (
-        <>
-          <div className="budget-summary">
-            <article>
-              <span>Total estimado</span>
-              <strong>{currency(total)}</strong>
-            </article>
-            <article>
-              <span>Por persona</span>
-              <strong>{currency(perPerson)}</strong>
-            </article>
-            <article>
-              <span>Grupo</span>
-              <strong>{groupSummary(currentTravelGroup)}</strong>
-            </article>
-          </div>
-          <div className="budget-list">
-            {rows.map(({ option, budget }) => (
-              <article key={option.id}>
-                <div>
-                  <span>{categoryConfig[option.category]?.shortLabel || 'Opción'}</span>
-                  <h2>{option.title}</h2>
-                  <p>{budget.travelers} personas consideradas</p>
-                </div>
-                <div className="budget-money">
-                  <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
-                  <span>{budget.missing ? 'Falta precio' : `${currency(budget.perPerson)} por persona`}</span>
-                </div>
-                <button onClick={() => onRemove(option.id)} type="button">
-                  Quitar
-                </button>
-              </article>
-            ))}
-          </div>
-        </>
-      ) : (
+  if (!budgetOptions.length) {
+    return (
+      <div className="budget-panel-v2">
         <div className="empty-state budget-empty-inline">
           <CircleDollarSign size={26} aria-hidden="true" />
-          <h2>No hay partidas en el presupuesto general</h2>
+          <h2>No hay partidas en el presupuesto</h2>
           <p>Agrega hospedajes, planes, comida o traslados desde sus tarjetas.</p>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      <section className="subbudget-panel">
-        <div className="subbudget-head">
-          <div>
-            <p className="eyebrow">Subpresupuesto</p>
-            <h2>{currentTravelGroup.name}</h2>
-            <p>{groupSummary(currentTravelGroup)}</p>
+  return (
+    <div className="budget-panel-v2">
+      {/* Header */}
+      <div className="budget-v2-header">
+        <div>
+          <p className="eyebrow">Presupuesto · Todo el viaje</p>
+          <h2 className="budget-v2-title">El viaje, en plata.</h2>
+        </div>
+      </div>
+
+      {/* KPI row */}
+      <div className="budget-v2-kpis">
+        <article className="budget-kpi">
+          <span>Total estimado · {travelers} personas</span>
+          <strong>{currency(total)}</strong>
+          {total < budgetGoal
+            ? <small className="kpi-good">−{currency(budgetGoal - total)} bajo meta</small>
+            : <small className="kpi-warn">+{currency(total - budgetGoal)} sobre meta</small>}
+          <div className="kpi-bar-track">
+            <div className="kpi-bar-fill" style={{ width: `${Math.min((total / budgetGoal) * 100, 100)}%` }} />
           </div>
-          <div className="subbudget-total">
-            <span>Total del subgrupo</span>
-            <strong>{subgroupTotal ? currency(subgroupTotal) : 'Por estimar'}</strong>
-            {subgroupPerPerson ? <small>{currency(subgroupPerPerson)} por persona</small> : null}
+          <span className="kpi-bar-label">Meta {currency(budgetGoal)}</span>
+        </article>
+        <article className="budget-kpi">
+          <span>Por persona</span>
+          <strong>{currency(perPerson)}</strong>
+          <small>{travelers} viajeros</small>
+        </article>
+        <article className="budget-kpi">
+          <span>Ya pagado</span>
+          <strong className="kpi-paid">{currency(paidTotal)}</strong>
+          <small>{paidPct}% del total</small>
+        </article>
+        <article className="budget-kpi">
+          <span>Por pagar</span>
+          <strong className="kpi-topay">{currency(Math.max(total - paidTotal, 0))}</strong>
+          <small>{100 - paidPct}% por delante</small>
+        </article>
+      </div>
+
+      {/* Proyecciones de alojamientos favoritos */}
+      {projections.map((proj) => {
+        const favoriteBudget = optionBudget(proj.favorite, currentTravelGroup, f1Count, nights)
+        const currentBudget = proj.current ? optionBudget(proj.current, currentTravelGroup, f1Count, nights) : { total: 0, perPerson: 0 }
+        const diffTotal = favoriteBudget.total - currentBudget.total
+        const isCheaper = diffTotal <= 0
+
+        return (
+          <div key={proj.city} className="budget-projected-card">
+            <div className="budget-projected-head">
+              <span className="budget-projected-title">
+                <Sparkles className="budget-projected-sparkle" size={14} />
+                RECOMENDACIÓN INTERACTIVA: ALOJAMIENTO FAVORITO EN {proj.city.toUpperCase()}
+              </span>
+              <span className="budget-projected-option-votes" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Heart size={12} fill="#ea580c" stroke="none" /> {proj.votesCount} {proj.votesCount === 1 ? 'voto de la familia' : 'votos de la familia'}
+              </span>
+            </div>
+            <div className="budget-projected-details">
+              <div className="budget-projected-option-info">
+                <span className="budget-projected-option-name">{proj.favorite.title}</span>
+                <span className="budget-projected-option-meta" style={{ fontSize: '0.76rem', color: 'var(--muted)' }}>
+                  {proj.favorite.capacity} · {proj.favorite.rating} de calificación ({proj.favorite.reviews} reseñas)
+                </span>
+              </div>
+              <div className="budget-projected-math">
+                {proj.current && (
+                  <div className="budget-projected-amount-col">
+                    <span className="budget-projected-amount-label">Presupuestado actual</span>
+                    <span className="budget-projected-amount-value" style={{ textDecoration: 'line-through', opacity: 0.6 }}>
+                      {currency(currentBudget.total)}
+                    </span>
+                  </div>
+                )}
+                <div className="budget-projected-amount-col">
+                  <span className="budget-projected-amount-label">Proyectado favorito</span>
+                  <span className="budget-projected-amount-value" style={{ color: '#ea580c' }}>
+                    {currency(favoriteBudget.total)}
+                  </span>
+                </div>
+                <div className="budget-projected-amount-col">
+                  <span className="budget-projected-amount-label">Por persona</span>
+                  <span className="budget-projected-amount-value">
+                    {currency(favoriteBudget.perPerson)}/p
+                  </span>
+                </div>
+                <span className={`budget-projected-diff ${isCheaper ? 'cheaper' : 'pricier'}`}>
+                  {isCheaper ? 'Ahorras ' : '+'}{currency(Math.abs(diffTotal))}
+                </span>
+              </div>
+            </div>
+            <button 
+              className="budget-projected-apply-btn" 
+              onClick={() => handleApplyFavorite(proj)}
+              type="button"
+            >
+              <CheckCircle2 size={14} />
+              Aplicar favorito al presupuesto
+            </button>
+          </div>
+        )
+      })}
+
+      {/* Charts + Settle row */}
+      <div className="budget-v2-charts-row">
+        <div className="budget-v2-charts">
+          {/* Donut */}
+          <div className="budget-donut-wrap">
+            <DonutChart segments={donutSegments} total={total} />
+            <div className="donut-legend">
+              {donutSegments.map((seg) => (
+                <div key={seg.label} className="donut-legend-item">
+                  <span className="donut-legend-dot" style={{ background: seg.color }} />
+                  <span className="donut-legend-label">{seg.label}</span>
+                  <span className="donut-legend-pct">{total ? Math.round((seg.value / total) * 100) : 0}%</span>
+                  <span className="donut-legend-val">{currency(seg.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Day bar chart */}
+          <div className="budget-day-chart">
+            <p className="eyebrow">Gasto por día</p>
+            <div className="day-bars">
+              {dayBars.map((d) => (
+                <div key={d.label} className="day-bar-col">
+                  <div className="day-bar-wrap">
+                    <div
+                      className="day-bar-fill"
+                      style={{ height: `${(d.value / maxDayBar) * 100}%` }}
+                      title={currency(d.value)}
+                    />
+                    {d.value > 0 && (
+                      <span className="day-bar-amount">{currency(d.value)}</span>
+                    )}
+                  </div>
+                  <span className="day-bar-label">{d.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {subgroupRows.length ? (
-          <div className="budget-list subgroup-budget-list">
-            {subgroupRows.map(({ option, budget }) => (
-              <article key={option.id}>
-                <div>
-                  <span>{categoryConfig[option.category]?.shortLabel || 'Opción'}</span>
-                  <h2>{option.title}</h2>
-                  <p>{budget.travelers} personas del subgrupo</p>
-                </div>
-                <div className="budget-money">
-                  <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
-                  <span>{budget.missing ? 'Falta precio' : `${currency(budget.perPerson)} por persona`}</span>
-                </div>
-                <button onClick={() => onToggleSubgroupBudget(option.id)} type="button">
-                  Quitar
-                </button>
-              </article>
-            ))}
+        {/* Quién pagó qué */}
+        <div className="budget-settle-panel">
+          <div className="settle-head">
+            <p className="eyebrow">Balances · Quién pagó qué</p>
+            <p className="settle-note">Asigna el pagador en cada partida. El balance se actualiza en tiempo real.</p>
           </div>
-        ) : (
-          <p className="subbudget-empty">
-            Este grupo todavía no tiene partidas propias. Agrega opciones abajo para que la IA sepa qué presupuesto cuidar.
-          </p>
-        )}
+          <div className="settle-rows">
+            {settleData.filter((s) => s.paid > 0 || s.balance !== 0 - perPerson).map((s) => (
+              <div key={s.id} className="settle-row">
+                <span className="settle-name">{s.name}</span>
+                <span className="settle-paid-total">{currency(s.paid)} pagado</span>
+                <span className={`settle-balance ${s.balance >= 0 ? 'positive' : 'negative'}`}>
+                  {s.balance >= 0 ? '+' : ''}{currency(s.balance)}
+                </span>
+              </div>
+            ))}
+            {Object.keys(paidByTotals).length === 0 && (
+              <p className="settle-empty-note">Asigna pagadores en las partidas de abajo →</p>
+            )}
+          </div>
+          <button className="settle-btn" onClick={() => setShowSettle(!showSettle)} type="button">
+            {showSettle ? 'Ocultar resumen' : 'Cuadrar cuentas'}
+          </button>
+          {showSettle && (
+            <div className="settle-result">
+              {settleData.filter((s) => s.balance < 0).length === 0 ? (
+                <p className="settle-ok">✓ Todo cuadrado</p>
+              ) : (
+                settleData.filter((s) => s.balance < 0).map((s) => {
+                  const creditor = settleData.find((x) => x.balance > 0)
+                  return creditor ? (
+                    <p key={s.id}>
+                      <strong>{s.name}</strong> debe <strong>{currency(Math.abs(s.balance))}</strong> a <strong>{creditor.name}</strong>
+                    </p>
+                  ) : null
+                })
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
-        {subgroupCandidates.length ? (
-          <div className="subbudget-picker">
-            {subgroupCandidates.map((option) => (
-              <button key={option.id} onClick={() => onToggleSubgroupBudget(option.id)} type="button">
-                <Plus size={14} aria-hidden="true" />
-                <span>{option.code}</span>
-                {option.title}
-              </button>
-            ))}
+      {/* View tabs */}
+      <div className="budget-view-tabs">
+        {['categoria', 'subgrupo', 'dia', 'ciudad'].map((v) => (
+          <button
+            key={v}
+            className={budgetView === v ? 'active' : ''}
+            onClick={() => setBudgetView(v)}
+            type="button"
+          >
+            {v === 'categoria' ? 'Categoría' : v === 'subgrupo' ? 'Subgrupo' : v === 'dia' ? 'Por día' : 'Por ciudad'}
+          </button>
+        ))}
+      </div>
+
+      {/* Budget lines table */}
+      <div className="budget-lines">
+        {rows.map(({ option, budget }) => (
+          <article key={option.id} className="budget-line">
+            <span className={`budget-cat-badge ${option.category}`}>
+              {categoryConfig[option.category]?.shortLabel || 'Opción'}
+            </span>
+            <div className="budget-line-info">
+              <strong>{option.title}</strong>
+              <small>{budget.travelers} personas · {groupSummary(currentTravelGroup)}</small>
+            </div>
+            <div className="budget-line-amounts">
+              <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
+              {!budget.missing && <span>{currency(budget.perPerson)}/p</span>}
+            </div>
+            <div className="budget-line-payer">
+              <label className="payer-select-wrap" title="¿Quién pagó esto?">
+                <select
+                  value={paidBy[option.id] || ''}
+                  onChange={(e) => setPayer(option.id, e.target.value)}
+                >
+                  <option value="">Pagador...</option>
+                  {familyMembers.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="budget-line-paid">
+              {option.priceTotal
+                ? <span className="paid-badge">Pagado</span>
+                : <span className="pending-badge">Sin pagar</span>}
+            </div>
+            <button className="budget-remove-btn" onClick={() => onRemove(option.id)} type="button" title="Quitar del presupuesto">
+              ×
+            </button>
+          </article>
+        ))}
+        {(subgroupCandidates.length > 0 || subgroupBudgetOptions?.length > 0) && (
+          <div className="budget-add-row">
+            <p className="eyebrow">Añadir / quitar línea</p>
+            <div className="budget-add-chips">
+              {/* Already added via subgroup toggle — show quitar */}
+              {(subgroupBudgetOptions || []).map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => onToggleSubgroupBudget(option.id)}
+                  type="button"
+                  className="budget-add-chip added"
+                  title="Quitar del presupuesto de subgrupo"
+                >
+                  <X size={12} aria-hidden="true" />
+                  {option.code} · {option.title}
+                </button>
+              ))}
+              {/* Candidates to add */}
+              {subgroupCandidates.map((option) => (
+                <button key={option.id} onClick={() => onToggleSubgroupBudget(option.id)} type="button" className="budget-add-chip">
+                  <Plus size={12} aria-hidden="true" />
+                  {option.code} · {option.title}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : null}
-      </section>
-      {rows.some((row) => row.budget.missing) ? (
+        )}
+      </div>
+
+      {rows.some((r) => r.budget.missing) && (
         <p className="budget-note">
-          Algunas partidas no tienen precio. Pega el link o escribe el precio visto para que entren en el cálculo.
+          Algunas partidas no tienen precio. Pega el link o escribe el precio para que entren en el cálculo.
         </p>
-      ) : null}
+      )}
     </div>
   )
 }
 
+// ── Group color palette for Gantt rows ────────────────────────────────────────
+const GANTT_COLORS = [
+  { bg: 'rgba(234,88,12,0.13)', border: '#ea580c', text: '#fdba74' },  // coral -> light orange text
+  { bg: 'rgba(37,99,235,0.12)', border: '#2563eb', text: '#93c5fd' },  // blue (F1) -> light blue text
+  { bg: 'rgba(13,148,136,0.12)', border: '#0d9488', text: '#5eead4' }, // teal (plan suave) -> light teal text
+  { bg: 'rgba(124,58,237,0.12)', border: '#7c3aed', text: '#c084fc' }, // violet -> light violet text
+  { bg: 'rgba(217,119,6,0.13)', border: '#d97706', text: '#fcd34d' },  // amber -> light amber text
+]
+
+function ganttEventForGroupDay(group, dayItem, dayIndex, allGroups) {
+  // AI-generated subgroupPlans take priority
+  if (dayItem.subgroupPlans?.length) {
+    const match = dayItem.subgroupPlans.find(
+      (sp) => sp.groupId === group.id || sp.groupName === group.name,
+    )
+    if (match) return { plan: match.plan, time: match.timeWindow }
+  }
+  // Static fallback based on known group ids
+  const isF1Day = dayIndex === 1 || dayIndex === 3  // Vie 11, Dom 13
+  if (!group.kind || group.kind !== 'subgroup') {
+    // Main family group — always show family plan
+    return { plan: dayItem.familyPlan || dayItem.title, time: null }
+  }
+  if (group.id === 'subgrupo-f1') {
+    return isF1Day || dayItem.f1Plan
+      ? { plan: dayItem.f1Plan || 'IFEMA / F1', time: `${group.startTime || '08:00'}–${group.endTime || '19:00'}` }
+      : null
+  }
+  if (group.id === 'subgrupo-plan-suave') {
+    return isF1Day
+      ? { plan: dayItem.familyPlan || 'Plan suave', time: `${group.startTime || '10:30'}–${group.endTime || '17:30'}` }
+      : null
+  }
+  // Ad-hoc subgroups: match by date if set
+  if (group.date) {
+    const dayStr = dayItem.date?.toLowerCase() || ''
+    const gStr = group.date?.toLowerCase() || ''
+    const overlap = dayStr.split(/[\s/]/).some((token) => gStr.includes(token) && token.length > 2)
+    if (overlap) {
+      return { plan: group.focus || group.name, time: group.startTime && group.endTime ? `${group.startTime}–${group.endTime}` : null }
+    }
+    return null
+  }
+  return null
+}
+
 function ItineraryPanel({
+  activeTrip,
+  activeTravelCities,
   availableOptions,
   busy,
   currentTravelGroup,
   f1Count,
   nights,
   onCreateSubgroup,
+  onDeleteGroup,
   onGenerate,
   onToggleDraftMember,
   onUpdateDraft,
   onUpdateGroup,
+  onUpdateDay,
   plan,
   subgroupDraft,
   travelGroups,
 }) {
+  const [selectedDay, setSelectedDay] = useState(0)
+  const [showSubgroupForm, setShowSubgroupForm] = useState(false)
+  const [itineraryView, setItineraryView] = useState('timeline') // 'timeline' or 'gantt'
+  const [subgroupFilter, setSubgroupFilter] = useState('all') // 'all' or specific subgroup ID
+
   const days = plan?.days?.length
     ? plan.days
-    : itineraryDraft.map((item) => ({
-        date: item.day,
-        city: item.city,
-        title: item.title,
-        familyPlan: item.family,
-        f1Plan: item.f1,
-        foodIdea: '',
-        routeNotes: '',
-        backup: '',
-        energyLevel: '',
-      }))
+    : generateFallbackItinerary(activeTrip, activeTravelCities, travelGroups)
+
+  const ganttGroups = travelGroups.filter(isPlanningGroup)
+  const selectedDayData = days[selectedDay]
+
+  // Detect conflicts: groups with overlapping times on same day
+  const conflicts = []
+  if (selectedDayData) {
+    const active = ganttGroups
+      .map((g) => ({ group: g, event: ganttEventForGroupDay(g, selectedDayData, selectedDay, ganttGroups) }))
+      .filter((x) => x.event)
+    if (active.length > 2) {
+      conflicts.push(`${active.length} subgrupos activos este día — confirmar logística de traslados.`)
+    }
+    const f1Group = ganttGroups.find((g) => g.id === 'subgrupo-f1')
+    if (f1Group && ganttEventForGroupDay(f1Group, selectedDayData, selectedDay, ganttGroups)) {
+      conflicts.push('F1 termina ~19:00, Warner cierra 20:00. La cena a las 20:30 será justa.')
+    }
+  }
+
+  // Stats
+  const totalDays = days.length
+  const splitDays = days.filter((day, i) => {
+    const events = ganttGroups.map((g) => ganttEventForGroupDay(g, day, i, ganttGroups)).filter(Boolean)
+    const plans = new Set(events.map((e) => e.plan))
+    return plans.size > 1
+  }).length
+
+  const reuniones = ganttGroups.filter((g) => !g.kind || g.kind !== 'subgroup').length
 
   return (
-    <div className="itinerary-panel">
+    <div className="itinerary-panel gantt-view">
+      {/* Toolbar */}
       <div className="itinerary-toolbar">
         <div>
-          <p className="eyebrow">Itinerario IA</p>
-          <h2>{plan?.title || 'Plan base familiar'}</h2>
-          {plan?.summary ? <p>{plan.summary}</p> : null}
+          <p className="eyebrow">Itinerario · Viaje de la familia</p>
+          <h2>{plan?.title || `${totalDays} días, varios planes en paralelo`}</h2>
+          {plan?.summary ? <p className="gantt-plan-summary">{plan.summary}</p> : null}
         </div>
-        <button className="primary-button compact" disabled={busy} onClick={onGenerate} type="button">
-          {busy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
-          Generar con IA
-        </button>
+        <div className="itinerary-toolbar-btns" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* View switcher */}
+          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', padding: '3px', borderRadius: '20px' }}>
+            <button
+               className={`timeline-filter-btn ${itineraryView === 'timeline' ? 'active' : ''}`}
+               style={{ border: 'none', background: itineraryView === 'timeline' ? 'var(--violet)' : 'transparent', color: itineraryView === 'timeline' ? '#09090b' : 'var(--ink)', padding: '4px 12px', fontSize: '0.7rem', borderRadius: '18px' }}
+               onClick={() => setItineraryView('timeline')}
+               type="button"
+             >
+               Línea de Tiempo
+             </button>
+             <button
+               className={`timeline-filter-btn ${itineraryView === 'gantt' ? 'active' : ''}`}
+               style={{ border: 'none', background: itineraryView === 'gantt' ? 'var(--violet)' : 'transparent', color: itineraryView === 'gantt' ? '#09090b' : 'var(--ink)', padding: '4px 12px', fontSize: '0.7rem', borderRadius: '18px' }}
+               onClick={() => setItineraryView('gantt')}
+               type="button"
+             >
+               Vista Gantt
+             </button>
+           </div>
+
+          <button
+            className="secondary-button compact"
+            onClick={() => setShowSubgroupForm((v) => !v)}
+            type="button"
+          >
+            <Layers size={15} aria-hidden="true" />
+            Dividir día
+          </button>
+          <button className="primary-button compact" disabled={busy} onClick={onGenerate} type="button">
+            {busy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
+            Generar con IA
+          </button>
+        </div>
       </div>
-      <SubgroupPlanner
-        availableOptions={availableOptions}
-        currentTravelGroup={currentTravelGroup}
-        f1Count={f1Count}
-        groups={travelGroups}
-        nights={nights}
-        onCreate={onCreateSubgroup}
-        onToggleDraftMember={onToggleDraftMember}
-        onUpdateDraft={onUpdateDraft}
-        onUpdateGroup={onUpdateGroup}
-        subgroupDraft={subgroupDraft}
-      />
-      {days.map((item) => (
-        <article key={`${item.date}-${item.title}`}>
-          <div className="date-chip">{item.date}</div>
-          <div>
-            <p>{item.city}</p>
-            <h2>{item.title}</h2>
-            <div className="itinerary-columns">
-              <span>
-                <Users size={16} aria-hidden="true" />
-                {item.familyPlan}
-              </span>
-              <span>
-                <Plane size={16} aria-hidden="true" />
-                {item.f1Plan}
-              </span>
+
+      {itineraryView === 'timeline' ? (
+        <div className="timeline-view-container">
+          {/* Subgroup Filter Toolbar */}
+          <div className="timeline-nav-filters">
+            <div>
+              <p className="eyebrow" style={{ margin: 0 }}>Filtros de Subgrupo</p>
             </div>
-            {item.foodIdea || item.routeNotes || item.backup ? (
-              <div className="itinerary-notes">
-                {item.foodIdea ? <span>Comida: {item.foodIdea}</span> : null}
-                {item.routeNotes ? <span>Ruta: {item.routeNotes}</span> : null}
-                {item.backup ? <span>Plan B: {item.backup}</span> : null}
-                {item.energyLevel ? <span>Energía: {item.energyLevel}</span> : null}
-              </div>
-            ) : null}
-            {item.subgroupPlans?.length ? (
-              <div className="subgroup-day-plans">
-                {item.subgroupPlans.map((subplan) => (
-                  <span key={`${item.date}-${subplan.groupId || subplan.groupName}`}>
-                    <strong>{subplan.groupName}</strong>
-                    {subplan.timeWindow ? ` · ${subplan.timeWindow}` : ''}
-                    <small>{subplan.plan}</small>
-                    {subplan.budgetNote ? <small>{subplan.budgetNote}</small> : null}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            <div className="timeline-filter-buttons">
+              <button
+                className={`timeline-filter-btn ${subgroupFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setSubgroupFilter('all')}
+                type="button"
+              >
+                Todos
+              </button>
+              {travelGroups.filter(isPlanningGroup).map((group) => {
+                let extraClass = ''
+                if (group.id === 'subgrupo-f1') extraClass = 'subgroup-f1-btn'
+                if (group.id === 'subgrupo-plan-suave') extraClass = 'subgroup-plan-suave-btn'
+                
+                return (
+                  <button
+                    key={group.id}
+                    className={`timeline-filter-btn ${extraClass} ${subgroupFilter === group.id ? 'active' : ''}`}
+                    onClick={() => setSubgroupFilter(group.id)}
+                    type="button"
+                  >
+                    {group.name}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </article>
-      ))}
+
+          {/* Timeline Layout */}
+          <div className="timeline-layout">
+            {days.map((day, di) => {
+              const activePlans = []
+              const showFamily = subgroupFilter === 'all' || subgroupFilter === 'familia-sept-2026'
+              const showF1 = subgroupFilter === 'all' || subgroupFilter === 'subgrupo-f1'
+              const showPlanSuave = subgroupFilter === 'all' || subgroupFilter === 'subgrupo-plan-suave'
+
+              if (showFamily && (day.familyPlan || day.title)) {
+                activePlans.push({
+                  groupId: 'familia-sept-2026',
+                  groupName: 'General / Todo el grupo',
+                  planClass: 'family',
+                  text: day.familyPlan || day.title,
+                  time: null,
+                })
+              }
+
+              const isF1Day = di === 1 || di === 3 || day.f1Plan
+              if (showF1 && isF1Day) {
+                activePlans.push({
+                  groupId: 'subgrupo-f1',
+                  groupName: 'Subgrupo F1',
+                  planClass: 'f1',
+                  text: day.f1Plan || 'Entrenamientos / GP de F1',
+                  time: '08:00–19:00',
+                })
+              }
+
+              if (showPlanSuave && isF1Day) {
+                activePlans.push({
+                  groupId: 'subgrupo-plan-suave',
+                  groupName: 'Plan suave con niños',
+                  planClass: 'plan-suave',
+                  text: day.familyPlan || 'Paseo tranquilo, parques y comidas con calma',
+                  time: '10:30–17:30',
+                })
+              }
+
+              if (day.subgroupPlans?.length) {
+                day.subgroupPlans.forEach((sp) => {
+                  const alreadyAdded = activePlans.some(p => p.groupId === sp.groupId)
+                  if (!alreadyAdded) {
+                    const group = travelGroups.find(g => g.id === sp.groupId || g.name === sp.groupName)
+                    const isVisible = subgroupFilter === 'all' || subgroupFilter === sp.groupId || (group && subgroupFilter === group.id)
+                    if (isVisible) {
+                      let planClass = 'family'
+                      if (sp.groupId === 'subgrupo-f1' || sp.groupName?.toLowerCase().includes('f1')) planClass = 'f1'
+                      else if (sp.groupId === 'subgrupo-plan-suave' || sp.groupName?.toLowerCase().includes('suave')) planClass = 'plan-suave'
+                      
+                      activePlans.push({
+                        groupId: sp.groupId,
+                        groupName: sp.groupName,
+                        planClass: planClass,
+                        text: sp.plan,
+                        time: sp.timeWindow,
+                      })
+                    }
+                  }
+                })
+              }
+
+              const rawEnergy = (day.energyLevel || 'Media').toLowerCase()
+              let energyClass = 'media'
+              let energyLabel = '⚡⚡ Media'
+              if (rawEnergy.includes('baja') || rawEnergy === 'baja') {
+                energyClass = 'baja'
+                energyLabel = '⚡ Baja'
+              } else if (rawEnergy.includes('alta') || rawEnergy === 'alta') {
+                energyClass = 'alta'
+                energyLabel = '⚡⚡⚡ Alta'
+              }
+
+              return (
+                <div key={day.date} className="timeline-day-node">
+                  <div className="timeline-node-marker">
+                    <div className="timeline-node-dot" />
+                  </div>
+                  <div
+                    className={`timeline-day-card ${selectedDay === di ? 'selected' : ''}`}
+                    onClick={() => setSelectedDay(di)}
+                  >
+                    <div className="timeline-day-head">
+                      <div className="timeline-day-title-area">
+                        <span className="timeline-day-date">{day.date}</span>
+                        <h4 className="timeline-day-title">{day.title}</h4>
+                        <span className="timeline-day-city">📍 {day.city}</span>
+                      </div>
+                      <div className="timeline-badges">
+                        <span className={`energy-badge ${energyClass}`}>
+                          {energyLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {activePlans.length > 0 ? (
+                      <div className="timeline-plans-stack">
+                        {activePlans.map((plan, pi) => (
+                          <div key={pi} className={`timeline-plan-card ${plan.planClass}`}>
+                            <span className={`timeline-plan-group-name ${plan.planClass}`}>
+                              {plan.groupName}
+                            </span>
+                            <p className="timeline-plan-text">{plan.text}</p>
+                            {plan.time && (
+                              <span className="timeline-plan-time">🕒 {plan.time}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="timeline-plan-text" style={{ fontStyle: 'italic', opacity: 0.6, margin: '10px 0' }}>
+                        Sin planes asignados para este filtro.
+                      </p>
+                    )}
+
+                    {selectedDay === di && (
+                      <div className="timeline-details-drawer">
+                        <form className="day-inline-editor-form" onSubmit={(e) => e.preventDefault()}>
+                          <div className="editor-row">
+                            <label style={{ flex: 2 }}>
+                              <span>Título del día</span>
+                              <input
+                                className="timeline-detail-input"
+                                type="text"
+                                value={day.title || ''}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { title: e.target.value })}
+                                placeholder="Ej. Llegada + Instalación"
+                              />
+                            </label>
+                            <label style={{ flex: 1 }}>
+                              <span>Nivel de Energía</span>
+                              <select
+                                className="timeline-detail-select"
+                                value={day.energyLevel || 'Media'}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { energyLevel: e.target.value })}
+                              >
+                                <option value="Baja">⚡ Baja</option>
+                                <option value="Media">⚡⚡ Media</option>
+                                <option value="Alta">⚡⚡⚡ Alta</option>
+                              </select>
+                            </label>
+                          </div>
+
+                          <div className="editor-row">
+                            <label>
+                              <span>Plan Familiar / General</span>
+                              <textarea
+                                className="timeline-detail-textarea"
+                                value={day.familyPlan || ''}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { familyPlan: e.target.value })}
+                                placeholder="Actividades principales para todo el grupo..."
+                              />
+                            </label>
+                            <label>
+                              <span>Plan F1 / Paralelo</span>
+                              <textarea
+                                className="timeline-detail-textarea"
+                                value={day.f1Plan || ''}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { f1Plan: e.target.value })}
+                                placeholder="Planes específicos de subgrupos o F1..."
+                              />
+                            </label>
+                          </div>
+
+                          <div className="editor-row three-cols">
+                            <label>
+                              <span>🍽️ Ideas de Comida</span>
+                              <textarea
+                                className="timeline-detail-textarea"
+                                value={day.foodIdea || ''}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { foodIdea: e.target.value })}
+                                placeholder="Restaurantes, picnics, reservas..."
+                              />
+                            </label>
+                            <label>
+                              <span>🗺️ Ruta y Logística</span>
+                              <textarea
+                                className="timeline-detail-textarea"
+                                value={day.routeNotes || ''}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { routeNotes: e.target.value })}
+                                placeholder="Trayectos, parking, metros, tiempos..."
+                              />
+                            </label>
+                            <label>
+                              <span>☂️ Plan de Respaldo</span>
+                              <textarea
+                                className="timeline-detail-textarea"
+                                value={day.backup || ''}
+                                onChange={(e) => onUpdateDay && onUpdateDay(di, { backup: e.target.value })}
+                                placeholder="Si llueve o hay cansancio..."
+                              />
+                            </label>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Gantt Grid */}
+          <div className="gantt-grid">
+            {/* Corner + Day headers */}
+            <div className="gantt-row gantt-header">
+              <div className="gantt-group-col" />
+              {days.map((day, i) => (
+                <button
+                  key={day.date}
+                  className={`gantt-day-header ${selectedDay === i ? 'active' : ''}`}
+                  onClick={() => setSelectedDay(i)}
+                  type="button"
+                >
+                  <span className="gantt-day-name">{day.date}</span>
+                  <span className="gantt-day-city">{day.city}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Group rows */}
+            {ganttGroups.map((group, gi) => {
+              const colors = GANTT_COLORS[gi % GANTT_COLORS.length]
+              return (
+                <div key={group.id} className="gantt-row">
+                  <div className="gantt-group-col">
+                    <span className="gantt-group-dot" style={{ background: colors.border }} />
+                    <div>
+                      <strong>{group.name}</strong>
+                      <small>{groupSummary(group)}</small>
+                    </div>
+                  </div>
+                  {days.map((day, di) => {
+                    const event = ganttEventForGroupDay(group, day, di, ganttGroups)
+                    return (
+                      <div
+                        key={`${group.id}-${di}`}
+                        className={`gantt-cell ${selectedDay === di ? 'gantt-cell-active' : ''}`}
+                        onClick={() => setSelectedDay(di)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === 'Enter' && setSelectedDay(di)}
+                      >
+                        {event ? (
+                          <div
+                            className="gantt-event"
+                            style={{ background: colors.bg, borderLeft: `3px solid ${colors.border}`, color: colors.text }}
+                          >
+                            {event.time && <span className="gantt-event-time">{event.time}</span>}
+                            <span className="gantt-event-plan">{event.plan}</span>
+                          </div>
+                        ) : (
+                          <div className="gantt-cell-empty" />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Day detail + Summary sidebar */}
+          {selectedDayData && (
+            <div className="gantt-detail-row">
+              {/* Day detail */}
+              <div className="gantt-detail-main">
+                <div className="gantt-detail-header">
+                  <p className="eyebrow">Detalle del día</p>
+                  <h3>{selectedDayData.date} · día {splitDays > 0 ? 'dividido' : 'completo'}</h3>
+                </div>
+                <div className="gantt-detail-cards">
+                  {ganttGroups.map((group, gi) => {
+                    const event = ganttEventForGroupDay(group, selectedDayData, selectedDay, ganttGroups)
+                    if (!event) return null
+                    const colors = GANTT_COLORS[gi % GANTT_COLORS.length]
+                    return (
+                      <article
+                        key={group.id}
+                        className="gantt-detail-card"
+                        style={{ borderTop: `3px solid ${colors.border}` }}
+                      >
+                        <div className="gantt-detail-card-head">
+                          <strong>{group.name}</strong>
+                          <span className="gantt-detail-members">{groupSummary(group)}</span>
+                        </div>
+                        {event.time && <span className="gantt-detail-time">{event.time}</span>}
+                        <p>{event.plan}</p>
+                        {selectedDayData.foodIdea && <small>🍽️ {selectedDayData.foodIdea}</small>}
+                        {selectedDayData.routeNotes && <small>🗺️ {selectedDayData.routeNotes}</small>}
+                      </article>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Right sidebar */}
+              <aside className="gantt-day-sidebar">
+                {conflicts.length > 0 && (
+                  <div className="gantt-conflicts">
+                    <p className="eyebrow">
+                      <AlertTriangle size={12} aria-hidden="true" />
+                      Conflictos del día
+                    </p>
+                    {conflicts.map((c) => (
+                      <p key={c} className="gantt-conflict-item">{c}</p>
+                    ))}
+                  </div>
+                )}
+                <div className="gantt-summary-box">
+                  <p className="eyebrow">Resumen</p>
+                  <div className="gantt-summary-rows">
+                    <div><span>{totalDays} días</span><strong>Duración</strong></div>
+                    <div><span>{splitDays} ({splitDays === 1 ? 'sáb' : 'días'})</span><strong>Días con split</strong></div>
+                    <div><span>{reuniones}</span><strong>Reuniones grupo</strong></div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Open questions */}
       {plan?.openQuestions?.length ? (
         <div className="itinerary-questions">
           <strong>Dudas para cerrar</strong>
-          <ul>
-            {plan.openQuestions.map((question) => (
-              <li key={question}>{question}</li>
-            ))}
-          </ul>
+          <ul>{plan.openQuestions.map((q) => <li key={q}>{q}</li>)}</ul>
         </div>
       ) : null}
+
+      {/* Subgroup form (collapsed by default) */}
+      {showSubgroupForm && (
+        <SubgroupPlanner
+          availableOptions={availableOptions}
+          currentTravelGroup={currentTravelGroup}
+          f1Count={f1Count}
+          groups={travelGroups}
+          nights={nights}
+          onCreate={onCreateSubgroup}
+          onDeleteGroup={onDeleteGroup}
+          onToggleDraftMember={onToggleDraftMember}
+          onUpdateDraft={onUpdateDraft}
+          onUpdateGroup={onUpdateGroup}
+          subgroupDraft={subgroupDraft}
+        />
+      )}
     </div>
   )
 }
@@ -5036,6 +6997,7 @@ function SubgroupPlanner({
   groups,
   nights,
   onCreate,
+  onDeleteGroup,
   onToggleDraftMember,
   onUpdateDraft,
   onUpdateGroup,
@@ -5119,17 +7081,50 @@ function SubgroupPlanner({
           return (
           <article className={group.id === currentTravelGroup.id ? 'active' : ''} key={group.id}>
             <div className="subgroup-rail-head">
-              <strong>{group.name}</strong>
+              <input
+                className="subgroup-name-input-editable"
+                type="text"
+                value={group.name}
+                onChange={(event) => onUpdateGroup(group.id, { name: event.target.value })}
+                placeholder="Nombre del subgrupo"
+              />
               <span>{groupSummary(group)}</span>
+              {onDeleteGroup && (
+                <button
+                  aria-label={`Eliminar subgrupo ${group.name}`}
+                  className="subgroup-delete-btn"
+                  onClick={() => {
+                    if (window.confirm(`¿Eliminar el subgrupo "${group.name}"?`)) {
+                      onDeleteGroup(group.id)
+                    }
+                  }}
+                  title="Eliminar subgrupo"
+                  type="button"
+                >
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              )}
             </div>
-            <div className="decision-avatar-row">
-              {group.memberIds.slice(0, 9).map((memberId) => (
-                <MiniAvatar
-                  active
-                  key={memberId}
-                  member={familyMembers.find((member) => member.id === memberId)}
-                />
-              ))}
+            <div className="subgroup-avatar-edit-row">
+              {familyMembers.map((member) => {
+                const isActive = group.memberIds.includes(member.id)
+                return (
+                  <button
+                    key={member.id}
+                    className={`mini-avatar-toggle-btn ${isActive ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      const newMemberIds = isActive
+                        ? group.memberIds.filter((id) => id !== member.id)
+                        : [...group.memberIds, member.id]
+                      onUpdateGroup(group.id, { memberIds: newMemberIds })
+                    }}
+                    title={member.name}
+                  >
+                    <MiniAvatar active={isActive} member={member} />
+                  </button>
+                )
+              })}
             </div>
             <div className="subgroup-schedule">
               <label>

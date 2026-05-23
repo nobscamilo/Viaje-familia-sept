@@ -27,6 +27,12 @@ export async function suggestLodgingWithAI(payload) {
   return result.data
 }
 
+export async function suggestLodgingPlacesWithAI(payload) {
+  const run = callable('suggestLodgingPlaces')
+  const result = await run(payload)
+  return result.data
+}
+
 export async function suggestFoodWithAI(payload) {
   const run = callable('suggestFoodPlaces')
   const result = await run(payload)

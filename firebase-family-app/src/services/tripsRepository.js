@@ -6,6 +6,7 @@
 
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -100,6 +101,8 @@ export async function seedMadridF1Trip(user) {
       {
         memberIds: [...new Set([...memberIds, user.uid])],
         members: { [user.uid]: memberEntry(user, 'admin') },
+        // Always ensure joinCode is present — may be missing from older documents
+        ...(existing.joinCode ? {} : { joinCode: MADRID_F1_JOIN_CODE }),
         updatedAt: serverTimestamp(),
       },
       { merge: true },
@@ -149,6 +152,10 @@ export async function createTrip(tripData, user) {
     destination: tripData.destination?.trim() || '',
     startDate: tripData.startDate || '',
     endDate: tripData.endDate || '',
+    returnDate: tripData.returnDate || '',
+    baseCity: tripData.baseCity?.trim() || '',
+    adults: Number(tripData.adults) || 2,
+    childrenAges: Array.isArray(tripData.childrenAges) ? tripData.childrenAges : [],
     emoji: tripData.emoji || '✈️',
     joinCode,
     isLocked: false,
@@ -162,6 +169,22 @@ export async function createTrip(tripData, user) {
 
   await setDoc(tripRef, trip)
   return trip
+}
+
+/**
+ * Delete a trip. Only the trip creator / admin should call this.
+ * NOTE: This removes the trip document only. Sub-collections (options, groups,
+ * cities) are orphaned — a Cloud Function cleanup can be added later.
+ */
+export async function deleteTrip(tripId, user) {
+  if (!canUseFirestore() || !user)
+    throw new Error('No hay conexión a Firebase o no hay sesión activa.')
+  if (!isTripAdmin(user))
+    throw new Error('Solo los administradores pueden borrar viajes.')
+  if (tripId === MADRID_F1_TRIP_ID)
+    throw new Error('El viaje Madrid F1 no puede borrarse.')
+
+  await deleteDoc(doc(firestoreDb, TRIPS_COLLECTION, tripId))
 }
 
 /**

@@ -10,12 +10,14 @@ import {
   Check,
   ChevronRight,
   Copy,
+  Loader2,
   LogOut,
   MapPin,
   Plus,
+  Trash2,
   Users,
 } from 'lucide-react'
-import { isTripAdmin } from '../services/tripsRepository'
+import { isTripAdmin, MADRID_F1_TRIP_ID } from '../services/tripsRepository'
 
 const CreateTripModal = lazy(() => import('./CreateTripModal'))
 
@@ -42,24 +44,58 @@ function buildShareUrl(joinCode) {
   return `${base}?join=${joinCode}`
 }
 
+// ─── Delete Confirmation Modal ─────────────────────────────────────────────────
+
+function DeleteTripModal({ trip, onCancel, onConfirm, busy }) {
+  return (
+    <div className="add-modal-overlay" role="dialog" aria-modal="true" aria-label="Borrar viaje">
+      <div className="add-modal delete-trip-modal">
+        <div className="delete-trip-icon">🗑️</div>
+        <h2>¿Borrar este viaje?</h2>
+        <p className="delete-trip-name">{trip.emoji || '✈️'} {trip.name}</p>
+        <p className="delete-trip-warning">
+          Esta acción es permanente. Se elimina el viaje y todos los miembros perderán acceso.
+          Las opciones guardadas quedarán huérfanas.
+        </p>
+        <div className="modal-actions">
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </button>
+          <button type="button" className="delete-confirm-btn" onClick={onConfirm} disabled={busy}>
+            {busy ? <Loader2 size={15} className="spin" aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
+            {busy ? 'Borrando…' : 'Sí, borrar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Trip Card ─────────────────────────────────────────────────────────────────
 
-function TripCard({ trip, onEnter }) {
+function TripCard({ trip, canDelete, onEnter, onDelete }) {
   const [copied, setCopied] = useState(false)
   const dateRange = formatDateRange(trip.startDate, trip.endDate)
   const count = memberCount(trip.members)
-  const shareUrl = buildShareUrl(trip.joinCode)
+  const hasJoinCode = Boolean(trip.joinCode)
+  const shareUrl = hasJoinCode ? buildShareUrl(trip.joinCode) : ''
+  const isProtected = trip.id === MADRID_F1_TRIP_ID
 
   async function handleCopyLink(e) {
     e.stopPropagation()
+    if (!hasJoinCode) return
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     } catch {
-      // Fallback: prompt
       window.prompt('Copia este enlace de invitación:', shareUrl)
     }
+  }
+
+  function handleDelete(e) {
+    e.stopPropagation()
+    onDelete(trip)
   }
 
   return (
@@ -91,12 +127,23 @@ function TripCard({ trip, onEnter }) {
         <button
           className="trip-share-btn"
           onClick={handleCopyLink}
-          title={`Copiar enlace: ${shareUrl}`}
+          disabled={!hasJoinCode}
+          title={hasJoinCode ? `Copiar enlace: ${shareUrl}` : 'Recarga la página para generar el enlace'}
           aria-label="Copiar enlace de invitación"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
           {copied ? 'Copiado' : 'Invitar'}
         </button>
+        {canDelete && !isProtected && (
+          <button
+            className="trip-delete-btn"
+            onClick={handleDelete}
+            title="Borrar viaje"
+            aria-label="Borrar viaje"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
         <span className="trip-enter-btn" aria-hidden="true">
           <ChevronRight size={18} />
         </span>
@@ -107,9 +154,26 @@ function TripCard({ trip, onEnter }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-export default function TripDashboard({ currentUser, userTrips, tripsLoading, onEnterTrip, onSignOut }) {
+export default function TripDashboard({ currentUser, userTrips, tripsLoading, onEnterTrip, onDeleteTrip, onSignOut }) {
   const [showCreate, setShowCreate] = useState(false)
+  const [tripToDelete, setTripToDelete] = useState(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
   const canCreateTrips = isTripAdmin(currentUser)
+
+  async function handleConfirmDelete() {
+    if (!tripToDelete || deleteBusy) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      await onDeleteTrip(tripToDelete.id)
+      setTripToDelete(null)
+    } catch (err) {
+      setDeleteError(err.message || 'No se pudo borrar el viaje.')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
 
   return (
     <main className="dashboard-screen">
@@ -156,9 +220,21 @@ export default function TripDashboard({ currentUser, userTrips, tripsLoading, on
         ) : (
           <div className="trips-grid">
             {userTrips.map((trip) => (
-              <TripCard key={trip.id} trip={trip} onEnter={onEnterTrip} />
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                canDelete={canCreateTrips}
+                onEnter={onEnterTrip}
+                onDelete={setTripToDelete}
+              />
             ))}
           </div>
+        )}
+
+        {deleteError && (
+          <p className="modal-error" role="alert" style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+            {deleteError}
+          </p>
         )}
 
         {/* Create Trip CTA — only for admins (Camilo & Juliana Bueno) */}
@@ -191,6 +267,16 @@ export default function TripDashboard({ currentUser, userTrips, tripsLoading, on
             }}
           />
         </Suspense>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {tripToDelete && (
+        <DeleteTripModal
+          trip={tripToDelete}
+          busy={deleteBusy}
+          onCancel={() => { setTripToDelete(null); setDeleteError(null) }}
+          onConfirm={handleConfirmDelete}
+        />
       )}
     </main>
   )

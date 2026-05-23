@@ -1,3 +1,4 @@
+// v2026-05-19b — scoreBreakdown + why personalizado en sugerencias IA (force redeploy)
 import { setGlobalOptions } from 'firebase-functions/v2'
 import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
@@ -70,6 +71,7 @@ function isAdultMemberId(memberId) {
 const optionSchema = {
   type: SchemaType.OBJECT,
   properties: {
+    thinkingProcess: { type: SchemaType.STRING },
     title: { type: SchemaType.STRING },
     source: { type: SchemaType.STRING },
     category: { type: SchemaType.STRING },
@@ -98,6 +100,7 @@ const optionSchema = {
     summary: { type: SchemaType.STRING },
   },
   required: [
+    'thinkingProcess',
     'title',
     'source',
     'category',
@@ -147,6 +150,7 @@ const lodgingSearchSchema = {
 const foodSearchSchema = {
   type: SchemaType.OBJECT,
   properties: {
+    thinkingProcess: { type: SchemaType.STRING },
     summary: { type: SchemaType.STRING },
     rankedPlaces: {
       type: SchemaType.ARRAY,
@@ -156,14 +160,48 @@ const foodSearchSchema = {
           placeId: { type: SchemaType.STRING },
           name: { type: SchemaType.STRING },
           score: { type: SchemaType.NUMBER },
-          why: { type: SchemaType.STRING },
+          why: {
+            type: SchemaType.STRING,
+            description: 'Razón concreta y personalizada (1-2 oraciones) de por qué este lugar encaja para este grupo. Menciona detalles específicos: capacidad, distancia, niños, menú, horario, o por qué supera a otros candidatos.',
+          },
           caution: { type: SchemaType.STRING },
+          scoreBreakdown: {
+            type: SchemaType.ARRAY,
+            description: '3-4 dimensiones de score específicas para la categoría (ej. Precio, Capacidad, Ubicación, Reseñas). Cada una con valor v (0-10) y max 10.',
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                label: { type: SchemaType.STRING },
+                v: { type: SchemaType.NUMBER },
+                max: { type: SchemaType.NUMBER },
+                note: { type: SchemaType.STRING },
+              },
+              required: ['label', 'v', 'max', 'note'],
+            },
+          },
+          tags: {
+            type: SchemaType.ARRAY,
+            description: '2-3 tags cortos y específicos que describen lo más relevante del lugar para este grupo (ej. "Mesa para 9", "A 5 min del metro", "Menú niños").',
+            items: { type: SchemaType.STRING },
+          },
+          estimatedPriceRange: {
+            type: SchemaType.OBJECT,
+            description: 'Rango de precio estimado basado en tu conocimiento general. Restaurante: precio plato principal + bebida por persona. Ej: {min:18,max:30,currency:"EUR",unit:"persona",label:"18-30€/p"}.',
+            properties: {
+              min: { type: SchemaType.NUMBER },
+              max: { type: SchemaType.NUMBER },
+              currency: { type: SchemaType.STRING },
+              unit: { type: SchemaType.STRING },
+              label: { type: SchemaType.STRING },
+            },
+            required: ['min', 'max', 'currency', 'unit', 'label'],
+          },
         },
-        required: ['placeId', 'name', 'score', 'why', 'caution'],
+        required: ['placeId', 'name', 'score', 'why', 'caution', 'scoreBreakdown', 'tags'],
       },
     },
   },
-  required: ['summary', 'rankedPlaces'],
+  required: ['thinkingProcess', 'summary', 'rankedPlaces'],
 }
 
 const transferSearchSchema = {
@@ -964,7 +1002,7 @@ function normalizePlace(place) {
     location,
     types: place.types || [],
     photoName: photo?.name || '',
-    photoNames: photos.slice(0, 2).map((p) => p.name).filter(Boolean),
+    photoNames: photos.slice(0, 5).map((p) => p.name).filter(Boolean),
     photoCredit: photo ? photoCredit(photo) : '',
   }
 }
@@ -1198,6 +1236,7 @@ function buildFallbackAnalysis(input, metadata, place, routes) {
   const totalTravelers = input.groupProfile?.totalTravelers || 9
 
   return {
+    thinkingProcess: 'Análisis de respaldo generado de manera local sin servicios externos.',
     title:
       input.title ||
       metadata.title ||
@@ -1285,6 +1324,7 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user, code
     highlights: (analysis.highlights || []).slice(0, 4),
     cautions: (analysis.cautions || []).slice(0, 4),
     aiSummary: analysis.summary || '',
+    aiThinkingProcess: analysis.thinkingProcess || '',
     aiQuestions: analysis.questions || [],
     routeModes: routes,
     groupProfile: input.groupProfile,
@@ -1299,7 +1339,7 @@ function optionFromAnalysis(input, analysis, metadata, place, routes, user, code
  * Derives F1 subgroup from `subgroups` array so prompts are not hardcoded
  * to specific member names or trip titles.
  */
-function buildTripContext(groupProfile, subgroups = []) {
+function buildTripContext(groupProfile, subgroups = [], city = '') {
   const f1Sub = subgroups.find(
     (sub) => /\bf1\b/i.test(String(sub.id || '')) || /\bF1\b/.test(String(sub.name || '')),
   )
@@ -1312,14 +1352,25 @@ function buildTripContext(groupProfile, subgroups = []) {
   if (groupProfile.focus) lines.push(`Foco: ${groupProfile.focus}.`)
   if (f1Sub) {
     const members = f1Sub.memberIds?.length ? f1Sub.memberIds.join(', ') : f1Sub.name
-    lines.push(
-      `Subgrupo F1 (solo van a la carrera): ${members}. El resto necesita planes alternos en paralelo.`,
-    )
+    const isMadrid = /madrid/i.test(city)
+    if (isMadrid) {
+      lines.push(
+        `Subgrupo F1 (SOLO para Madrid, 11-13 sep — la carrera es en IFEMA/MADRING): ${members}. Esos días el grupo se divide: F1 van a la carrera, el resto necesita planes alternos en paralelo. FUERA de Madrid o del 11-13 sep, el grupo viaja y planifica JUNTO.`,
+      )
+    } else if (city) {
+      lines.push(
+        `IMPORTANTE: El viaje incluye un subgrupo F1, pero la carrera de Fórmula 1 es ÚNICAMENTE en Madrid (11-13 sep). En ${city} NO hay evento F1 — el grupo viaja y planifica COMPLETAMENTE JUNTO como ${groupProfile.totalTravelers} personas. No dividas el grupo ni planifiques planes F1 para esta ciudad.`,
+      )
+    } else {
+      lines.push(
+        `Nota: hay un subgrupo F1 en el viaje. La carrera F1 es SOLO en Madrid (11-13 sep). Para otras ciudades el grupo viaja junto.`,
+      )
+    }
   }
   return lines.map((line, i) => (i === 0 ? line : `- ${line}`)).join('\n')
 }
 
-async function generateJson(schema, prompt, fallback) {
+async function generateJson(schema, prompt, fallback, { maxTokens = 4096 } = {}) {
   if (!projectId) return fallback
 
   try {
@@ -1328,7 +1379,7 @@ async function generateJson(schema, prompt, fallback) {
       model: geminiModel,
       generationConfig: {
         temperature: 0.25,
-        maxOutputTokens: 4096,
+        maxOutputTokens: maxTokens,
         responseMimeType: 'application/json',
         responseSchema: schema,
       },
@@ -1348,6 +1399,7 @@ async function generateJson(schema, prompt, fallback) {
         .trim() || ''
     return JSON.parse(text.replace(/^```json|```$/g, '').trim())
   } catch (error) {
+    console.error('[generateJson] Vertex AI error:', error?.message || error)
     return {
       ...fallback,
       aiFallbackReason: error.message,
@@ -1475,11 +1527,13 @@ export const analyzeTripOption = onCall(functionOptions, async (request) => {
 Eres el copiloto IA de un viaje familiar. Analiza la opción propuesta con ojo crítico y práctico.
 
 Contexto del viaje:
-- ${buildTripContext(groupProfile, subgroups)}
+- ${buildTripContext(groupProfile, subgroups, input.city)}
 - Presupuesto hospedaje orientativo: 300 a 600 EUR/noche total.
 - Prioridad: alojamiento completo, logística fácil con niños, espacios comunes, buena conectividad al punto central.
 - No inventes precios. Solo llena priceNight y priceTotal si input.priceNight/input.priceTotal o metadata.priceCandidates traen una cifra explícita; si no hay precio visible, deja ambos en null y ponlo como duda.
 - bathrooms: extrae el número de baños del título, descripción o metadata. Si no aparece explícito, deja en null.
+
+En tu propiedad "thinkingProcess", explica paso a paso tu razonamiento lógico e intelectual (de al menos 2 párrafos cortos en español): evalúa la capacidad de camas/baños para las 9 personas, analiza la conveniencia de la ubicación y el transporte público hacia el punto central, y justifica la puntuación de viabilidad y precio. Sé directo, honesto y detallado.
 
 Analiza esta opción y responde SOLO el JSON del esquema:
 ${JSON.stringify({ input, metadata, place, routes })}
@@ -1563,11 +1617,13 @@ export const reanalyzeTripOption = onCall(functionOptions, async (request) => {
 Eres el copiloto IA de un viaje familiar. Re-analiza esta opción con la información actualizada.
 
 Contexto del viaje:
-- ${buildTripContext(groupProfile, subgroups)}
+- ${buildTripContext(groupProfile, subgroups, input.city)}
 - Presupuesto hospedaje orientativo: 300 a 600 EUR/noche total.
 - Prioridad: alojamiento completo, logística fácil con niños, espacios comunes, buena conectividad al punto central.
 - No inventes precios. Solo llena priceNight y priceTotal si hay cifra explícita; si no, deja en null.
 - bathrooms: extrae el número de baños del título, descripción o metadata. Si no aparece explícito, deja en null.
+
+En tu propiedad "thinkingProcess", detalla tu proceso intelectual de evaluación de esta opción (mínimo 2 párrafos cortos en español): analiza la idoneidad para las 9 personas del grupo, calcula la viabilidad logística de transporte público y evalúa críticamente la relación calidad-precio.
 
 Analiza esta opción y responde SOLO el JSON del esquema:
 ${JSON.stringify({ input, metadata, place, routes })}
@@ -1579,6 +1635,7 @@ ${JSON.stringify({ input, metadata, place, routes })}
   const patch = stripUndefined({
     aiScore: clamp(analysis.aiScore, 25, 99),
     aiSummary: analysis.summary || '',
+    aiThinkingProcess: analysis.thinkingProcess || '',
     highlights: (analysis.highlights || []).slice(0, 4),
     cautions: (analysis.cautions || []).slice(0, 4),
     aiQuestions: analysis.questions || [],
@@ -1695,7 +1752,7 @@ export const suggestLodgingSearch = onCall(functionOptions, async (request) => {
   }
   const prompt = `
 Genera una estrategia de búsqueda de hospedaje para el viaje familiar.
-${buildTripContext(groupProfile, subgroups)}
+${buildTripContext(groupProfile, subgroups, search.city)}
 Datos de búsqueda:
 ${JSON.stringify(search)}
 Responde SOLO JSON según el esquema. No inventes disponibilidad exacta.
@@ -1723,16 +1780,21 @@ Responde SOLO JSON según el esquema. No inventes disponibilidad exacta.
   return payload
 })
 
-export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
+export const suggestLodgingPlaces = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
   const tripId = cleanTripId(request.data?.tripId)
   const city = cleanText(request.data?.city, 'Madrid')
-  const kind = cleanText(request.data?.kind, 'Comida')
-  const notes = cleanText(request.data?.notes, 'restaurantes familiares bien valorados')
+  const dates = cleanText(request.data?.dates, '')
   const resultLimit = cleanSuggestionLimit(request.data?.limit)
   const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
+  const childrenStr = groupProfile.childrenAges.length > 0 ? `Niños: edades ${groupProfile.childrenAges.join(', ')}.` : 'Sin niños.'
+  const subgroups = Array.isArray(request.data?.subgroups)
+    ? request.data.subgroups.map((g) => normalizeGroupProfile(g))
+    : []
   await requireTripMember(tripId, user)
-  const rawPlaces = await searchSuggestionCandidates(kind, notes, city, resultLimit).catch((error) => {
+
+  const notes = `apartamentos o hoteles para ${groupProfile.totalTravelers} personas, familia con niños, bien valorados y ubicación central`
+  const rawPlaces = await searchSuggestionCandidates('alojamiento', notes, city, resultLimit).catch((error) => {
     throw new HttpsError('unavailable', error.message)
   })
   const places = rawPlaces.map((place) => normalizePlace(place))
@@ -1744,21 +1806,44 @@ export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
     userRatingCount: place.userRatingCount,
     types: place.types,
   }))
+
+  const search = { city, dates, notes, type: 'lodging' }
+  const links = platformLinks(search, groupProfile)
+
   const fallback = {
-    summary: `Encontré ${places.length} candidatos de ${kind.toLowerCase()} en ${city}; ordenar por rating, reseñas y facilidad para grupo.`,
+    summary: `Encontré ${places.length} opciones de alojamiento en ${city}. Compara en Booking y Airbnb antes de decidir.`,
     rankedPlaces: places.map((place) => ({
       placeId: place.placeId,
       name: place.name,
       score: clamp(Math.round((place.rating || 4) * 18), 50, 95),
-      why: place.formattedAddress || 'Buena opción para revisar en Maps',
-      caution: `Confirmar reserva para ${groupProfile.totalTravelers} personas y menú para niños`,
+      why: `En ${city} con ${groupProfile.totalTravelers} personas — verifica capacidad y política de cancelación.`,
+      caution: `Verificar capacidad para ${groupProfile.totalTravelers} personas y política de cancelación`,
+      scoreBreakdown: [
+        { label: 'Reseñas', v: Math.round((place.rating || 4) * 2), max: 10 },
+        { label: 'Capacidad', v: 7, max: 10 },
+        { label: 'Ubicación', v: 7, max: 10 },
+        { label: 'Precio', v: 6, max: 10 },
+      ],
+      tags: [`${groupProfile.totalTravelers} personas`, place.formattedAddress ? place.formattedAddress.split(',')[0] : city, 'Verificar disponibilidad'],
+      estimatedPriceRange: { min: 80, max: 200, currency: 'EUR', unit: 'noche', label: '80-200€/noche' },
     })),
   }
   const prompt = `
-Ordena estas opciones de ${kind.toLowerCase()} para ${groupProfile.name}: ${groupProfile.totalTravelers} personas en ${city}.
-Niños: ${groupProfile.childrenAges.join(', ') || 'ninguno'}. Prioriza rating de Google Maps, número de reseñas, facilidad logística, ubicación y que funcione para un grupo familiar.
-Si el tipo es Comida, evita planes turísticos y enfócate en restaurantes/reservas/menús. Si el tipo es Actividades o Planes, evita restaurantes y enfócate en horarios, entradas, duración y ritmo familiar.
-Lugares de Google Places:
+Eres un experto en alojamientos familiares. Ordena y evalúa estas opciones para ${groupProfile.name} — ${groupProfile.totalTravelers} personas en ${city}.
+${dates ? `Fechas: ${dates}.` : ''}
+${childrenStr}
+${buildTripContext(groupProfile, subgroups, city)}
+
+En tu propiedad "thinkingProcess" general (en la raíz del JSON, mínimo 2 párrafos cortos en español): realiza un análisis estratégico comparando las opciones presentadas. Explica cuál es la más viable para un grupo de 9 personas, qué retos de capacidad detectas y cómo influye el transporte en esta ciudad.
+
+Para CADA opción en "rankedPlaces", genera:
+- "why": razón concreta y específica (1-2 oraciones) de por qué este alojamiento encaja para ESTE grupo. Menciona capacidad, distancia a lugares clave, facilidad con niños, o ventajas frente a otros candidatos. NO uses frases genéricas como "buena opción" o "bien ubicado".
+- "scoreBreakdown": 4 dimensiones relevantes para hospedaje familiar: "Precio" (relación calidad-precio), "Capacidad" (cabe el grupo sin problemas), "Ubicación" (cercanía a transporte y atracciones), "Reseñas" (rating Google y volumen). Cada una con valor v de 0-10 y una "note" corta (1 frase, ≤15 palabras) justificando objetivamente el puntaje.
+- "tags": 2-3 etiquetas cortas y específicas como "Apto 9 personas", "A 3 min del metro", "Cocina equipada".
+- "estimatedPriceRange": Precio estimado por noche para el grupo en ${city}, basado en tu conocimiento general del tipo de alojamiento (hotel, apartamento, hostal). Ej: {min:120,max:250,currency:"EUR",unit:"noche",label:"120-250€/noche"}. NOTA: Son estimaciones orientativas, no precios exactos.
+
+Prioriza: rating Google Maps ≥ 4.3, volumen de reseñas, capacidad real para el grupo, sin hostels solo adultos.
+Lugares candidatos:
 ${JSON.stringify(placesForRanking)}
 Responde SOLO JSON según el esquema.
 `
@@ -1772,7 +1857,130 @@ Responde SOLO JSON según el esquema.
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, resultLimit)
   const rankedPlaces = await Promise.all(
-    rankedPlacesBase.map((place, index) => (index < 10 ? withPlacePhotos(place) : stripUndefined(place))),
+    rankedPlacesBase.map((place, index) => (index < 20 ? withPlacePhotos(place) : stripUndefined(place))),
+  )
+
+  const id = `lodging-${slug(city)}-${Date.now()}`
+  const payload = stripUndefined({
+    id,
+    tripId,
+    type: 'lodging',
+    city,
+    dates,
+    notes,
+    status: 'ready',
+    groupProfile,
+    places: rankedPlaces,
+    links,
+    analysis,
+    createdBy: user.uid,
+    createdByName: user.name,
+  })
+
+  await db
+    .collection('searchRequests')
+    .doc(scopedDocId(tripId, id))
+    .set(
+      {
+        ...payload,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+  return payload
+})
+
+export const suggestFoodPlaces = onCall(functionOptions, async (request) => {
+  const user = requireAuth(request)
+  const tripId = cleanTripId(request.data?.tripId)
+  const city = cleanText(request.data?.city, 'Madrid')
+  const kind = cleanText(request.data?.kind, 'Comida')
+  const notes = cleanText(request.data?.notes, 'restaurantes familiares bien valorados')
+  const dates = cleanText(request.data?.dates, '')
+  const resultLimit = cleanSuggestionLimit(request.data?.limit)
+  const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
+  const subgroups = Array.isArray(request.data?.subgroups)
+    ? request.data.subgroups.map((g) => normalizeGroupProfile(g))
+    : []
+  await requireTripMember(tripId, user)
+  const rawPlaces = await searchSuggestionCandidates(kind, notes, city, resultLimit).catch((error) => {
+    throw new HttpsError('unavailable', error.message)
+  })
+  const places = rawPlaces.map((place) => normalizePlace(place))
+  const placesForRanking = places.map((place) => ({
+    placeId: place.placeId,
+    name: place.name,
+    formattedAddress: place.formattedAddress,
+    rating: place.rating,
+    userRatingCount: place.userRatingCount,
+    types: place.types,
+  }))
+  const isFood = /comida|restaurante|cena|almuerzo|desayuno/i.test(kind)
+  const isActivity = /actividad|plan|excursión|tour|museo|parque|ticket/i.test(kind)
+  const childrenStr2 = groupProfile.childrenAges.length > 0 ? `Niños: edades ${groupProfile.childrenAges.join(', ')}.` : 'Sin niños.'
+
+  const fallback = {
+    summary: `Encontré ${places.length} candidatos de ${kind.toLowerCase()} en ${city}; ordenar por rating, reseñas y facilidad para grupo.`,
+    rankedPlaces: places.map((place) => ({
+      placeId: place.placeId,
+      name: place.name,
+      score: clamp(Math.round((place.rating || 4) * 18), 50, 95),
+      why: `Opción destacada en ${city} para ${groupProfile.totalTravelers} personas — revisa capacidad y disponibilidad.`,
+      caution: `Confirmar reserva para ${groupProfile.totalTravelers} personas y menú para niños`,
+      scoreBreakdown: isFood
+        ? [
+            { label: 'Reseñas', v: Math.round((place.rating || 4) * 2), max: 10 },
+            { label: 'Para grupo', v: 7, max: 10 },
+            { label: 'Niños OK', v: groupProfile.childrenAges.length > 0 ? 7 : 5, max: 10 },
+            { label: 'Precio', v: 6, max: 10 },
+          ]
+        : [
+            { label: 'Reseñas', v: Math.round((place.rating || 4) * 2), max: 10 },
+            { label: 'Niños', v: groupProfile.childrenAges.length > 0 ? 7 : 5, max: 10 },
+            { label: 'Logística', v: 7, max: 10 },
+            { label: 'Costo', v: 6, max: 10 },
+          ],
+      tags: [`${groupProfile.totalTravelers} personas`, place.formattedAddress ? place.formattedAddress.split(',')[0] : city],
+      estimatedPriceRange: isFood
+        ? { min: 15, max: 35, currency: 'EUR', unit: 'persona', label: '15-35€/p' }
+        : { min: 10, max: 25, currency: 'EUR', unit: 'persona', label: '10-25€/p' },
+    })),
+  }
+  const prompt = `
+Eres un experto en viajes familiares. Evalúa y ordena estas opciones de "${kind}" para ${groupProfile.name} — ${groupProfile.totalTravelers} personas en ${city}.
+${childrenStr2}
+${buildTripContext(groupProfile, subgroups, city)}
+
+En tu propiedad "thinkingProcess" general (en la raíz del JSON, mínimo 2 párrafos cortos en español): realiza un análisis general de las opciones para comer/planes. Explica qué opciones destacan para 9 personas, qué tan amigable es el ambiente para los niños de estas edades y qué precauciones de reserva recomiendas tomar.
+
+Para CADA opción en "rankedPlaces", genera:
+- "why": razón CONCRETA y personalizada (1-2 oraciones) de por qué esta opción encaja para ESTE grupo. Sé específico: menciona si tiene menú infantil, si acepta grupos grandes, si es fácil logísticamente, cuánto tarda, si vale la pena el precio. NUNCA uses frases genéricas como "buena opción" o "bien valorado".
+${isFood
+  ? '- "scoreBreakdown": 4 dimensiones: "Precio" (relación calidad-precio), "Para grupo" (apto para grupo grande), "Niños OK" (amigable con niños), "Reseñas" (calidad y volumen en Google). Cada una con valor v de 0-10 y una "note" corta (1 frase, ≤15 palabras) justificando el puntaje.'
+  : isActivity
+    ? '- "scoreBreakdown": 4 dimensiones: "Niños" (apto para niños de las edades del grupo), "Logística" (fácil de organizar sin complicaciones), "Costo" (valor por el precio), "Reseñas" (calidad en Google). Cada una con valor v de 0-10 y una "note" corta (1 frase, ≤15 palabras) justificando el puntaje.'
+    : '- "scoreBreakdown": 4 dimensiones relevantes para esta categoría. Cada una con valor v de 0-10 y una "note" corta justificando el puntaje.'}
+- "tags": 2-3 etiquetas cortas y específicas que describan lo más relevante (ej. "Mesa para 9", "Sin reserva previa", "Menú niños", "A 10 min andando").
+- "estimatedPriceRange": Precio estimado basado en tu conocimiento general del tipo de lugar y la ciudad ${city}. ${isFood ? `Para restaurante: precio plato principal + bebida por persona. Ej: {min:18,max:30,currency:"EUR",unit:"persona",label:"18-30€/p"}.` : `Para actividad: precio entrada por adulto. Ej: {min:10,max:20,currency:"EUR",unit:"persona",label:"10-20€/p"}.`} NOTA: Son estimaciones orientativas, no precios exactos.
+
+${isFood ? 'Enfócate en restaurantes: menú, reserva, espacio para grupo, apto niños. Evita planes turísticos.' : ''}
+${isActivity ? 'Enfócate en horarios, entradas, duración y ritmo familiar. Evita restaurantes.' : ''}
+Lugares candidatos:
+${JSON.stringify(placesForRanking)}
+Responde SOLO JSON según el esquema.
+`
+  const analysis = await generateJson(foodSearchSchema, prompt, fallback)
+  const rankedById = new Map((analysis.rankedPlaces || []).map((place) => [place.placeId, place]))
+  const rankedPlacesBase = places
+    .map((place) => ({
+      ...place,
+      ...(rankedById.get(place.placeId) || {}),
+    }))
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, resultLimit)
+  const rankedPlaces = await Promise.all(
+    rankedPlacesBase.map((place, index) => (index < 20 ? withPlacePhotos(place) : stripUndefined(place))),
   )
 
   const id = `food-${slug(city)}-${Date.now()}`
@@ -1781,6 +1989,7 @@ Responde SOLO JSON según el esquema.
     tripId,
     type: 'food',
     city,
+    dates,
     notes,
     status: 'ready',
     groupProfile,
@@ -1876,9 +2085,12 @@ export const generateItinerary = onCall(functionOptions, async (request) => {
   const tripId = cleanTripId(request.data?.tripId)
   const city = cleanText(request.data?.city, 'Madrid')
   const dates = cleanText(request.data?.dates, '10-14 sep 2026')
+  const tripTotalDates = cleanText(request.data?.tripTotalDates, dates)
   const routeMode = cleanText(request.data?.routeMode, 'TRANSIT')
   const groupProfile = normalizeGroupProfile(request.data?.groupProfile)
   const subgroups = normalizeItinerarySubgroups(request.data?.subgroups)
+  // citySchedule: [{city, dates, notes, isBase}] — passed from frontend activeTravelCities
+  const cityScheduleRaw = Array.isArray(request.data?.citySchedule) ? request.data.citySchedule : []
   await requireTripMember(tripId, user)
   const [optionsSnapshot, citiesSnapshot] = await Promise.all([
     db
@@ -1890,7 +2102,20 @@ export const generateItinerary = onCall(functionOptions, async (request) => {
     db.collection('travelCities').where('tripId', '==', tripId).limit(12).get(),
   ])
   const options = optionsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-  const cities = citiesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const citiesFromDb = citiesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
+  // Merge client-side citySchedule with Firestore cities for completeness.
+  // Client data wins when a city appears in both (it has more context: dates, notes).
+  const cityScheduleMap = new Map(cityScheduleRaw.map((c) => [c.city?.toLowerCase(), c]))
+  citiesFromDb.forEach((dbCity) => {
+    const key = dbCity.city?.toLowerCase()
+    if (key && !cityScheduleMap.has(key)) {
+      cityScheduleMap.set(key, { city: dbCity.city, dates: dbCity.dates || '', notes: dbCity.notes || '', isBase: dbCity.isBase || false })
+    }
+  })
+  const citySchedule = [...cityScheduleMap.values()].filter((c) => c.city)
+  // Keep legacy `cities` for backward compat in fallback/payload
+  const cities = citiesFromDb
   const f1FallbackSub = subgroups.find(
     (sub) => /\bf1\b/i.test(String(sub.id || '')) || /\bF1\b/.test(String(sub.name || '')),
   )
@@ -1945,20 +2170,28 @@ export const generateItinerary = onCall(functionOptions, async (request) => {
     ],
     openQuestions: ['Elegir hospedaje final', 'Confirmar ciudad posterior al 14 de septiembre'],
   }
+  // Build a human-readable city calendar for the prompt
+  const cityCalendarLines = citySchedule.length
+    ? citySchedule
+        .map((c) => `• ${c.city}${c.dates ? ` → ${c.dates}` : ' → fechas por confirmar'}${c.notes ? ` (${c.notes})` : ''}`)
+        .join('\n')
+    : `• ${city} → ${tripTotalDates}`
+
   const prompt = `
 Genera un itinerario familiar práctico. No hagas marketing; debe servir para decidir.
 Contexto:
-- ${buildTripContext(groupProfile, subgroups)}
-- Ciudad base solicitada: ${city}.
-- Fechas: ${dates}.
+- ${buildTripContext(groupProfile, subgroups, '')}
+- Fechas del viaje COMPLETO: ${tripTotalDates}. IMPORTANTE: el itinerario DEBE limitarse estrictamente a este rango. NO generes días antes ni después de estas fechas. El número total de días en el JSON debe coincidir exactamente con los días del viaje completo.
 - Modo de ruta preferido: ${routeMode}.
+- CALENDARIO MULTI-CIUDAD OBLIGATORIO. Asigna CADA día a la ciudad que le corresponde según este calendario. El campo "city" de cada entrada del array "days" debe ser la ciudad correcta para esa fecha:
+${cityCalendarLines}
+  Si un día cae dentro del rango de una ciudad, su campo city = esa ciudad. No inventes ciudades no listadas.
+  Si el grupo viaja de una ciudad a otra ese día, indícalo en familyPlan/routeNotes y asigna city a la ciudad de destino.
 - Subgrupos, horarios y subpresupuestos que debes respetar:
 ${JSON.stringify(subgroups)}
 - Si un subgrupo tiene fecha/hora, usa subgroupPlans en el día correspondiente. No mezcles comida con planes: las comidas van en foodIdea o budgetNote, los planes en familyPlan/f1Plan/subgroupPlans.
-- Opciones actuales:
+- Opciones actuales confirmadas (úsalas cuando encajen con la ciudad y el día):
 ${JSON.stringify(options.slice(0, 14))}
-- Ciudades candidatas posteriores:
-${JSON.stringify(cities)}
 Responde SOLO JSON según el esquema.
 `
   const itinerary = await generateJson(itinerarySchema, prompt, fallback)
@@ -1968,6 +2201,8 @@ Responde SOLO JSON según el esquema.
     tripId,
     city,
     dates,
+    tripTotalDates,
+    citySchedule: citySchedule.length ? citySchedule : undefined,
     routeMode,
     groupProfile,
     subgroups,
@@ -2005,7 +2240,7 @@ export const suggestDayTrips = onCall(functionOptions, async (request) => {
     : []
   await requireTripMember(tripId, user)
 
-  const tripCtx = buildTripContext(groupProfile, subgroups)
+  const tripCtx = buildTripContext(groupProfile, subgroups, baseCity)
 
   const fallback = {
     suggestions: [
@@ -2022,6 +2257,7 @@ export const suggestDayTrips = onCall(functionOptions, async (request) => {
   const schema = {
     type: SchemaType.OBJECT,
     properties: {
+      thinkingProcess: { type: SchemaType.STRING },
       suggestions: {
         type: SchemaType.ARRAY,
         items: {
@@ -2046,22 +2282,30 @@ export const suggestDayTrips = onCall(functionOptions, async (request) => {
         },
       },
     },
-    required: ['suggestions'],
+    required: ['thinkingProcess', 'suggestions'],
   }
+
+  const isGuardo = baseCity.toLowerCase().includes('guardo')
+  const specificGuardoGuidance = isGuardo
+    ? '\nNOTA ESPECIAL PARA GUARDO: Al usuario le encanta la idea de desplazarse en coche por Cantabria y la costa, volviendo el mismo día. Sugiere explícitamente una ruta de día hacia la costa de Cantabria, por ejemplo: "Guardo → Comillas (11:00 visitar El Capricho de Gaudí) → Santander (14:00 comida frente al mar y paseo por El Sardinero) → Guardo", y otras rutas espectaculares por la zona (como Potes/Picos de Europa, la ruta del Románico Palentino, o la Montaña Palentina).\n'
+    : ''
 
   const prompt = `
 Eres un experto en viajes familiares por España.
 
 ${tripCtx}
 
+${specificGuardoGuidance}
+
 Ciudad base (casa, sin hospedaje): ${baseCity}, ${baseCountry}.
 El grupo vive o se aloja en ${baseCity} y quiere hacer excursiones de un solo día —
 salen por la mañana y regresan a dormir a ${baseCity}.
 
+En tu propiedad "thinkingProcess" (mínimo 1 párrafo en español): analiza la geografía general desde ${baseCity}, describe los tiempos de desplazamiento razonables para el grupo de 9 personas y explica cómo equilibrar cultura, paisajes y la fatiga con niños de 5 y 9 años.
+
 Sugiere entre 3 y 5 rutas de día distintas desde ${baseCity}.
 Requisitos de cada ruta:
-- Solo incluye pueblos/ciudades que se puedan visitar en un día desde ${baseCity}
-  (máximo 1.5h de trayecto en coche en cada dirección).
+- Solo incluye pueblos/ciudades que se puedan visitar en un día desde ${baseCity}. Normalmente hasta 1.5h de trayecto, pero ampliable hasta 2.5h para visitas excepcionales de día completo a la costa (ej. Santander, Comillas - El Capricho de Gaudí, etc.), volviendo el mismo día a dormir a ${baseCity}.
 - Propone qué hacer, dónde comer y qué ver en cada parada.
 - Adapta los planes para que sean aptos para niños y adultos.
 - Indica la duración total estimada de la excursión.
@@ -2105,9 +2349,37 @@ async function generateText(systemPrompt, history = [], userMessage = '', fallba
   }
 }
 
-// ─── assessTripPlan ──────────────────────────────────────────────────────────
-// Analyses all cities in the trip and returns a structured plan:
-// priorities, viability, day distribution, transfer suggestions.
+
+// ─── buildTripWindow ─────────────────────────────────────────────────────────
+// Returns a plain-text description of the fixed + free trip windows so the AI
+// knows which dates are locked (main event) and which are available ("después").
+function buildTripWindow(tripDoc, clientCtx = {}) {
+  const mainCity = clientCtx.mainCity || tripDoc?.destination || tripDoc?.name || 'Madrid'
+  const start = clientCtx.mainStart || tripDoc?.startDate || ''
+  const end = clientCtx.mainEnd || tripDoc?.endDate || ''
+  const returnDate = clientCtx.returnDate || ''
+
+  const lines = []
+
+  if (start && end) {
+    lines.push(`VIAJE PRINCIPAL (INAMOVIBLE): ${mainCity} del ${start} al ${end}.`)
+    lines.push(`No se puede cambiar ni reducir esta etapa.`)
+  }
+
+  if (end && returnDate) {
+    lines.push(`VENTANA DISPONIBLE PARA CIUDADES ADICIONALES: del ${end} al ${returnDate}.`)
+    lines.push(`Todas las sugerencias de ciudades extra deben caber en este período.`)
+  } else if (end) {
+    lines.push(`VENTANA DISPONIBLE: a partir del ${end} (fecha de regreso aún no definida).`)
+  }
+
+  if (lines.length === 0) return ''
+  return lines.join('\n')
+}
+
+// ─── assessTripPlan
+// Given a list of trip cities, returns a structured analysis with priorities,
+// viability scores, day distribution, and transfer suggestions.
 export const assessTripPlan = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
   const tripId = cleanTripId(request.data?.tripId)
@@ -2115,27 +2387,49 @@ export const assessTripPlan = onCall(functionOptions, async (request) => {
   const subgroups = Array.isArray(request.data?.subgroups)
     ? request.data.subgroups.map((g) => normalizeGroupProfile(g))
     : []
+  // Optional client-side trip context (speeds things up, no extra Firestore read needed)
+  const clientCtx = request.data?.tripContext || {}
   await requireTripMember(tripId, user)
 
-  // Fetch cities from Firestore
-  const snapshot = await db
-    .collection('travelCities')
-    .where('tripId', '==', tripId)
-    .limit(20)
-    .get()
-  const cities = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  // Fetch cities + trip doc in parallel
+  const [citiesSnap, tripSnap] = await Promise.all([
+    db.collection('travelCities').where('tripId', '==', tripId).limit(40).get(),
+    db.collection('trips').doc(tripId).get(),
+  ])
+  const allCities = citiesSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .filter((c) => c.status !== 'removed')
+
+  // Deduplicate by city name (case-insensitive). Among duplicates keep the one
+  // with the highest readiness score (most data filled in).
+  const cityMap = new Map()
+  for (const c of allCities) {
+    const key = String(c.city || '').trim().toLowerCase()
+    if (!key) continue
+    const existing = cityMap.get(key)
+    if (!existing || (c.readiness || 0) > (existing.readiness || 0)) {
+      cityMap.set(key, c)
+    }
+  }
+  const cities = Array.from(cityMap.values())
+
   if (!cities.length) {
-    return { priorities: [], overview: 'No hay ciudades añadidas todavía.', transfers: [], warnings: [] }
+    return { priorities: [], overview: 'No hay ciudades añadidas todavía.', warnings: [] }
   }
 
-  const tripCtx = buildTripContext(groupProfile, subgroups)
+  const tripDoc = tripSnap.data() || {}
+  const tripCtx = buildTripContext(groupProfile, subgroups, '')
+  const windowCtx = buildTripWindow(tripDoc, clientCtx)
   const baseCities = cities.filter((c) => c.isBase)
   const normalCities = cities.filter((c) => !c.isBase)
 
   const cityList = cities
     .map((c) => {
-      const tag = c.isBase ? '[BASE/CASA]' : '[PERNOCTAR]'
-      return `- ${c.city} (${c.country}) ${tag}${c.dates && c.dates !== 'Fechas por definir' ? ` · ${c.dates}` : ''}${c.transfer && c.transfer !== 'Traslado por definir' ? ` · ${c.transfer}` : ''}${c.angle ? ` — ${c.angle}` : ''}`
+      const tag = c.isBase ? '[BASE/CASA — sin pernoctar]' : '[PERNOCTAR]'
+      const dates = c.dates && !['Fechas por definir', 'Base / casa'].includes(c.dates) ? ` · ${c.dates}` : ''
+      const transfer = c.transfer && !['Traslado por definir', 'Sin traslado (base)'].includes(c.transfer) ? ` · traslado: ${c.transfer}` : ''
+      const angle = c.angle && c.angle !== 'Pendiente de analizar con IA' ? ` — ${c.angle}` : ''
+      return `- ${c.city} (${c.country}) ${tag}${dates}${transfer}${angle}`
     })
     .join('\n')
 
@@ -2145,10 +2439,10 @@ export const assessTripPlan = onCall(functionOptions, async (request) => {
       rank: i + 1,
       viability: 'media',
       suggestedDays: c.isBase ? 0 : 3,
-      reasoning: 'Pendiente de análisis.',
+      reasoning: 'Pendiente de análisis IA.',
       transfers: [],
     })),
-    overview: 'Análisis no disponible en modo offline.',
+    overview: 'Análisis IA no disponible. Asegúrate de que las funciones estén desplegadas.',
     warnings: [],
   }
 
@@ -2163,23 +2457,10 @@ export const assessTripPlan = onCall(functionOptions, async (request) => {
           properties: {
             city: { type: SchemaType.STRING },
             rank: { type: SchemaType.NUMBER, description: '1 = máxima prioridad' },
-            viability: {
-              type: SchemaType.STRING,
-              enum: ['alta', 'media', 'baja', 'no-recomendada'],
-            },
-            suggestedDays: {
-              type: SchemaType.NUMBER,
-              description: 'Días recomendados en esta ciudad. 0 si es base o day-trip.',
-            },
-            reasoning: {
-              type: SchemaType.STRING,
-              description: '1-2 frases explicando la recomendación.',
-            },
-            transfers: {
-              type: SchemaType.ARRAY,
-              items: { type: SchemaType.STRING },
-              description: 'Opciones de traslado recomendadas para llegar a esta ciudad.',
-            },
+            viability: { type: SchemaType.STRING, enum: ['alta', 'media', 'baja', 'no-recomendada'] },
+            suggestedDays: { type: SchemaType.NUMBER, description: 'Días a pasar en la ciudad. 0 si es base o day-trip desde base.' },
+            reasoning: { type: SchemaType.STRING, description: 'Max 1 frase corta (≤20 palabras) explicando la recomendación.' },
+            transfers: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Opciones de traslado recomendadas.' },
           },
           required: ['city', 'rank', 'viability', 'suggestedDays', 'reasoning', 'transfers'],
         },
@@ -2187,7 +2468,7 @@ export const assessTripPlan = onCall(functionOptions, async (request) => {
       warnings: {
         type: SchemaType.ARRAY,
         items: { type: SchemaType.STRING },
-        description: 'Conflictos o problemas detectados en el plan (fechas solapadas, distancias imposibles, etc.).',
+        description: 'Problemas detectados: demasiadas ciudades, distancias inviables, días insuficientes, etc.',
       },
     },
     required: ['overview', 'priorities', 'warnings'],
@@ -2198,31 +2479,33 @@ Eres un experto planificador de viajes familiares por España y Europa.
 
 ${tripCtx}
 
-Ciudades en el plan (${cities.length} total, ${baseCities.length} base, ${normalCities.length} pernoctar):
+${windowCtx ? `CONTEXTO DE FECHAS DEL VIAJE:\n${windowCtx}` : ''}
+
+Ciudades en el plan "Después" (${cities.length} total: ${baseCities.length} base, ${normalCities.length} para pernoctar):
 ${cityList}
 
-Analiza la viabilidad de este plan y devuelve:
+TAREA: Analiza la viabilidad de este plan teniendo en cuenta la ventana de tiempo disponible y devuelve:
 1. Un resumen ejecutivo de 2-3 frases.
-2. Cada ciudad con: prioridad (1 = primera), viabilidad, días recomendados, razonamiento breve y opciones de traslado.
-3. Advertencias si detectas problemas (demasiadas ciudades, distancias imposibles, fechas solapadas, etc.).
+2. Cada ciudad con: rango de prioridad (1 = visitar primero), viabilidad, días recomendados, razonamiento y traslados.
+3. Advertencias si hay problemas.
 
-Criterios:
-- Las ciudades [BASE/CASA] tienen 0 días (no se pernocta, ya viven ahí o tienen alojamiento).
-- Para las ciudades cercanas a la base, prefiere day-trips en vez de pernoctar.
-- Considera que el grupo viaja con niños — evita planes muy intensos.
-- Si hay demasiadas ciudades para el tiempo disponible, recomienda cuáles priorizar y cuáles combinar.
-- Los traslados desde/hacia la base deben ser realistas (coche, tren, bus).
+CRITERIOS IMPORTANTES:
+- Las ciudades [BASE/CASA] tienen 0 días de pernoctar — el grupo ya tiene alojamiento ahí.
+- Para ciudades cercanas a la base (≤1.5h), recomienda day-trips en lugar de pernoctar.
+- Ten en cuenta la ventana disponible — si hay 10 días y 5 ciudades de pernoctar, advierte que es demasiado.
+- Prioriza calidad de la experiencia sobre cantidad de ciudades.
+- El grupo viaja con niños — evita planes con demasiado desplazamiento en un día.
+- Los traslados deben ser realistas (AVE, bus, coche).
 - Escribe en español, tono cercano y familiar.
 
 Devuelve JSON con el esquema indicado.
 `.trim()
 
-  return generateJson(schema, prompt, fallback)
+  return generateJson(schema, prompt, fallback, { maxTokens: 16384 })
 })
 
 // ─── chatWithPlanner ─────────────────────────────────────────────────────────
-// Conversational trip planner. Receives the current cities, group profile,
-// conversation history, and a new user message. Returns a text reply.
+// Conversational trip planner with full trip date context.
 export const chatWithPlanner = onCall(functionOptions, async (request) => {
   const user = requireAuth(request)
   const tripId = cleanTripId(request.data?.tripId)
@@ -2232,46 +2515,52 @@ export const chatWithPlanner = onCall(functionOptions, async (request) => {
     : []
   const history = Array.isArray(request.data?.history) ? request.data.history : []
   const message = cleanText(request.data?.message, '')
+  const clientCtx = request.data?.tripContext || {}
   await requireTripMember(tripId, user)
 
   if (!message.trim()) return { reply: '' }
 
-  // Fetch cities from Firestore for fresh context
-  const snapshot = await db
-    .collection('travelCities')
-    .where('tripId', '==', tripId)
-    .limit(20)
-    .get()
-  const cities = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  // Fetch cities + trip doc in parallel
+  const [citiesSnap, tripSnap] = await Promise.all([
+    db.collection('travelCities').where('tripId', '==', tripId).limit(20).get(),
+    db.collection('trips').doc(tripId).get(),
+  ])
+  const cities = citiesSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const tripDoc = tripSnap.data() || {}
 
-  const tripCtx = buildTripContext(groupProfile, subgroups)
+  const tripCtx = buildTripContext(groupProfile, subgroups, '')
+  const windowCtx = buildTripWindow(tripDoc, clientCtx)
+
   const cityList = cities.length
     ? cities
         .map((c) => {
           const tag = c.isBase ? '[BASE/CASA]' : '[PERNOCTAR]'
+          const dates = c.dates && !['Fechas por definir', 'Base / casa'].includes(c.dates) ? ` · ${c.dates}` : ''
           const trips = Array.isArray(c.dayTrips) && c.dayTrips.length
-            ? ` · day-trips: ${c.dayTrips.map((t) => t.label).join(', ')}`
+            ? ` · excursiones: ${c.dayTrips.map((t) => t.label).join(', ')}`
             : ''
-          return `- ${c.city} (${c.country}) ${tag}${c.dates && c.dates !== 'Fechas por definir' ? ` · ${c.dates}` : ''}${trips}`
+          return `- ${c.city} (${c.country}) ${tag}${dates}${trips}`
         })
         .join('\n')
     : '(sin ciudades añadidas todavía)'
 
   const systemPrompt = `
-Eres el planificador de viaje familiar de la app de viajes. Tu rol es ayudar a decidir qué ciudades visitar, cómo organizar los días, qué traslados usar y qué planes son viables para el grupo.
+Eres el planificador de viaje familiar de la app. Ayudas a decidir qué ciudades visitar, cómo organizar los días, qué traslados usar y qué planes son viables.
 
 ${tripCtx}
+
+${windowCtx ? `FECHAS DEL VIAJE:\n${windowCtx}` : ''}
 
 Ciudades actuales en el plan:
 ${cityList}
 
-Instrucciones:
-- Responde siempre en español, tono cercano e informal (como un amigo experto en viajes).
-- Sé directo y concreto — nada de vaguedades.
-- Si el usuario pregunta sobre viabilidad, da tu opinión clara (sí/no/depende) con razonamiento breve.
-- Si sugieres cambios al plan, explica brevemente por qué.
-- Si no tienes suficiente información para responder, pídela con una sola pregunta.
-- Máximo 3-4 párrafos cortos por respuesta.
+INSTRUCCIONES:
+- Responde en español, tono informal y directo (como un amigo experto en viajes).
+- Da opiniones claras: "sí vale", "no merece la pena", "depende de X".
+- Sé concreto: sugiere traslados reales, horarios orientativos, qué hacer en cada parada.
+- Recuerda siempre la ventana de fechas disponible al sugerir planes.
+- El grupo viaja con niños — sin planes agotadores.
+- Máximo 3-4 párrafos cortos. Sin listas largas ni bullets excesivos.
 `.trim()
 
   const safeHistory = history.slice(-10).map((turn) => ({
@@ -2279,6 +2568,6 @@ Instrucciones:
     content: String(turn.content || ''),
   }))
 
-  const reply = await generateText(systemPrompt, safeHistory, message, 'No pude generar una respuesta. Intenta de nuevo.')
+  const reply = await generateText(systemPrompt, safeHistory, message, 'No pude generar respuesta. Intenta de nuevo.')
   return { reply }
 })

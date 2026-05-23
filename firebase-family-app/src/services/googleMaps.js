@@ -1,4 +1,4 @@
-const defaultLibraries = ['core', 'maps', 'marker', 'routes', 'places', 'geocoding']
+const defaultLibraries = ['core', 'maps', 'marker', 'routes', 'geocoding']
 let loadingPromise
 let libraryImportPromise = Promise.resolve()
 const loadedLibraries = new Set()

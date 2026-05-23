@@ -17,12 +17,21 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      'no-unused-vars': 'warn',
+      'react-hooks/immutability': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
   },
   {
     files: ['functions/**/*.js'],
     extends: [js.configs.recommended],
     languageOptions: {
       globals: globals.nodeBuiltin,
+    },
+    rules: {
+      'no-unused-vars': 'warn',
     },
   },
 ])

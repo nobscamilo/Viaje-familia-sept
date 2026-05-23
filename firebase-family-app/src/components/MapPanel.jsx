@@ -127,10 +127,11 @@ function CitySelectionPanel({ budgetOptionIds, city, options, votes }) {
   )
 }
 
-function TripMap({ city, destinationCoords, options, routeMode }) {
+function TripMap({ budgetOptionIds, city, destinationCoords, options, routeMode }) {
   const mapRef = useRef(null)
   const [mapError, setMapError] = useState('')
   const [routeSummaries, setRouteSummaries] = useState({})
+  const [originLabel, setOriginLabel] = useState('')
   const hasDestination = Boolean(destinationCoords?.lat && destinationCoords?.lng)
   const hasRealMap = hasMapsKey() && hasDestination
 
@@ -138,48 +139,52 @@ function TripMap({ city, destinationCoords, options, routeMode }) {
     if (!hasRealMap || !mapRef.current) return undefined
 
     let cancelled = false
-    const mapItems = []
+    const mapItems = []   // markers, renderers, polylines to clean up
     setMapError('')
     setRouteSummaries({})
+    setOriginLabel('')
 
-    loadGoogleMapsLibraries(['core', 'maps', 'marker', 'routes'])
+    loadGoogleMapsLibraries(['core', 'maps', 'marker', 'routes', 'geometry'])
       .then(({ google, libraries }) => {
         if (cancelled || !mapRef.current) return
+
         const mapsLibrary = libraries.maps || google.maps
         const coreLibrary = libraries.core || google.maps
         const markerLibrary = libraries.marker || google.maps
         const routesLibrary = libraries.routes || google.maps
+
         const GoogleMap = mapsLibrary.Map || google.maps.Map
         const InfoWindow = mapsLibrary.InfoWindow || google.maps.InfoWindow
-        const Polyline = mapsLibrary.Polyline || google.maps.Polyline
         const LatLng = coreLibrary.LatLng || google.maps.LatLng
         const LatLngBounds = coreLibrary.LatLngBounds || google.maps.LatLngBounds
-        const Point = coreLibrary.Point || google.maps.Point
-        const Size = coreLibrary.Size || google.maps.Size
-        const Marker = markerLibrary.Marker || google.maps.Marker
+        const AdvancedMarkerElement = markerLibrary.AdvancedMarkerElement || null
+
+        // DirectionsService + DirectionsRenderer — available in browser Maps JS SDK
         const DirectionsService = routesLibrary.DirectionsService || google.maps.DirectionsService
         const DirectionsRenderer = routesLibrary.DirectionsRenderer || google.maps.DirectionsRenderer
-        const DirectionsStatus = routesLibrary.DirectionsStatus || google.maps.DirectionsStatus
-        const TravelMode = routesLibrary.TravelMode || google.maps.TravelMode
+        const TravelMode = google.maps.TravelMode || {
+          DRIVING: 'DRIVING', WALKING: 'WALKING', TRANSIT: 'TRANSIT', BICYCLING: 'BICYCLING',
+        }
+
+        const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID'
 
         const map = new GoogleMap(mapRef.current, {
           center: destinationCoords,
           zoom: 12,
+          mapId: MAP_ID,
           mapTypeControl: false,
           fullscreenControl: false,
           streetViewControl: false,
           clickableIcons: false,
-          styles: [
-            {
-              featureType: 'poi.business',
-              stylers: [{ visibility: 'off' }],
-            },
-          ],
+          styles: MAP_ID === 'DEMO_MAP_ID'
+            ? [{ featureType: 'poi.business', stylers: [{ visibility: 'off' }] }]
+            : undefined,
         })
 
         const bounds = new LatLngBounds()
         const infoWindow = new InfoWindow()
         const directionsService = new DirectionsService()
+
         const destinationPosition = new LatLng(destinationCoords.lat, destinationCoords.lng)
         const isMadrid = city === 'Madrid'
 
@@ -192,137 +197,225 @@ function TripMap({ city, destinationCoords, options, routeMode }) {
         }
         const defaultColor = { fill: '#475569', stroke: '#334155' }
 
-        function makePinIcon(label, category) {
+        // Route colors per category
+        const routeColors = {
+          lodging: '#2563eb',
+          food: '#ea580c',
+          activities: '#0d9488',
+          transport: '#7c3aed',
+          transfer: '#7c3aed',
+        }
+
+        function makePinElement(label, category) {
           const { fill, stroke } = categoryColors[category] || defaultColor
           const text = (label || '').substring(0, 3)
           const fontSize = text.length > 2 ? 8 : 10
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
+          const el = document.createElement('div')
+          el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50" style="display:block">
             <path d="M20 1C9.507 1 1 9.507 1 20c0 14.255 19 29 19 29S39 34.255 39 20C39 9.507 30.493 1 20 1z" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
             <circle cx="20" cy="20" r="11" fill="rgba(255,255,255,0.25)"/>
             <text x="20" y="${20 + fontSize / 2 + 1}" font-family="Arial,Helvetica,sans-serif" font-size="${fontSize}" font-weight="700" fill="#fff" text-anchor="middle">${text}</text>
           </svg>`
-          return {
-            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-            scaledSize: new Size(40, 50),
-            anchor: new Point(20, 50),
-          }
+          el.style.cssText = 'cursor:pointer;transform-origin:bottom center'
+          return el
         }
 
-        function makeDestinationIcon(label) {
-          const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54">
+        function makeDestinationElement(label) {
+          const el = document.createElement('div')
+          el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54" style="display:block">
             <path d="M22 1C10.402 1 1 10.402 1 22c0 15.681 21 31 21 31S43 37.681 43 22C43 10.402 33.598 1 22 1z" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>
             <circle cx="22" cy="22" r="13" fill="rgba(255,255,255,0.2)"/>
             <text x="22" y="17" font-family="Arial,Helvetica,sans-serif" font-size="8" font-weight="800" fill="#fff" text-anchor="middle">${label}</text>
             <text x="22" y="28" font-size="14" text-anchor="middle">🏁</text>
           </svg>`
-          return {
-            url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-            scaledSize: new Size(44, 54),
-            anchor: new Point(22, 54),
-          }
+          el.style.cssText = 'transform-origin:bottom center'
+          return el
         }
 
-        const destinationMarker = new Marker({
-          map,
-          position: destinationPosition,
-          title: isMadrid ? 'IFEMA / MADRING' : `Centro de ${city}`,
-          icon: makeDestinationIcon(isMadrid ? 'F1' : 'C'),
-          zIndex: 100,
-        })
+        function makeOriginElement(label) {
+          const el = document.createElement('div')
+          el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="54" viewBox="0 0 44 54" style="display:block">
+            <path d="M22 1C10.402 1 1 10.402 1 22c0 15.681 21 31 21 31S43 37.681 43 22C43 10.402 33.598 1 22 1z" fill="#1d4ed8" stroke="#1e3a8a" stroke-width="2"/>
+            <circle cx="22" cy="22" r="13" fill="rgba(255,255,255,0.2)"/>
+            <text x="22" y="27" font-size="16" text-anchor="middle">🏨</text>
+          </svg><div style="position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);background:#1d4ed8;color:#fff;font-size:10px;font-weight:700;white-space:nowrap;padding:2px 6px;border-radius:4px">${label}</div>`
+          el.style.cssText = 'position:relative;transform-origin:bottom center;cursor:default'
+          return el
+        }
+
+        function makeMarker(position, content, title, zIndex) {
+          if (AdvancedMarkerElement) {
+            return new AdvancedMarkerElement({ map, position, content, title, zIndex })
+          }
+          const LegacyMarker = google.maps.Marker
+          return new LegacyMarker({ map, position, title, zIndex })
+        }
+
+        // ── Determine route origin: budget lodging > city center ──────────────
+        const locatedOptions = options.filter((option) => option.coords)
+
+        const budgetLodging = locatedOptions.find(
+          (option) => option.category === 'lodging' && budgetOptionIds.includes(option.id),
+        )
+        // Also consider voted lodging as fallback
+        const votedLodging = !budgetLodging
+          ? locatedOptions.find((option) => option.category === 'lodging')
+          : null
+        const originOption = budgetLodging || votedLodging || null
+
+        // originCoords: from lodging if available, else city center
+        const originCoords = originOption
+          ? { lat: originOption.coords.lat, lng: originOption.coords.lng }
+          : { lat: destinationCoords.lat, lng: destinationCoords.lng }
+
+        const originLatLng = new LatLng(originCoords.lat, originCoords.lng)
+        const originName = originOption ? originOption.title : (isMadrid ? 'IFEMA / MADRING' : `Centro de ${city}`)
+
+        if (!cancelled) setOriginLabel(originOption ? originOption.title : '')
+
+        // ── async route fetcher using DirectionsService ───────────────────────
+        function fetchRoute(option) {
+          return new Promise((resolve) => {
+            // destination for lodging = city reference point (IFEMA/centro)
+            // destination for everything else = the option's own position
+            const isOriginOption = originOption && option.id === originOption.id
+            if (isOriginOption) {
+              // Lodging itself: show route to IFEMA / city center
+              const dest = { lat: destinationCoords.lat, lng: destinationCoords.lng }
+              directionsService.route(
+                {
+                  origin: originLatLng,
+                  destination: dest,
+                  travelMode: TravelMode[routeMode] || TravelMode.DRIVING,
+                },
+                (result, status) => {
+                  if (cancelled) { resolve(); return }
+                  if (status === 'OK') {
+                    const leg = result.routes[0]?.legs?.[0]
+                    const duration = leg?.duration?.text || '?'
+                    const distance = leg?.distance?.text || '?'
+                    setRouteSummaries((cur) => ({
+                      ...cur,
+                      [option.id]: { title: option.title, code: option.code, duration, distance, status: `${duration} · ${distance}` },
+                    }))
+                    const renderer = new DirectionsRenderer({
+                      map,
+                      directions: result,
+                      suppressMarkers: true,
+                      polylineOptions: { strokeColor: '#dc2626', strokeOpacity: 0.6, strokeWeight: 3 },
+                    })
+                    mapItems.push(renderer)
+                  } else {
+                    setRouteSummaries((cur) => ({
+                      ...cur,
+                      [option.id]: { title: option.title, code: option.code, status: 'Sin ruta disponible' },
+                    }))
+                  }
+                  resolve()
+                },
+              )
+              return
+            }
+
+            // All other options: route FROM origin TO option
+            directionsService.route(
+              {
+                origin: originLatLng,
+                destination: { lat: option.coords.lat, lng: option.coords.lng },
+                travelMode: TravelMode[routeMode] || TravelMode.DRIVING,
+              },
+              (result, status) => {
+                if (cancelled) { resolve(); return }
+                if (status === 'OK') {
+                  const leg = result.routes[0]?.legs?.[0]
+                  const duration = leg?.duration?.text || '?'
+                  const distance = leg?.distance?.text || '?'
+                  setRouteSummaries((cur) => ({
+                    ...cur,
+                    [option.id]: { title: option.title, code: option.code, duration, distance, status: `${duration} · ${distance}` },
+                  }))
+                  const strokeColor = routeColors[option.category] || '#475569'
+                  const renderer = new DirectionsRenderer({
+                    map,
+                    directions: result,
+                    suppressMarkers: true,
+                    polylineOptions: { strokeColor, strokeOpacity: 0.65, strokeWeight: 4 },
+                  })
+                  mapItems.push(renderer)
+                } else {
+                  setRouteSummaries((cur) => ({
+                    ...cur,
+                    [option.id]: { title: option.title, code: option.code, status: 'Sin ruta disponible' },
+                  }))
+                }
+                resolve()
+              },
+            )
+          })
+        }
+
+        // ── Draw destination / city-reference marker ──────────────────────────
+        const destinationMarker = makeMarker(
+          destinationPosition,
+          makeDestinationElement(isMadrid ? 'F1' : 'C'),
+          isMadrid ? 'IFEMA / MADRING' : `Centro de ${city}`,
+          100,
+        )
         mapItems.push(destinationMarker)
         bounds.extend(destinationPosition)
 
-        const locatedOptions = options.filter((option) => option.coords)
+        // ── Draw origin marker (lodging) if different from destination ─────────
+        if (originOption) {
+          const shortLabel = originOption.code || '🏨'
+          const originMarker = makeMarker(
+            originLatLng,
+            makeOriginElement(shortLabel),
+            originOption.title,
+            90,
+          )
+          mapItems.push(originMarker)
+          bounds.extend(originLatLng)
+        }
 
+        // ── Draw option markers and request routes ────────────────────────────
         locatedOptions.forEach((option) => {
           const position = new LatLng(option.coords.lat, option.coords.lng)
-          const marker = new Marker({
-            map,
-            position,
-            title: option.title,
-            icon: makePinIcon(option.code, option.category),
-            zIndex: 10,
-          })
-          const fallbackLine = new Polyline({
-            map,
-            path: [position, destinationPosition],
-            geodesic: true,
-            strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
-            strokeOpacity: 0.55,
-            strokeWeight: 3,
-          })
+          const isOriginOption = originOption && option.id === originOption.id
 
-          const routeLabel = routeModes[routeMode]?.label || 'Ruta'
-          marker.routeStatus = option.transit
-          setRouteSummaries((current) => ({
-            ...current,
-            [option.id]: {
-              title: option.title,
-              code: option.code,
-              status: option.id === 'f1-madring' ? 'Destino de referencia' : 'Calculando...',
-            },
-          }))
+          // Skip rendering a separate marker for the origin lodging (already drawn above)
+          if (!isOriginOption) {
+            const pinEl = makePinElement(option.code, option.category)
+            const marker = makeMarker(position, pinEl, option.title, 10)
 
-          marker.addListener('click', () => {
-            infoWindow.setContent(
-              `<strong>${option.title}</strong><br>${routeLabel}<br>${marker.routeStatus || option.transit}<br>${option.aiScore}/100`,
-            )
-            infoWindow.open({ anchor: marker, map })
-          })
-
-          if (option.id !== 'f1-madring') {
-            directionsService.route(
-              {
-                origin: position,
-                destination: destinationPosition,
-                travelMode: TravelMode[routeMode],
-              },
-              (result, status) => {
-                if (status !== DirectionsStatus.OK || !result) {
-                  marker.routeStatus = 'Sin tiempo disponible'
-                  setRouteSummaries((current) => ({
-                    ...current,
-                    [option.id]: {
-                      title: option.title,
-                      code: option.code,
-                      status: 'Sin tiempo disponible',
-                    },
-                  }))
-                  return
-                }
-                const leg = result.routes?.[0]?.legs?.[0]
-                const duration = leg?.duration?.text || 'Tiempo no disponible'
-                const distance = leg?.distance?.text || ''
-                marker.routeStatus = `${duration}${distance ? ` · ${distance}` : ''}`
-                setRouteSummaries((current) => ({
-                  ...current,
-                  [option.id]: {
-                    title: option.title,
-                    code: option.code,
-                    duration,
-                    distance,
-                    status: `${duration}${distance ? ` · ${distance}` : ''}`,
-                  },
-                }))
-                fallbackLine.setMap(null)
-                const renderer = new DirectionsRenderer({
-                  directions: result,
-                  map,
-                  preserveViewport: true,
-                  suppressMarkers: true,
-                  polylineOptions: {
-                    strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
-                    strokeOpacity: 0.72,
-                    strokeWeight: 4,
-                  },
-                })
-                mapItems.push(renderer)
-              },
-            )
+            const openInfo = () => {
+              const summary = routeSummaries[option.id]
+              const routeLabel = routeModes[routeMode]?.label || 'Ruta'
+              infoWindow.setContent(
+                `<strong>${option.title}</strong><br>${routeLabel} desde ${originName}: ${summary?.status || '…'}`,
+              )
+              infoWindow.open({ anchor: marker, map })
+            }
+            if (marker.addListener) {
+              marker.addListener('click', openInfo)
+            } else {
+              pinEl.addEventListener('click', openInfo)
+            }
+            mapItems.push(marker)
+            bounds.extend(position)
           }
 
-          mapItems.push(marker, fallbackLine)
-          bounds.extend(position)
+          // Mark as "Calculando..." before fetch
+          if (option.id !== 'f1-madring') {
+            setRouteSummaries((cur) => ({
+              ...cur,
+              [option.id]: {
+                title: option.title,
+                code: option.code,
+                status: 'Calculando...',
+              },
+            }))
+            fetchRoute(option)
+          }
         })
 
         if (locatedOptions.length) {
@@ -338,9 +431,13 @@ function TripMap({ city, destinationCoords, options, routeMode }) {
 
     return () => {
       cancelled = true
-      mapItems.forEach((item) => item.setMap(null))
+      mapItems.forEach((item) => {
+        if (!item) return
+        if (typeof item.setMap === 'function') item.setMap(null)
+        else if ('map' in item) item.map = null
+      })
     }
-  }, [city, destinationCoords, hasRealMap, options, routeMode])
+  }, [city, destinationCoords, hasRealMap, options, routeMode, budgetOptionIds])
 
   if (!hasRealMap || mapError) {
     return <ConceptMap city={city} mapOptions={options} note={mapError} />
@@ -352,7 +449,10 @@ function TripMap({ city, destinationCoords, options, routeMode }) {
       <div className="map-caption">
         <CheckCircle2 size={16} aria-hidden="true" />
         <span>
-          Rutas en modo {routeModes[routeMode]?.label || 'ruta'} hacia {city === 'Madrid' ? 'IFEMA / MADRING' : `centro de ${city}`}
+          Rutas en modo {routeModes[routeMode]?.label || 'ruta'}
+          {originLabel
+            ? ` desde ${originLabel}`
+            : ` hacia ${city === 'Madrid' ? 'IFEMA / MADRING' : `centro de ${city}`}`}
         </span>
       </div>
       <div className="map-legend">
@@ -367,14 +467,19 @@ function TripMap({ city, destinationCoords, options, routeMode }) {
           .filter((option) => option.coords && option.id !== 'f1-madring')
           .map((option) => {
             const summary = routeSummaries[option.id]
+            const isOrigin = originLabel && originLabel === option.title
             return (
               <article key={option.id} className={`route-item-${option.category || 'default'}`}>
                 <span className={`route-code-badge ${option.category}`}>{option.code}</span>
                 <div className="route-item-info">
                   <strong>{option.title}</strong>
-                  <small>{categoryConfig[option.category]?.shortLabel || option.category}</small>
+                  <small>
+                    {isOrigin ? '📍 Alojamiento base' : categoryConfig[option.category]?.shortLabel || option.category}
+                  </small>
                 </div>
-                <em className={summary?.duration ? 'route-time-ok' : ''}>{summary?.status || 'Calculando...'}</em>
+                <em className={summary?.duration ? 'route-time-ok' : ''}>
+                  {summary?.status || 'Calculando...'}
+                </em>
               </article>
             )
           })}
@@ -447,7 +552,7 @@ export default function MapPanel({
         <MapPinned size={20} aria-hidden="true" />
         <div>
           <p className="eyebrow">Mapa de la ciudad activa</p>
-          <h2>{city}: {options.length ? 'opciones ubicadas' : 'sin opciones guardadas todavía'}</h2>
+          <h2>{city}: {options.length ? `${options.length} opción${options.length > 1 ? 'es' : ''} seleccionada${options.length > 1 ? 's' : ''}` : 'sin opciones aceptadas todavía'}</h2>
         </div>
       </div>
 
@@ -497,23 +602,23 @@ export default function MapPanel({
         </span>
         <span>
           {categoryFilter === 'all'
-            ? `${options.length} opciones visibles`
-            : `${visibleOptions.length} de ${options.length} opciones`}
+            ? `${options.length} seleccionada${options.length !== 1 ? 's' : ''} (votadas/presupuesto)`
+            : `${visibleOptions.length} de ${options.length} seleccionadas`}
         </span>
       </div>
 
       {options.length === 0 ? (
         <div className="map-empty-callout">
-          <strong>{city} ya puede mostrarse en el mapa.</strong>
+          <strong>El mapa solo muestra opciones seleccionadas.</strong>
           <span>
-            Falta agregar hospedajes, comida o planes de esta ciudad para que aparezcan
-            marcadores y tiempos de desplazamiento.
+            Vota, añade al presupuesto o acepta opciones de hospedaje, comida o planes para que aparezcan aquí con sus rutas.
           </span>
         </div>
       ) : null}
 
       <div className="map-panel-layout">
         <TripMap
+          budgetOptionIds={budgetOptionIds}
           city={city}
           destinationCoords={destinationCoords}
           options={visibleOptions}
