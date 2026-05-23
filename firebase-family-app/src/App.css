@@ -9742,6 +9742,7 @@ table, tr, td, th {
 .comparator-table th {
   color: var(--muted) !important;
   border-bottom: 1px solid var(--border) !important;
+  background: transparent !important;
 }
 
 .comparator-table td {
@@ -9752,6 +9753,181 @@ table, tr, td, th {
 .comparator-table tr:hover td {
   background: var(--surface-soft) !important;
 }
+
+/* ── OVERVIEW PANEL DARK OVERRIDES ── */
+.overview-panel {
+  color: var(--text) !important;
+}
+
+.overview-stat {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.overview-stat-num {
+  color: var(--ink) !important;
+}
+
+.overview-stat-label {
+  color: var(--muted) !important;
+}
+
+.overview-category-card {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+.overview-category-card:hover {
+  border-color: var(--card-accent, var(--violet)) !important;
+  box-shadow: 0 4px 16px rgba(167, 139, 250, 0.08) !important;
+  background: var(--surface-input) !important;
+}
+
+.overview-card-count {
+  color: var(--muted) !important;
+}
+
+.overview-card-label {
+  color: var(--ink) !important;
+}
+
+.overview-card-top {
+  color: var(--muted) !important;
+}
+
+.overview-card-empty {
+  color: var(--card-accent, var(--violet)) !important;
+}
+
+.overview-card-budget-tag {
+  background: rgba(52, 211, 153, 0.1) !important;
+  color: var(--green) !important;
+  border: 1px solid rgba(52, 211, 153, 0.2) !important;
+}
+
+.overview-cities-list {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.overview-city-name {
+  color: var(--ink) !important;
+}
+
+.overview-city-dates {
+  color: var(--muted) !important;
+}
+
+.overview-action-btn {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.overview-action-btn:hover {
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+  background: var(--accent-pale) !important;
+}
+
+/* ── QUICK ACTION BAR DARK OVERRIDES ── */
+.quick-action-bar {
+  background: var(--surface-soft) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.qab-sep {
+  background: var(--border) !important;
+}
+
+.qab-btn {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.qab-btn:hover:not(:disabled) {
+  border-color: var(--violet) !important;
+  color: var(--violet) !important;
+  background: var(--surface-soft) !important;
+}
+
+.qab-btn-primary {
+  background: var(--violet) !important;
+  color: #09090b !important;
+  border-color: var(--violet) !important;
+}
+
+.qab-btn-primary:hover:not(:disabled) {
+  background: #c084fc !important;
+  border-color: #c084fc !important;
+  color: #09090b !important;
+}
+
+.qab-btn-vote {
+  background: linear-gradient(135deg, var(--violet), rgba(167, 139, 250, 0.5)) !important;
+  color: #09090b !important;
+  border-color: transparent !important;
+}
+
+.qab-btn-vote:hover:not(:disabled) {
+  opacity: 0.9 !important;
+}
+
+.qab-btn-voted {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+.qab-btn-voted:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25) !important;
+  color: #ef4444 !important;
+}
+
+.qab-meta {
+  color: var(--muted) !important;
+}
+
+.qab-stat {
+  color: var(--ink) !important;
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+}
+
+/* ── OTHER PANELS/INTERFACES DARK OVERRIDES ── */
+.itinerary-questions,
+.transport-planner,
+.subgroup-preview {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+
+.budget-add-chip.added {
+  background: rgba(167, 139, 250, 0.15) !important;
+  border-color: rgba(167, 139, 250, 0.35) !important;
+  color: var(--violet) !important;
+}
+
+.budget-add-chip.added:hover {
+  background: var(--violet) !important;
+  color: #09090b !important;
+}
+
+.payer-select-wrap select {
+  background: var(--surface-input) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--ink) !important;
+}
+
+.settle-ok {
+  color: var(--green) !important;
+}
+
 
 
 
