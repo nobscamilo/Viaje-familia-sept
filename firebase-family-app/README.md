@@ -78,7 +78,10 @@ APIs activadas:
 - Login con Google.
 - Pantalla de inicio obligatoria; sin sesión no se entra a la app.
 - Con sesión, se sincronizan opciones, votos, ciudades y estado de retirar/restaurar en Firestore.
-- Las opciones base se siembran automáticamente en Firestore cuando entra el primer usuario.
+- Dashboard de viajes con enlaces de invitación por código.
+- Cada viaje aísla opciones, votos, ciudades, búsquedas, grupos e itinerarios por `tripId`.
+- Madrid/F1 conserva y migra los datos existentes; los viajes nuevos empiezan vacíos.
+- Las opciones base se siembran automáticamente solo para Madrid/F1 cuando entra un admin.
 - Mapa real de Google Maps con marcadores y rutas hacia IFEMA / MADRING.
 - Selector de ruta: transporte público, andando o coche, con tiempos estimados visibles por opción.
 - Ciudades dinámicas con fechas, país, traslado e idea del plan.

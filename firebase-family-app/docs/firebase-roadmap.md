@@ -13,6 +13,10 @@
 - Permitir votos por familiar en `votes`. Listo en primera versión.
 - Marcar opciones como `active`, `pending` o `removed`. Listo en primera versión.
 - Adultos agregan opciones directamente; menores quedan como pendientes. Listo.
+- Aislar opciones, votos, ciudades, grupos, búsquedas e itinerarios por `tripId`. Listo.
+- Migrar datos legacy de Madrid/F1 a `tripId = madrid-f1-sept-2026`. Listo.
+- Crear viajes nuevos vacíos, sin semillas de Madrid/F1. Listo.
+- Unirse por código mediante Cloud Function y leer datos solo como miembro del viaje. Listo.
 
 ## Fase 3: IA
 

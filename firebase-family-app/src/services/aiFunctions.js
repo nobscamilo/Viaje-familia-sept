@@ -44,3 +44,27 @@ export async function generateItineraryWithAI(payload) {
   const result = await run(payload)
   return result.data
 }
+
+export async function reanalyzeOptionWithAI(payload) {
+  const run = callable('reanalyzeTripOption')
+  const result = await run(payload)
+  return result.data
+}
+
+export async function suggestDayTripsWithAI(payload) {
+  const run = callable('suggestDayTrips')
+  const result = await run(payload)
+  return result.data
+}
+
+export async function assessTripPlanWithAI(payload) {
+  const run = callable('assessTripPlan')
+  const result = await run(payload)
+  return result.data
+}
+
+export async function chatWithPlannerAI(payload) {
+  const run = callable('chatWithPlanner')
+  const result = await run(payload)
+  return result.data
+}

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CalendarDays,
-  Car,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   CloudOff,
-  Footprints,
+  ExternalLink,
   Heart,
   Home,
   Hotel,
@@ -14,6 +16,7 @@ import {
   LogIn,
   LogOut,
   MapPinned,
+  MessageCircle,
   Plane,
   Plus,
   Route,
@@ -24,6 +27,7 @@ import {
   TrainFront,
   Utensils,
   Users,
+  X,
 } from 'lucide-react'
 import './App.css'
 import {
@@ -41,10 +45,14 @@ import {
   isFirebaseConfigured,
 } from './services/firebaseClient'
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
-import { hasMapsKey, loadGoogleMaps } from './services/googleMaps'
+import { hasMapsKey, loadGoogleMapsLibraries } from './services/googleMaps'
 import {
   analyzeOptionWithAI,
+  assessTripPlanWithAI,
+  chatWithPlannerAI,
   generateItineraryWithAI,
+  reanalyzeOptionWithAI,
+  suggestDayTripsWithAI,
   suggestTransferWithAI,
   suggestFoodWithAI,
   suggestLodgingWithAI,
@@ -54,20 +62,42 @@ import {
   canUseFirestore,
   saveOptionVotes,
   saveSearchRequest,
+  saveTripBudget,
   saveTripOption,
-  saveTravelCity,
   saveTravelGroup,
+  saveTravelCity,
   saveUserProfile,
-  seedInitialTripOptions,
-  seedInitialTravelCities,
-  seedInitialTravelGroups,
+  seedMadridF1Data,
+  subscribeTripBudget,
   subscribeTripOptions,
   subscribeTravelCities,
   subscribeTravelGroups,
   subscribeVotes,
   updateTravelCityStatus,
   updateTripOptionStatus,
+  MADRID_F1_TRIP_ID,
 } from './services/tripRepository'
+import {
+  isTripAdmin,
+  seedMadridF1Trip,
+  subscribeUserTrips,
+} from './services/tripsRepository'
+import {
+  cityKey,
+  citySuggestionNames,
+  defaultBudgetOptionIdsForTrip,
+  defaultDraftForTrip,
+  defaultSearchDraftForTrip,
+  defaultTransferDraftForTrip,
+  groupSummary,
+  primaryTripCity,
+  tripDatesForSearch,
+} from './utils/tripDefaults'
+
+const TripDashboard = lazy(() => import('./components/TripDashboard'))
+const JoinTripModal = lazy(() => import('./components/JoinTripModal'))
+const PlaceSuggestionModal = lazy(() => import('./components/PlaceSuggestionModal'))
+const MapPanel = lazy(() => import('./components/MapPanel'))
 
 const tabs = [
   { id: 'lodging', icon: Home },
@@ -80,11 +110,50 @@ const tabs = [
 ]
 
 const optionWorkspaceTabs = ['lodging', 'activities', 'food']
+const placeSuggestionLimit = 50
+const suggestionPageSize = 10
 
 const targetLabels = {
   family: 'Toda la familia',
   f1: 'Grupo F1',
   'non-f1': 'Planes sin F1',
+}
+
+const defaultTravelGroup = {
+  id: 'grupo-del-viaje',
+  name: 'Grupo del viaje',
+  adults: 2,
+  childrenAges: [],
+  memberIds: [],
+  budgetOptionIds: [],
+  note: 'Ajusta el grupo cuando empiece la planeación.',
+}
+
+const childAgeByMemberId = {
+  juanfe: 9,
+  guillermo: 5,
+}
+
+const profileMemberFallbacks = {
+  'familia-sept-2026': familyMembers.map((member) => member.id),
+  'subgrupo-f1': ['camilo', 'juliana-bueno', 'fernando'],
+  'subgrupo-plan-suave': ['julian-papa', 'cielo', 'juliana-hermana', 'juliancho', 'juanfe', 'guillermo'],
+  pareja: ['camilo', 'juliana-bueno'],
+  'adultos-4': ['camilo', 'juliana-bueno', 'julian-papa', 'fernando'],
+}
+
+const previewVotes = {
+  'lodging-m': ['camilo'],
+  'lodging-b': ['juliana-bueno'],
+  'activity-retiro': ['cielo'],
+}
+
+function readPreviewMode() {
+  try {
+    return import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') === '1'
+  } catch {
+    return false
+  }
 }
 
 const ifemaCoords = { lat: 40.4625, lng: -3.6155 }
@@ -187,37 +256,12 @@ const obviousCityDefaults = {
     angle: 'Playa, centro histórico y plan suave con niños',
     coords: { lat: 36.7213, lng: -4.4214 },
   },
-}
-
-const citySuggestionNames = [
-  'Madrid',
-  'Barcelona',
-  'Valencia',
-  'Sevilla',
-  'París',
-  'Lisboa',
-  'Bilbao',
-  'León',
-  'Valladolid',
-  'Santander',
-  'Zaragoza',
-  'Córdoba',
-  'Granada',
-  'Málaga',
-]
-
-const routeModes = {
-  TRANSIT: {
-    label: 'Transporte público',
-    icon: TrainFront,
-  },
-  WALKING: {
-    label: 'Andando',
-    icon: Footprints,
-  },
-  DRIVING: {
-    label: 'Coche',
-    icon: Car,
+  segovia: {
+    country: 'España',
+    dates: 'Flexible',
+    transfer: 'Tren Avant o coche desde Madrid',
+    angle: 'Acueducto, Alcázar, comida castellana y paseo fácil',
+    coords: { lat: 40.9429, lng: -4.1088 },
   },
 }
 
@@ -277,14 +321,6 @@ function getHostname(url) {
   } catch {
     return 'link pendiente'
   }
-}
-
-function cityKey(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function displayImage(url) {
@@ -357,16 +393,19 @@ function buildCityDraft(draft) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 
+  const isBase = Boolean(draft.isBase)
   return {
     id: `${slug || 'ciudad'}-${Date.now()}`,
     city: draft.city.trim(),
     country: draft.country.trim() || 'Por definir',
-    dates: draft.dates.trim() || 'Fechas por definir',
-    transfer: draft.transfer.trim() || 'Traslado por definir',
+    dates: isBase ? 'Base / casa' : (draft.dates.trim() || 'Fechas por definir'),
+    transfer: isBase ? 'Sin traslado (base)' : (draft.transfer.trim() || 'Traslado por definir'),
     angle: draft.angle.trim() || 'Pendiente de analizar con IA',
     coords: draft.coords || obviousCityDefaults[cityKey(draft.city)]?.coords || null,
-    readiness: 18,
+    readiness: isBase ? 100 : 18,
     status: 'active',
+    isBase,
+    dayTrips: draft.dayTrips || [],
   }
 }
 
@@ -386,14 +425,15 @@ async function resolveCityCoords(city) {
   if (city.coords || !hasMapsKey()) return city
 
   try {
-    const google = await loadGoogleMaps()
-    const geocoder = new google.maps.Geocoder()
+    const { libraries } = await loadGoogleMapsLibraries(['geocoding'])
+    const { Geocoder, GeocoderStatus } = libraries.geocoding
+    const geocoder = new Geocoder()
     const address = [city.city, city.country === 'Por definir' ? '' : city.country]
       .filter(Boolean)
       .join(', ')
     const results = await new Promise((resolve) => {
       geocoder.geocode({ address }, (items, status) => {
-        resolve(status === google.maps.GeocoderStatus.OK ? items || [] : [])
+        resolve(status === GeocoderStatus.OK ? items || [] : [])
       })
     })
     const location = results[0]?.geometry?.location
@@ -434,29 +474,6 @@ function priceBreakdown(option, nights = 4) {
   return {
     primary: priceTotal ? `${currency(priceTotal)} total` : currency(priceNight),
     secondary: priceNight && priceTotal ? `${currency(priceNight)} referencia` : '',
-  }
-}
-
-function buildFamilyProfileDraft(draft) {
-  const slug = draft.name
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-
-  const childrenAges = draft.childrenAges
-    .split(',')
-    .map((age) => Number(age.trim()))
-    .filter((age) => Number.isFinite(age) && age > 0 && age < 18)
-
-  return {
-    id: `${slug || 'grupo'}-${Date.now()}`,
-    name: draft.name.trim(),
-    adults: Math.max(1, Number(draft.adults) || 1),
-    childrenAges,
-    note: draft.note.trim() || 'Grupo personalizado',
   }
 }
 
@@ -527,10 +544,308 @@ function parseTripDates(value) {
   }
 }
 
-function groupSummary(profile) {
-  const children = profile.childrenAges?.length || 0
-  const total = (Number(profile.adults) || 0) + children
-  return `${total} viajeros · ${profile.adults} adultos · ${children} niños`
+function LoadingScreen({ title = 'Cargando', detail = 'Un momento mientras preparamos la app.' }) {
+  return (
+    <main className="login-screen">
+      <div className="login-panel">
+        <Loader2 size={28} aria-hidden="true" className="spin" />
+        <h1>{title}</h1>
+        <p>{detail}</p>
+      </div>
+    </main>
+  )
+}
+
+function memberInitials(member) {
+  return String(member?.name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+}
+
+function MiniAvatar({ active = false, member }) {
+  return (
+    <span
+      className={`mini-avatar ${active ? 'active' : ''}`}
+      title={member?.name || 'Familiar'}
+    >
+      {memberInitials(member)}
+    </span>
+  )
+}
+
+function memberIdsForProfile(profile = {}) {
+  const rawIds = Array.isArray(profile.memberIds)
+    ? profile.memberIds
+    : profileMemberFallbacks[profile.id] || []
+  return rawIds.filter((id, index, list) =>
+    familyMembers.some((member) => member.id === id) && list.indexOf(id) === index,
+  )
+}
+
+function enrichTravelGroup(profile = defaultTravelGroup) {
+  const memberIds = memberIdsForProfile(profile)
+  const members = memberIds
+    .map((id) => familyMembers.find((member) => member.id === id))
+    .filter(Boolean)
+  const derivedAdults = members.filter((member) => member.adult).length
+  const derivedChildrenAges = members
+    .filter((member) => !member.adult)
+    .map((member) => childAgeByMemberId[member.id])
+    .filter(Boolean)
+  const adults = memberIds.length ? derivedAdults : Number(profile.adults) || 0
+  const childrenAges = memberIds.length
+    ? derivedChildrenAges
+    : Array.isArray(profile.childrenAges)
+      ? profile.childrenAges
+      : []
+
+  return {
+    ...defaultTravelGroup,
+    ...profile,
+    memberIds,
+    adults,
+    childrenAges,
+    totalTravelers: adults + childrenAges.length,
+    budgetOptionIds: Array.isArray(profile.budgetOptionIds) ? profile.budgetOptionIds : [],
+  }
+}
+
+function isPlanningGroup(profile = {}) {
+  return Boolean(
+    profile.kind === 'subgroup' ||
+      profile.memberIds?.length ||
+      profile.date ||
+      profile.startTime ||
+      profile.endTime ||
+      profile.focus,
+  )
+}
+
+function defaultSubgroupDraftForTrip(trip) {
+  return {
+    name: '',
+    date: trip?.startDate || '2026-09-11',
+    startTime: '10:00',
+    endTime: '16:00',
+    focus: '',
+    memberIds: [],
+  }
+}
+
+function searchTypeForTab(tab, currentType = 'lodging') {
+  if (tab === 'lodging') return 'lodging'
+  if (tab === 'activities') return 'activities'
+  if (tab === 'food') return 'food'
+  if (tab === 'transport') return 'transport'
+  return ['lodging', 'food', 'activities', 'transport'].includes(currentType) ? currentType : 'lodging'
+}
+
+function smartConfigForType(type) {
+  return smartSuggestionTypes.find((item) => item.id === type) || smartSuggestionTypes[0]
+}
+
+function searchMetaForType(type) {
+  if (type === 'activities') {
+    return {
+      title: 'Planes por ciudad',
+      typeLabel: 'Planes',
+      action: 'Sugerir planes',
+      icon: Landmark,
+    }
+  }
+  if (type === 'food') {
+    return {
+      title: 'Comida por ciudad',
+      typeLabel: 'Comida',
+      action: 'Sugerir comida',
+      icon: Utensils,
+    }
+  }
+  return {
+    title: 'Hospedajes por ciudad',
+    typeLabel: 'Hospedajes',
+    action: 'Preparar búsqueda',
+    icon: Hotel,
+  }
+}
+
+function pagedItems(items, page, pageSize = suggestionPageSize) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const start = (safePage - 1) * pageSize
+  return {
+    page: safePage,
+    totalPages,
+    items: items.slice(start, start + pageSize),
+  }
+}
+
+function itinerarySubgroupPayload(profile, options, nights, f1Count) {
+  const group = enrichTravelGroup(profile)
+  const budgetOptions = (group.budgetOptionIds || [])
+    .map((optionId) => options.find((option) => option.id === optionId))
+    .filter(Boolean)
+    .map((option) => {
+      const budget = optionBudget(option, group, f1Count, nights)
+      return {
+        id: option.id,
+        title: option.title,
+        category: option.category,
+        city: option.city,
+        total: budget.total || null,
+        perPerson: budget.perPerson || null,
+      }
+    })
+
+  return {
+    id: group.id,
+    name: group.name,
+    members: group.memberIds.map(memberName),
+    memberIds: group.memberIds,
+    adults: group.adults,
+    childrenAges: group.childrenAges,
+    totalTravelers: group.totalTravelers,
+    date: group.date || '',
+    startTime: group.startTime || '',
+    endTime: group.endTime || '',
+    focus: group.focus || group.note || '',
+    budgetOptions,
+  }
+}
+
+function FrontendUpdatePanel({
+  activeMember,
+  budgetOptionIds,
+  currentTravelGroup,
+  onAddOption,
+  onOpenDecision,
+  onPasteLink,
+  onVote,
+  options,
+  votes,
+}) {
+  const liveOptions = options.filter((option) => option.status !== 'removed')
+  const voteCount = (option) => votes[option.id]?.length || 0
+  const candidates = liveOptions
+    .filter((option) => option.category === 'lodging')
+    .sort((a, b) => (voteCount(b) - voteCount(a)) || (b.aiScore || 0) - (a.aiScore || 0))
+    .slice(0, 2)
+  const fallbackCandidates = candidates.length >= 2
+    ? candidates
+    : liveOptions
+      .slice()
+      .sort((a, b) => (voteCount(b) - voteCount(a)) || (b.aiScore || 0) - (a.aiScore || 0))
+      .slice(0, 2)
+  const [primary, secondary] = fallbackCandidates
+  const decisionVoters = new Set(
+    fallbackCandidates.flatMap((option) => votes[option.id] || []),
+  )
+  const currentMemberVotedPrimary = Boolean(primary && votes[primary.id]?.includes(activeMember))
+  const budgetOptions = budgetOptionIds
+    .map((id) => liveOptions.find((option) => option.id === id))
+    .filter(Boolean)
+  const leadingOption = liveOptions
+    .slice()
+    .sort((a, b) => (voteCount(b) - voteCount(a)) || (b.aiScore || 0) - (a.aiScore || 0))[0]
+  const activeGroupTotal =
+    (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0)
+  const activityItems = [
+    leadingOption
+      ? {
+          label: 'Votos',
+          title: `${leadingOption.code} va primero`,
+          detail: `${voteCount(leadingOption)} voto${voteCount(leadingOption) === 1 ? '' : 's'} · ${categoryConfig[leadingOption.category]?.shortLabel || leadingOption.category}`,
+        }
+      : null,
+    budgetOptions[0]
+      ? {
+          label: 'Presupuesto',
+          title: `${budgetOptions.length} opción${budgetOptions.length === 1 ? '' : 'es'} en presupuesto`,
+          detail: budgetOptions[0].priceNight ? `Desde ${currency(budgetOptions[0].priceNight)}` : 'Listas para revisar por persona',
+        }
+      : null,
+    {
+      label: 'Subgrupos',
+      title: 'F1, niños y familia completa',
+      detail: `${activeGroupTotal || 9} viajeros con carriles de decisión separados`,
+    },
+  ].filter(Boolean)
+
+  return (
+    <section className="family-command-grid" aria-label="Actualización familiar">
+      <article className="paste-detector-card">
+        <div>
+          <p className="eyebrow">Atajo rápido</p>
+          <h2>Pega un link y lo convierto en opción.</h2>
+          <span>Booking, Airbnb, Google Maps o restaurantes.</span>
+        </div>
+        <div className="paste-detector-actions">
+          <button onClick={onPasteLink} type="button">
+            <ExternalLink size={16} aria-hidden="true" />
+            Pegar link
+          </button>
+          <button onClick={onAddOption} type="button">
+            <Plus size={16} aria-hidden="true" />
+            Manual
+          </button>
+        </div>
+      </article>
+
+      <article className="active-decision-card">
+        <div className="active-decision-copy">
+          <p className="eyebrow">Tu turno de votar</p>
+          <h2>
+            {primary && secondary
+              ? `${primary.code} o ${secondary.code}: decidir hospedaje`
+              : 'Elige la mejor opción del viaje'}
+          </h2>
+          <span>
+            {decisionVoters.size} de {familyMembers.length} han votado
+          </span>
+        </div>
+        <div className="decision-avatar-row" aria-label="Estado de votos">
+          {familyMembers.map((member) => (
+            <MiniAvatar
+              active={decisionVoters.has(member.id) || member.id === activeMember}
+              key={member.id}
+              member={member}
+            />
+          ))}
+        </div>
+        <div className="decision-actions">
+          <button disabled={!primary} onClick={() => primary && onVote(primary.id)} type="button">
+            <Heart size={15} aria-hidden="true" />
+            {currentMemberVotedPrimary ? 'Quitar voto' : `Votar ${primary?.code || ''}`}
+          </button>
+          <button onClick={() => onOpenDecision(primary?.category || 'lodging')} type="button">
+            Comparar
+          </button>
+        </div>
+      </article>
+
+      <article className="family-activity-card">
+        <div className="activity-head">
+          <p className="eyebrow">Qué cambió</p>
+          <span>vista rápida</span>
+        </div>
+        <div className="activity-list">
+          {activityItems.map((item) => (
+            <div className="activity-row" key={`${item.label}-${item.title}`}>
+              <strong>{item.label}</strong>
+              <div>
+                <span>{item.title}</span>
+                <small>{item.detail}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </article>
+    </section>
+  )
 }
 
 function isAdultMember(memberId) {
@@ -698,8 +1013,66 @@ function getPlaceUrl(place) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`
 }
 
+function smartSuggestionQueries(label, notes, city) {
+  return [
+    `${notes} en ${city}`,
+    `${label} mejor valorados en ${city}`,
+    `${label} con muchas reseñas en ${city}`,
+    `${label} recomendados para familias en ${city}`,
+  ].filter((query, index, list) => query && list.indexOf(query) === index)
+}
+
+function textSearchPlaces(service, google, request, placesLibrary = google.maps.places) {
+  return new Promise((resolve) => {
+    service.textSearch(request, (results, status) => {
+      if (status !== placesLibrary.PlacesServiceStatus.OK || !results) {
+        resolve({ results: [], status })
+        return
+      }
+      resolve({ results, status })
+    })
+  })
+}
+
+async function searchBrowserPlaces(service, google, queries, limit, requestBase = {}, placesLibrary) {
+  const seen = new Set()
+  const places = []
+  const statusCodes = placesLibrary || google.maps.places
+  let lastStatus = statusCodes.PlacesServiceStatus.ZERO_RESULTS
+
+  for (const queryText of queries) {
+    if (places.length >= limit) break
+    const { results, status } = await textSearchPlaces(
+      service,
+      google,
+      {
+        ...requestBase,
+        query: queryText,
+      },
+      statusCodes,
+    )
+    lastStatus = status
+    for (const place of results) {
+      const id = getPlaceId(place)
+      if (seen.has(id)) continue
+      seen.add(id)
+      places.push(place)
+      if (places.length >= limit) break
+    }
+  }
+
+  return { places, status: places.length ? statusCodes.PlacesServiceStatus.OK : lastStatus }
+}
+
 function mergeOption(current, option) {
   return [option, ...current.filter((item) => item.id !== option.id)]
+}
+
+// Extract bathroom count: use stored field first, fall back to regex on title
+function extractBathrooms(option) {
+  if (option.bathrooms != null) return option.bathrooms
+  const match = (option.title || '').match(/(\d+)\s*ba[ñn]o/i)
+  return match ? parseInt(match[1], 10) : null
 }
 
 function aiScoreLabel(score) {
@@ -715,6 +1088,7 @@ function aiScoreTitle(score) {
 }
 
 function App() {
+  const previewMode = readPreviewMode()
   const [activeTab, setActiveTab] = useState('lodging')
   const [selectedCity, setSelectedCity] = useState('Todas')
   const [activeMember, setActiveMember] = useState('camilo')
@@ -727,25 +1101,12 @@ function App() {
     detail: 'Conectando opciones y votos familiares...',
     online: true,
   })
-  const [options, setOptions] = useState(initialOptions)
-  const [travelCities, setTravelCities] = useState(cityIdeas)
-  const [travelGroups, setTravelGroups] = useState(familyProfiles)
+  const [options, setOptions] = useState(() => (previewMode ? initialOptions : []))
+  const [travelCities, setTravelCities] = useState(() => (previewMode ? cityIdeas : []))
+  const [travelGroups, setTravelGroups] = useState(() => (previewMode ? familyProfiles : []))
   const [activeTravelGroupId, setActiveTravelGroupId] = useState('familia-sept-2026')
-  const [votes, setVotes] = useState({
-    'lodging-m': ['camilo'],
-    'lodging-b': ['juliana-bueno'],
-    'activity-retiro': ['cielo'],
-  })
-  const [draft, setDraft] = useState({
-    title: '',
-    url: '',
-    category: 'lodging',
-    city: 'Madrid',
-    targetGroup: 'family',
-    priceTotal: '',
-    priceNight: '',
-    notes: '',
-  })
+  const [votes, setVotes] = useState(() => (previewMode ? previewVotes : {}))
+  const [draft, setDraft] = useState(() => defaultDraftForTrip(null))
   const [cityDraft, setCityDraft] = useState({
     city: '',
     country: '',
@@ -753,27 +1114,21 @@ function App() {
     transfer: '',
     angle: '',
     coords: null,
+    isBase: false,
   })
-  const [familyProfileDraft, setFamilyProfileDraft] = useState({
-    name: '',
-    adults: 2,
-    childrenAges: '',
-    note: '',
-  })
-  const [searchDraft, setSearchDraft] = useState({
-    city: 'Madrid',
-    dates: '10-14 sep 2026',
-    type: 'lodging',
-    notes: '9 personas, presupuesto 300-600 EUR/noche, buena movilidad familiar',
-  })
+  const [searchDraft, setSearchDraft] = useState(() => defaultSearchDraftForTrip(null))
   const [searchResult, setSearchResult] = useState(null)
   const [places, setPlaces] = useState([])
+  const [placesPage, setPlacesPage] = useState(1)
   const [placesBusy, setPlacesBusy] = useState(false)
   const [smartSuggestionType, setSmartSuggestionType] = useState('food')
   const [smartSuggestions, setSmartSuggestions] = useState(null)
+  const [smartSuggestionsPage, setSmartSuggestionsPage] = useState(1)
   const [smartSuggestionsBusy, setSmartSuggestionsBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiFeedback, setAiFeedback] = useState(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [placeDraft, setPlaceDraft] = useState(null)
   const [itineraryBusy, setItineraryBusy] = useState(false)
   const [generatedItinerary, setGeneratedItinerary] = useState(null)
   const [externalLink, setExternalLink] = useState('')
@@ -781,19 +1136,32 @@ function App() {
   const [externalPriceNight, setExternalPriceNight] = useState('')
   const [externalBusy, setExternalBusy] = useState(false)
   const [availabilityBusyId, setAvailabilityBusyId] = useState('')
-  const [budgetOptionIds, setBudgetOptionIds] = useState(['lodging-m'])
-  const [transferDraft, setTransferDraft] = useState({
-    origin: 'Madrid',
-    destination: 'París',
-    date: '14 sep 2026',
-    pricePerPerson: '',
-    notes: 'Comparar tren, bus y avión para el grupo',
-  })
+  const [budgetOptionIds, setBudgetOptionIds] = useState(() => (previewMode ? ['lodging-m'] : []))
+  const [transferDraft, setTransferDraft] = useState(() => defaultTransferDraftForTrip(null))
   const [transferResult, setTransferResult] = useState(null)
   const [transferBusy, setTransferBusy] = useState(false)
+  const [subgroupDraft, setSubgroupDraft] = useState(() => defaultSubgroupDraftForTrip(null))
 
-  const previewMode =
-    import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') === '1'
+  // ── Phase 1: multi-trip state ───────────────────────────────────────
+  const [activeTripId, setActiveTripId] = useState(() => {
+    try {
+      return window.localStorage.getItem('activeTripId') || null
+    } catch {
+      return null
+    }
+  })
+  const [userTrips, setUserTrips] = useState([])
+  const [tripsLoading, setTripsLoading] = useState(true)
+  const [pendingJoinCode, setPendingJoinCode] = useState(() => {
+    try {
+      const code = new URLSearchParams(window.location.search).get('join')
+      return code ? code.trim().toUpperCase() : null
+    } catch {
+      return null
+    }
+  })
+  const defaultedTripRef = useRef('')
+
   const firebaseStatus = getFirebaseStatus()
   const canSync = Boolean(currentUser && canUseFirestore())
   const displayedSyncStatus = currentUser || previewMode
@@ -815,22 +1183,34 @@ function App() {
   const f1Crew = familyMembers.filter((member) => member.group === 'f1')
   const activeContributorIsAdult = isAdultMember(activeMember)
   const showOptionWorkspace = optionWorkspaceTabs.includes(activeTab)
+  const activeTrip = useMemo(
+    () => userTrips.find((t) => t.id === activeTripId) || null,
+    [userTrips, activeTripId],
+  )
+  const normalizedTravelGroups = useMemo(
+    () => (travelGroups.length ? travelGroups : familyProfiles).map((profile) => enrichTravelGroup(profile)),
+    [travelGroups],
+  )
   const currentTravelGroup = useMemo(
     () =>
-      travelGroups.find((profile) => profile.id === activeTravelGroupId) ||
-      travelGroups[0] ||
-      familyProfiles[0],
-    [activeTravelGroupId, travelGroups],
+      normalizedTravelGroups.find((profile) => profile.id === activeTravelGroupId) ||
+      normalizedTravelGroups[0] ||
+      enrichTravelGroup(defaultTravelGroup),
+    [activeTravelGroupId, normalizedTravelGroups],
   )
   const activeTravelCities = useMemo(
     () => travelCities.filter((idea) => idea.status !== 'removed'),
     [travelCities],
   )
-  const cityFilters = useMemo(
-    () => ['Todas', 'Madrid', ...activeTravelCities.map((idea) => idea.city)]
-      .filter((city, index, list) => city && list.indexOf(city) === index),
-    [activeTravelCities],
-  )
+	  const cityFilters = useMemo(
+	    () => {
+	      const baseCity = primaryTripCity(activeTrip)
+	      const fallbackCities = baseCity === 'Madrid' ? ['Madrid'] : [baseCity, 'Madrid']
+	      return ['Todas', ...fallbackCities, ...activeTravelCities.map((idea) => idea.city)]
+	        .filter((city, index, list) => city && list.indexOf(city) === index)
+	    },
+	    [activeTravelCities, activeTrip],
+	  )
   const effectiveSelectedCity = cityFilters.includes(selectedCity) ? selectedCity : 'Todas'
   const budgetOptions = useMemo(
     () =>
@@ -839,114 +1219,214 @@ function App() {
         .filter(Boolean),
     [budgetOptionIds, options],
   )
+  const subgroupBudgetOptions = useMemo(
+    () =>
+      (currentTravelGroup.budgetOptionIds || [])
+        .map((optionId) => options.find((option) => option.id === optionId))
+        .filter(Boolean),
+    [currentTravelGroup.budgetOptionIds, options],
+  )
   const budgetNights = estimateNightsFromDates(searchDraft.dates)
+  const activeSearchType = searchTypeForTab(activeTab, searchDraft.type)
+  const activeSearchMeta = searchMetaForType(activeSearchType)
+  const smartSuggestionTypeForTab = activeTab === 'activities' || activeTab === 'food'
+    ? activeSearchType
+    : smartSuggestionType
 
-  useEffect(() => {
-    if (!firebaseAuth) return undefined
-
-    return onAuthStateChanged(firebaseAuth, (user) => {
-      setCurrentUser(user)
-      setAuthReady(true)
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!currentUser || !canUseFirestore()) {
-      return undefined
+  const budgetTotalPerPerson = useMemo(() => {
+    if (!budgetOptions.length) return null
+    let total = 0
+    for (const option of budgetOptions) {
+      const b = optionBudget(option, currentTravelGroup, f1Crew.length, budgetNights)
+      if (b.perPerson) total += b.perPerson
     }
+    return total > 0 ? total : null
+  }, [budgetOptions, currentTravelGroup, f1Crew.length, budgetNights])
 
-    let active = true
+  const daysUntilTrip = useMemo(() => {
+    const tripStart = new Date(`${activeTrip?.startDate || '2026-09-10'}T00:00:00Z`)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const diff = Math.ceil((tripStart - today) / 86_400_000)
+    return diff > 0 ? diff : 0
+  }, [activeTrip?.startDate])
+
+	  useEffect(() => {
+	    if (!firebaseAuth) return undefined
+
+	    return onAuthStateChanged(firebaseAuth, (user) => {
+	      setCurrentUser(user)
+	      setAuthReady(true)
+	      setTripsLoading(Boolean(user))
+	      if (!user) {
+	        setUserTrips([])
+	      }
+	    })
+	  }, [])
+
+	  useEffect(() => {
+	    if (!currentUser || !canUseFirestore()) {
+	      return undefined
+	    }
+
+	    let active = true
+
     saveUserProfile(currentUser, activeMember)
-      .then(() =>
-        Promise.all([
-          seedInitialTripOptions(currentUser),
-          seedInitialTravelCities(currentUser),
-          seedInitialTravelGroups(currentUser),
-        ]),
-      )
-      .catch((error) => {
-        if (!active) return
+      .then(async () => {
+        if (!isTripAdmin(currentUser)) return
+        await seedMadridF1Trip(currentUser)
+        await seedMadridF1Data(currentUser)
+      })
+	      .catch((error) => {
+	        if (!active) return
         setSyncStatus({
           label: 'Revisar permisos',
           detail: error.message,
           online: false,
-        })
-      })
+	        })
+	      })
 
-    const unsubscribeOptions = subscribeTripOptions(
-      (nextOptions) => {
-        if (!active) return
-        if (nextOptions.length) setOptions(nextOptions)
-        setSyncStatus({
-          label: 'Sincronizado',
-          detail: currentUser.email || 'Sesión activa',
-          online: true,
-        })
+	    return () => {
+	      active = false
+	    }
+	  }, [activeMember, currentUser])
+
+	  useEffect(() => {
+	    if (!currentUser || !canUseFirestore() || !activeTripId) {
+	      return undefined
+	    }
+
+	    let active = true
+
+	    const unsubscribeOptions = subscribeTripOptions(
+	      activeTripId,
+	      (nextOptions) => {
+	        if (!active) return
+	        setOptions(nextOptions)
+	        setSyncStatus({
+	          label: 'Sincronizado',
+	          detail: currentUser.email || 'Sesión activa',
+	          online: true,
+	        })
+	      },
+	      (error) => {
+	        if (!active) return
+	        setSyncStatus({
+	          label: 'Sin conexión',
+	          detail: error.message,
+	          online: false,
+	        })
+	      },
+	    )
+
+	    const unsubscribeVotes = subscribeVotes(
+	      activeTripId,
+	      (nextVotes) => {
+	        if (active) setVotes(nextVotes)
+	      },
+	      (error) => {
+	        if (!active) return
+	        setSyncStatus({
+	          label: 'Votos locales',
+	          detail: error.message,
+	          online: false,
+	        })
+	      },
+	    )
+
+	    const unsubscribeCities = subscribeTravelCities(
+	      activeTripId,
+	      (nextCities) => {
+	        if (active) setTravelCities(nextCities)
+	      },
+	      (error) => {
+	        if (!active) return
+	        setSyncStatus({
+	          label: 'Ciudades locales',
+	          detail: error.message,
+	          online: false,
+	        })
+	      },
+	    )
+
+	    const unsubscribeGroups = subscribeTravelGroups(
+	      activeTripId,
+	      (nextGroups) => {
+	        if (!active) return
+	        setTravelGroups(nextGroups)
+	        if (nextGroups.length && !nextGroups.some((profile) => profile.id === activeTravelGroupId)) {
+	          setActiveTravelGroupId(nextGroups[0].id)
+	        }
+	      },
+	      (error) => {
+	        if (!active) return
+	        setSyncStatus({
+	          label: 'Grupos locales',
+	          detail: error.message,
+	          online: false,
+	        })
+	      },
+	    )
+
+	    const unsubscribeBudget = subscribeTripBudget(
+	      activeTripId,
+	      (nextOptionIds) => {
+	        if (active) setBudgetOptionIds(nextOptionIds)
+	      },
+	      (error) => {
+	        if (!active) return
+	        setSyncStatus({
+	          label: 'Presupuesto local',
+	          detail: error.message,
+	          online: false,
+	        })
+	      },
+	    )
+
+	    return () => {
+	      active = false
+	      unsubscribeOptions()
+	      unsubscribeVotes()
+	      unsubscribeCities()
+	      unsubscribeGroups()
+	      unsubscribeBudget()
+	    }
+	  }, [activeMember, activeTravelGroupId, activeTripId, currentUser])
+
+  // ── Phase 1: subscribe to the user's trips list ─────────────────────
+	  useEffect(() => {
+	    if (!currentUser || !canUseFirestore()) {
+	      return undefined
+	    }
+	    const unsubscribe = subscribeUserTrips(
+	      currentUser.uid,
+      (trips) => {
+        setUserTrips(trips)
+        setTripsLoading(false)
       },
       (error) => {
-        if (!active) return
-        setSyncStatus({
-          label: 'Sin conexión',
-          detail: error.message,
-          online: false,
-        })
+        console.error('subscribeUserTrips error:', error)
+        setTripsLoading(false)
       },
-    )
+	    )
+	    return () => unsubscribe()
+	  }, [currentUser])
 
-    const unsubscribeVotes = subscribeVotes(
-      (nextVotes) => {
-        if (active) setVotes(nextVotes)
-      },
-      (error) => {
-        if (!active) return
-        setSyncStatus({
-          label: 'Votos locales',
-          detail: error.message,
-          online: false,
-        })
-      },
-    )
-
-    const unsubscribeCities = subscribeTravelCities(
-      (nextCities) => {
-        if (active && nextCities.length) setTravelCities(nextCities)
-      },
-      (error) => {
-        if (!active) return
-        setSyncStatus({
-          label: 'Ciudades locales',
-          detail: error.message,
-          online: false,
-        })
-      },
-    )
-
-    const unsubscribeGroups = subscribeTravelGroups(
-      (nextGroups) => {
-        if (!active || !nextGroups.length) return
-        setTravelGroups(nextGroups)
-        if (!nextGroups.some((profile) => profile.id === activeTravelGroupId)) {
-          setActiveTravelGroupId(nextGroups[0].id)
-        }
-      },
-      (error) => {
-        if (!active) return
-        setSyncStatus({
-          label: 'Grupos locales',
-          detail: error.message,
-          online: false,
-        })
-      },
-    )
-
-    return () => {
-      active = false
-      unsubscribeOptions()
-      unsubscribeVotes()
-      unsubscribeCities()
-      unsubscribeGroups()
+  // Phase 1: persist activeTripId in localStorage
+  useEffect(() => {
+    try {
+      if (activeTripId) window.localStorage.setItem('activeTripId', activeTripId)
+      else window.localStorage.removeItem('activeTripId')
+    } catch {
+      // ignore quota / private mode
     }
-  }, [activeMember, activeTravelGroupId, currentUser])
+  }, [activeTripId])
+
+  useEffect(() => {
+    if (!activeTrip || defaultedTripRef.current === activeTrip.id) return
+    applyTripDefaults(activeTrip)
+    defaultedTripRef.current = activeTrip.id
+  }, [activeTrip])
 
   const visibleOptions = useMemo(() => {
     return options
@@ -972,13 +1452,9 @@ function App() {
           option.category !== 'itinerary',
       ),
     [effectiveSelectedCity, options],
-  )
-  const currentMapCity = cityCenter(effectiveSelectedCity, activeTravelCities)
-  const activeCityHelp =
-    effectiveSelectedCity === 'Todas'
-      ? 'Ves todas las tarjetas; el mapa usa Madrid como referencia inicial.'
-      : `Lista, mapa y búsquedas quedan filtradas a ${effectiveSelectedCity}.`
-  function updateDraft(field, value) {
+	  )
+	  const currentMapCity = cityCenter(effectiveSelectedCity, activeTravelCities)
+	  function updateDraft(field, value) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
@@ -1005,6 +1481,68 @@ function App() {
     setSearchDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function switchTab(tabId) {
+    const nextType = searchTypeForTab(tabId, searchDraft.type)
+    if (optionWorkspaceTabs.includes(tabId)) {
+      const config = nextType === 'lodging' ? null : smartConfigForType(nextType)
+      setSearchDraft((current) => ({
+        ...current,
+        type: nextType,
+        notes: current.type === nextType ? current.notes : config?.notes || current.notes,
+      }))
+      setPlaces([])
+      setSearchResult(null)
+      setPlacesPage(1)
+      setSmartSuggestionsPage(1)
+      if (nextType === 'activities' || nextType === 'food') {
+        setSmartSuggestionType(nextType)
+      }
+    }
+    setActiveTab(tabId)
+  }
+
+  async function pasteExternalLinkFromClipboard() {
+    if (!navigator.clipboard?.readText) {
+      setAiFeedback({
+        title: 'Portapapeles no disponible',
+        detail: 'Pega el link manualmente en la búsqueda inteligente.',
+        tone: 'warning',
+      })
+      return
+    }
+
+    try {
+      const text = (await navigator.clipboard.readText()).trim()
+      if (!/^https?:\/\//i.test(text)) {
+        setAiFeedback({
+          title: 'No encontré un link',
+          detail: 'Copia primero un enlace de Booking, Airbnb o Google Maps.',
+          tone: 'warning',
+        })
+        return
+      }
+
+      setExternalLink(text)
+      setSearchDraft((current) => ({
+        ...current,
+        city: currentMapCity.city,
+        type: 'lodging',
+      }))
+      setActiveTab('lodging')
+      setAiFeedback({
+        title: 'Link listo para analizar',
+        detail: 'Lo dejé preparado en la búsqueda inteligente.',
+        tone: 'ready',
+      })
+    } catch {
+      setAiFeedback({
+        title: 'Permiso de portapapeles',
+        detail: 'El navegador no permitió leerlo. Pega el link manualmente abajo.',
+        tone: 'warning',
+      })
+    }
+  }
+
   function selectCityFilter(city) {
     setSelectedCity(city)
 
@@ -1018,20 +1556,178 @@ function App() {
     }))
   }
 
-  function updateFamilyProfileDraft(field, value) {
-    setFamilyProfileDraft((current) => ({ ...current, [field]: value }))
-  }
-
   function updateTransferDraft(field, value) {
     setTransferDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function persistTripBudget(nextOptionIds) {
+    if (!canSync) return
+    saveTripBudget(nextOptionIds, currentUser, activeTripId).catch((error) => {
+      setSyncStatus({
+        label: 'Presupuesto local',
+        detail: error.message,
+        online: false,
+      })
+    })
+  }
+
   function toggleBudgetOption(optionId) {
-    setBudgetOptionIds((current) =>
-      current.includes(optionId)
-        ? current.filter((item) => item !== optionId)
-        : [...current, optionId],
-    )
+    const nextOptionIds = budgetOptionIds.includes(optionId)
+      ? budgetOptionIds.filter((item) => item !== optionId)
+      : [...budgetOptionIds, optionId]
+    setBudgetOptionIds(nextOptionIds)
+    persistTripBudget(nextOptionIds)
+  }
+
+  function addOptionToBudget(optionId) {
+    const nextOptionIds = [...new Set([...budgetOptionIds, optionId])]
+    setBudgetOptionIds(nextOptionIds)
+    persistTripBudget(nextOptionIds)
+  }
+
+  function removeOptionFromBudget(optionId) {
+    const nextOptionIds = budgetOptionIds.filter((item) => item !== optionId)
+    setBudgetOptionIds(nextOptionIds)
+    persistTripBudget(nextOptionIds)
+  }
+
+  function persistTravelGroup(profile) {
+    if (!canSync) return
+    saveTravelGroup(profile, currentUser, activeTripId).catch((error) => {
+      setSyncStatus({
+        label: 'Subgrupo local',
+        detail: error.message,
+        online: false,
+      })
+    })
+  }
+
+  function upsertTravelGroup(profile) {
+    const normalized = enrichTravelGroup(profile)
+    setTravelGroups((current) => {
+      const source = current.length ? current : normalizedTravelGroups
+      return [normalized, ...source.filter((item) => item.id !== normalized.id)]
+    })
+    persistTravelGroup(normalized)
+    return normalized
+  }
+
+  function updateSubgroupDraft(field, value) {
+    setSubgroupDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  function toggleSubgroupDraftMember(memberId) {
+    setSubgroupDraft((current) => {
+      const memberIds = current.memberIds.includes(memberId)
+        ? current.memberIds.filter((id) => id !== memberId)
+        : [...current.memberIds, memberId]
+      return { ...current, memberIds }
+    })
+  }
+
+  function createSubgroup(event) {
+    event.preventDefault()
+    const memberIds = subgroupDraft.memberIds.length
+      ? subgroupDraft.memberIds
+      : [activeMember]
+    const memberNames = memberIds.map(memberName)
+    const name = subgroupDraft.name.trim() || `Subgrupo ${memberNames.slice(0, 2).join(' + ')}`
+    const profile = upsertTravelGroup({
+      id: `subgrupo-${citySlug(name)}-${Date.now()}`,
+      name,
+      memberIds,
+      adults: memberIds.filter(isAdultMember).length,
+      childrenAges: memberIds
+        .filter((id) => !isAdultMember(id))
+        .map((id) => childAgeByMemberId[id])
+        .filter(Boolean),
+      date: subgroupDraft.date,
+      startTime: subgroupDraft.startTime,
+      endTime: subgroupDraft.endTime,
+      focus: subgroupDraft.focus.trim(),
+      note: subgroupDraft.focus.trim(),
+      kind: 'subgroup',
+      budgetOptionIds: [],
+    })
+    setActiveTravelGroupId(profile.id)
+    setSubgroupDraft(defaultSubgroupDraftForTrip(activeTrip))
+    setAiFeedback({
+      tone: 'ready',
+      title: 'Subgrupo creado',
+      detail: `${profile.name} ya tiene horario propio para el itinerario IA.`,
+    })
+  }
+
+  function updateTravelGroup(groupId, patch) {
+    const existing =
+      normalizedTravelGroups.find((profile) => profile.id === groupId) ||
+      currentTravelGroup
+    upsertTravelGroup({ ...existing, ...patch })
+  }
+
+  function toggleSubgroupBudgetOption(optionId) {
+    const currentIds = currentTravelGroup.budgetOptionIds || []
+    const nextIds = currentIds.includes(optionId)
+      ? currentIds.filter((id) => id !== optionId)
+      : [...currentIds, optionId]
+    updateTravelGroup(currentTravelGroup.id, { budgetOptionIds: nextIds })
+  }
+
+  // ── Phase 2: trip navigation handlers ───────────────────────────────
+  function cleanJoinFromUrl() {
+    try {
+      const url = new URL(window.location.href)
+      if (url.searchParams.has('join')) {
+        url.searchParams.delete('join')
+        window.history.replaceState({}, '', url.toString())
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  function applyTripDefaults(trip) {
+    setDraft(defaultDraftForTrip(trip))
+    setSearchDraft(defaultSearchDraftForTrip(trip, defaultTravelGroup))
+    setTransferDraft(defaultTransferDraftForTrip(trip, defaultTravelGroup))
+    setSubgroupDraft(defaultSubgroupDraftForTrip(trip))
+    setSelectedCity('Todas')
+  }
+
+  function resetTripScopedState(trip) {
+    const tripId = trip?.id || trip
+    setOptions([])
+    setTravelCities([])
+    setTravelGroups([])
+    setVotes({})
+    setBudgetOptionIds(defaultBudgetOptionIdsForTrip(tripId))
+    setGeneratedItinerary(null)
+    setSearchResult(null)
+    setPlaces([])
+    setPlacesPage(1)
+    setSmartSuggestions(null)
+    setSmartSuggestionsPage(1)
+    setPlaceDraft(null)
+    setTransferResult(null)
+    applyTripDefaults(trip)
+    defaultedTripRef.current = tripId || ''
+  }
+
+  function handleEnterTrip(trip) {
+    resetTripScopedState(trip)
+    setActiveTripId(trip.id)
+    setPendingJoinCode(null)
+    cleanJoinFromUrl()
+  }
+
+  function handleBackToDashboard() {
+    setActiveTripId(null)
+    defaultedTripRef.current = ''
+  }
+
+  function handleDismissJoinModal() {
+    setPendingJoinCode(null)
+    cleanJoinFromUrl()
   }
 
   async function handleSignIn() {
@@ -1051,15 +1747,26 @@ function App() {
   async function handleSignOut() {
     if (!firebaseAuth) return
     await signOut(firebaseAuth)
-    setOptions(initialOptions)
-    setTravelCities(cityIdeas)
-    setTravelGroups(familyProfiles)
+    setOptions(previewMode ? initialOptions : [])
+    setTravelCities(previewMode ? cityIdeas : [])
+    setTravelGroups(previewMode ? familyProfiles : [])
     setActiveTravelGroupId('familia-sept-2026')
-    setVotes({
-      'lodging-m': ['camilo'],
-      'lodging-b': ['juliana-bueno'],
-      'activity-retiro': ['cielo'],
-    })
+    setVotes(previewMode ? previewVotes : {})
+    setBudgetOptionIds(previewMode ? ['lodging-m'] : [])
+    // Phase 1: reset multi-trip state
+    setActiveTripId(null)
+    setUserTrips([])
+    setPendingJoinCode(null)
+    setDraft(defaultDraftForTrip(null))
+    setSearchDraft(defaultSearchDraftForTrip(null))
+    setTransferDraft(defaultTransferDraftForTrip(null))
+    setSubgroupDraft(defaultSubgroupDraftForTrip(null))
+    defaultedTripRef.current = ''
+    try {
+      window.localStorage.removeItem('activeTripId')
+    } catch {
+      // ignore
+    }
   }
 
   async function addOption(event) {
@@ -1074,12 +1781,14 @@ function App() {
       })
 
       try {
-        const result = await analyzeOptionWithAI({
-          ...draft,
+	        const result = await analyzeOptionWithAI({
+	          tripId: activeTripId,
+	          ...draft,
           dates: searchDraft.dates,
           isAdultContributor: activeContributorIsAdult,
           selectedMemberId: activeMember,
           groupProfile: currentTravelGroup,
+          subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
         })
         if (result.option) {
           setOptions((current) => mergeOption(current, result.option))
@@ -1100,6 +1809,7 @@ function App() {
           })
           setActiveTab(result.option.category)
           setAiBusy(false)
+          setShowAddModal(false)
           return
         }
       } catch (error) {
@@ -1115,9 +1825,9 @@ function App() {
 
     const option = buildDraftOption(draft, activeContributorIsAdult ? 'active' : 'pending')
     setOptions((current) => mergeOption(current, option))
-    if (canSync) {
-      await saveTripOption(option, currentUser)
-    }
+	    if (canSync) {
+	      await saveTripOption(option, currentUser, activeTripId)
+	    }
     setDraft({
       title: '',
       url: '',
@@ -1129,6 +1839,7 @@ function App() {
       notes: '',
     })
     setActiveTab(option.category)
+    setShowAddModal(false)
   }
 
   async function analyzeExternalLink(event) {
@@ -1143,8 +1854,9 @@ function App() {
     })
 
     try {
-      const result = await analyzeOptionWithAI({
-        title: '',
+	      const result = await analyzeOptionWithAI({
+	        tripId: activeTripId,
+	        title: '',
         url: externalLink,
         category: 'lodging',
         city: searchDraft.city,
@@ -1156,6 +1868,7 @@ function App() {
         isAdultContributor: activeContributorIsAdult,
         selectedMemberId: activeMember,
         groupProfile: currentTravelGroup,
+        subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
       })
 
       if (result.option) {
@@ -1205,11 +1918,12 @@ function App() {
       transfer: '',
       angle: '',
       coords: null,
+      isBase: false,
     })
 
-    if (canSync) {
-      await saveTravelCity(city, currentUser)
-    }
+	    if (canSync) {
+	      await saveTravelCity(city, currentUser, activeTripId)
+	    }
   }
 
   function removeCity(cityId) {
@@ -1223,8 +1937,8 @@ function App() {
       setSelectedCity('Todas')
     }
 
-    if (canSync) {
-      updateTravelCityStatus(cityId, 'removed', currentUser).catch((error) => {
+	    if (canSync) {
+	      updateTravelCityStatus(cityId, 'removed', currentUser, activeTripId).catch((error) => {
         setSyncStatus({
           label: 'Ciudad local',
           detail: error.message,
@@ -1240,6 +1954,158 @@ function App() {
     )
     if (city) removeCity(city.id)
   }
+
+  async function updateCity(updatedCity) {
+    setTravelCities((current) =>
+      current.map((item) => (item.id === updatedCity.id ? { ...item, ...updatedCity } : item)),
+    )
+    if (canSync) {
+      await saveTravelCity({ ...updatedCity }, currentUser, activeTripId)
+    }
+  }
+
+  function autoFillCityDates() {
+    const active = activeTravelCities.filter((c) => c.status !== 'removed')
+    if (!active.length) return
+
+    // Base: trip end date (or Sep 14 for Madrid F1), window of ~10 days
+    const baseDateStr = activeTrip?.endDate || '2026-09-14'
+    const base = new Date(`${baseDateStr}T00:00:00Z`)
+    const totalDays = 10
+    const daysPerCity = Math.max(2, Math.floor(totalDays / active.length))
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+
+    function fmtRange(start, end) {
+      if (start.getUTCMonth() === end.getUTCMonth()) {
+        return `${start.getUTCDate()}-${end.getUTCDate()} ${months[start.getUTCMonth()]} ${start.getUTCFullYear()}`
+      }
+      return `${start.getUTCDate()} ${months[start.getUTCMonth()]}-${end.getUTCDate()} ${months[end.getUTCMonth()]} ${start.getUTCFullYear()}`
+    }
+
+    let cursor = new Date(base)
+    const updated = active.map((city) => {
+      const start = new Date(cursor)
+      const end = new Date(cursor.getTime() + daysPerCity * 86_400_000)
+      cursor = end
+      const key = cityKey(city.city)
+      const defaultTransfer = obviousCityDefaults[key]?.transfer || city.transfer
+      return {
+        ...city,
+        dates: fmtRange(start, end),
+        transfer:
+          city.transfer === 'Traslado por definir' || !city.transfer
+            ? defaultTransfer
+            : city.transfer,
+        readiness: Math.min((city.readiness || 18) + 15, 65),
+      }
+    })
+
+    setTravelCities((current) =>
+      current.map((item) => {
+        const u = updated.find((c) => c.id === item.id)
+        return u || item
+      }),
+    )
+    if (canSync) {
+      updated.forEach((city) => saveTravelCity(city, currentUser, activeTripId))
+    }
+  }
+
+  // ── Base city & day-trip helpers ──────────────────────────────────────────
+
+  function toggleCityBase(cityId) {
+    setTravelCities((current) =>
+      current.map((item) => {
+        if (item.id !== cityId) return item
+        const wasBase = Boolean(item.isBase)
+        const updated = {
+          ...item,
+          isBase: !wasBase,
+          dayTrips: wasBase ? [] : (item.dayTrips || []),
+          dates: !wasBase ? 'Base / casa' : (item.dates === 'Base / casa' ? 'Fechas por definir' : item.dates),
+          transfer: !wasBase ? 'Sin traslado (base)' : (item.transfer === 'Sin traslado (base)' ? 'Traslado por definir' : item.transfer),
+          readiness: !wasBase ? 100 : Math.min(item.readiness, 65),
+        }
+        if (canSync) saveTravelCity(updated, currentUser, activeTripId)
+        return updated
+      }),
+    )
+  }
+
+  function addDayTrip(cityId, trip) {
+    setTravelCities((current) =>
+      current.map((item) => {
+        if (item.id !== cityId) return item
+        const updated = { ...item, dayTrips: [...(item.dayTrips || []), trip] }
+        if (canSync) saveTravelCity(updated, currentUser, activeTripId)
+        return updated
+      }),
+    )
+  }
+
+  function removeDayTrip(cityId, tripId) {
+    setTravelCities((current) =>
+      current.map((item) => {
+        if (item.id !== cityId) return item
+        const updated = { ...item, dayTrips: (item.dayTrips || []).filter((t) => t.id !== tripId) }
+        if (canSync) saveTravelCity(updated, currentUser, activeTripId)
+        return updated
+      }),
+    )
+  }
+
+  async function suggestDayTrips(cityId) {
+    const city = activeTravelCities.find((c) => c.id === cityId)
+    if (!city || !canSync) return null
+    try {
+      const result = await suggestDayTripsWithAI({
+        tripId: activeTripId,
+        baseCity: city.city,
+        baseCountry: city.country,
+        groupProfile: currentTravelGroup,
+        subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
+      })
+      if (result?.suggestions?.length) {
+        result.suggestions.forEach((trip) => addDayTrip(cityId, trip))
+      }
+      return result
+    } catch (err) {
+      console.error('suggestDayTrips error', err)
+      return null
+    }
+  }
+
+  async function assessPlan() {
+    if (!canSync) return null
+    try {
+      return await assessTripPlanWithAI({
+        tripId: activeTripId,
+        groupProfile: currentTravelGroup,
+        subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
+      })
+    } catch (err) {
+      console.error('assessPlan error', err)
+      return null
+    }
+  }
+
+  async function chatPlanner(message, history) {
+    if (!canSync || !message.trim()) return null
+    try {
+      return await chatWithPlannerAI({
+        tripId: activeTripId,
+        groupProfile: currentTravelGroup,
+        subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
+        message,
+        history,
+      })
+    } catch (err) {
+      console.error('chatPlanner error', err)
+      return null
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   function prepareCityLodging(city) {
     selectCityFilter(city.city)
@@ -1278,37 +2144,21 @@ function App() {
   }
 
   function datesForOptionCity(cityName) {
-    if (cityName === 'Madrid') return '10-14 sep 2026'
-    const city = activeTravelCities.find((item) => item.city === cityName)
-    return city?.dates || searchDraft.dates || '14-24 sep 2026'
-  }
-
-  async function addTravelGroup(event) {
-    event.preventDefault()
-    if (!familyProfileDraft.name.trim()) return
-
-    const profile = buildFamilyProfileDraft(familyProfileDraft)
-    setTravelGroups((current) => [profile, ...current])
-    setActiveTravelGroupId(profile.id)
-    setFamilyProfileDraft({
-      name: '',
-      adults: 2,
-      childrenAges: '',
-      note: '',
-    })
-
-    if (canSync) {
-      await saveTravelGroup(profile, currentUser)
+    if (activeTrip?.id === MADRID_F1_TRIP_ID && cityName === 'Madrid') return '10-14 sep 2026'
+    if (activeTrip && cityName === primaryTripCity(activeTrip)) {
+      return tripDatesForSearch(activeTrip) || searchDraft.dates || 'Fechas por definir'
     }
+    const city = activeTravelCities.find((item) => item.city === cityName)
+    return city?.dates || searchDraft.dates || tripDatesForSearch(activeTrip) || 'Fechas por definir'
   }
 
   async function createLodgingSearch(event) {
     event.preventDefault()
-    if (searchDraft.type === 'food') {
-      await findFoodPlaces()
+    if (activeSearchType === 'food' || activeSearchType === 'activities') {
+      await findFoodPlaces(activeSearchType)
       return
     }
-    if (searchDraft.type === 'transport') {
+    if (activeSearchType === 'transport') {
       await createTransferSearch()
       return
     }
@@ -1317,7 +2167,7 @@ function App() {
       setPlaces([])
       setSearchResult({
         id: `search-${Date.now()}`,
-        type: 'lodging',
+        type: activeSearchType,
         city: searchDraft.city,
         status: 'working',
         notes: 'La IA está preparando búsquedas y criterios de comparación.',
@@ -1325,9 +2175,11 @@ function App() {
       })
 
       try {
-        const result = await suggestLodgingWithAI({
-          ...searchDraft,
+	        const result = await suggestLodgingWithAI({
+	          tripId: activeTripId,
+	          ...searchDraft,
           groupProfile: currentTravelGroup,
+          subgroups: normalizedTravelGroups.filter((p) => p.kind === 'subgroup'),
         })
         setSearchResult(result)
         return
@@ -1345,7 +2197,7 @@ function App() {
 
     const request = {
       id: `search-${Date.now()}`,
-      type: searchDraft.type,
+      type: activeSearchType,
       city: searchDraft.city,
       dates: searchDraft.dates,
       notes: searchDraft.notes,
@@ -1361,9 +2213,9 @@ function App() {
       links: platformSearchLinks(searchDraft, currentTravelGroup),
     })
 
-    if (canSync) {
-      await saveSearchRequest(request, currentUser)
-    }
+	    if (canSync) {
+	      await saveSearchRequest(request, currentUser, activeTripId)
+	    }
   }
 
   async function createTransferSearch() {
@@ -1376,8 +2228,9 @@ function App() {
       links: [],
     })
 
-    const payload = {
-      ...transferDraft,
+	    const payload = {
+	      tripId: activeTripId,
+	      ...transferDraft,
       groupProfile: currentTravelGroup,
       notes: transferDraft.notes,
     }
@@ -1450,12 +2303,12 @@ function App() {
     }
 
     setOptions((current) => mergeOption(current, option))
-    setBudgetOptionIds((current) => [...new Set([...current, option.id])])
+    addOptionToBudget(option.id)
     setActiveTab('budget')
 
-    if (canSync) {
-      await saveTripOption(option, currentUser)
-    }
+	    if (canSync) {
+	      await saveTripOption(option, currentUser, activeTripId)
+	    }
   }
 
   async function verifyAvailability(option) {
@@ -1478,8 +2331,9 @@ function App() {
     })
 
     try {
-      const availability = await verifyAvailabilityWithAI({
-        optionId: option.id,
+	      const availability = await verifyAvailabilityWithAI({
+	        tripId: activeTripId,
+	        optionId: option.id,
         title: option.title,
         url: option.url,
         city: option.city,
@@ -1508,23 +2362,32 @@ function App() {
     }
   }
 
-  async function findFoodPlaces() {
+  async function findFoodPlaces(type = activeSearchType) {
+    const config = smartConfigForType(type)
+    const city = searchDraft.city || primaryTripCity(activeTrip)
+    const notes = searchDraft.type === type ? searchDraft.notes || config.notes : config.notes
     setPlacesBusy(true)
     setPlaces([])
+    setPlacesPage(1)
 
     if (canSync) {
       try {
         const result = await suggestFoodWithAI({
+          tripId: activeTripId,
           ...searchDraft,
+          city,
+          kind: config.label,
+          notes,
+          limit: placeSuggestionLimit,
           groupProfile: currentTravelGroup,
         })
         setPlaces(result.places || [])
         setSearchResult({
           id: result.id,
-          type: 'food',
+          type: config.id,
           city: result.city,
           status: 'ready',
-          notes: result.analysis?.summary || 'Sugerencias de comida obtenidas con IA y Google Places.',
+          notes: result.analysis?.summary || `Sugerencias de ${config.label.toLowerCase()} obtenidas con IA y Google Places.`,
           links: [],
           analysis: result.analysis,
         })
@@ -1543,40 +2406,38 @@ function App() {
     }
 
     try {
-      const google = await loadGoogleMaps()
-      const service = new google.maps.places.PlacesService(document.createElement('div'))
-      const query = `restaurantes familiares bien valorados en ${searchDraft.city || 'Madrid'}`
-
-      service.textSearch(
-        {
-          query,
-          region: 'es',
-        },
-        (results, status) => {
-          setPlacesBusy(false)
-          if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
-            setSearchResult({
-              id: `places-${Date.now()}`,
-              type: 'food',
-              city: searchDraft.city,
-              status: 'error',
-              notes: `Google Places respondió: ${status}`,
-              links: [],
-            })
-            return
-          }
-
-          setPlaces(results.slice(0, 6))
-          setSearchResult({
-            id: `places-${Date.now()}`,
-            type: 'food',
-            city: searchDraft.city,
-            status: 'ready',
-            notes: 'Sugerencias de comida obtenidas con Google Maps Places.',
-            links: [],
-          })
-        },
+      const { google, libraries } = await loadGoogleMapsLibraries(['places'])
+      const service = new libraries.places.PlacesService(document.createElement('div'))
+      const { places: browserPlaces, status } = await searchBrowserPlaces(
+        service,
+        google,
+        smartSuggestionQueries(config.label, notes, city),
+        placeSuggestionLimit,
+        { region: 'es' },
+        libraries.places,
       )
+      setPlacesBusy(false)
+      if (!browserPlaces.length) {
+        setSearchResult({
+          id: `places-${Date.now()}`,
+          type: 'food',
+          city: searchDraft.city,
+          status: 'error',
+          notes: `Google Places respondió: ${status}`,
+          links: [],
+        })
+        return
+      }
+
+      setPlaces(browserPlaces)
+      setSearchResult({
+        id: `places-${Date.now()}`,
+        type: config.id,
+        city: searchDraft.city,
+        status: 'ready',
+        notes: `Sugerencias de ${config.label.toLowerCase()} obtenidas con Google Maps Places (${browserPlaces.length}).`,
+        links: [],
+      })
     } catch (error) {
       setPlacesBusy(false)
       setSearchResult({
@@ -1590,11 +2451,12 @@ function App() {
     }
   }
 
-  async function findSmartSuggestions(type = smartSuggestionType) {
+  async function findSmartSuggestions(type = smartSuggestionTypeForTab) {
     const config =
       smartSuggestionTypes.find((item) => item.id === type) || smartSuggestionTypes[0]
     const city = currentMapCity.city || searchDraft.city || 'Madrid'
     setSmartSuggestionType(config.id)
+    setSmartSuggestionsPage(1)
     setSmartSuggestionsBusy(true)
     setSmartSuggestions({
       id: `smart-${Date.now()}`,
@@ -1610,17 +2472,19 @@ function App() {
     if (canSync) {
       try {
         const result = await suggestFoodWithAI({
+          tripId: activeTripId,
           city,
           dates: searchDraft.dates,
           kind: config.label,
           notes: config.notes,
+          limit: placeSuggestionLimit,
           groupProfile: currentTravelGroup,
         })
         setSmartSuggestions({
           ...result,
           type: config.id,
           category: config.category,
-          places: (result.places || []).slice(0, 3),
+          places: (result.places || []).slice(0, placeSuggestionLimit),
         })
         setSmartSuggestionsBusy(false)
         return
@@ -1639,40 +2503,40 @@ function App() {
     }
 
     try {
-      const google = await loadGoogleMaps()
-      const service = new google.maps.places.PlacesService(document.createElement('div'))
-      service.textSearch(
-        {
-          query: `${config.notes} en ${city}`,
-          ...(city === 'Madrid' ? { region: 'es' } : {}),
-        },
-        (results, status) => {
-          setSmartSuggestionsBusy(false)
-          if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
-            setSmartSuggestions({
-              id: `smart-${Date.now()}`,
-              city,
-              type: config.id,
-              status: 'error',
-              places: [],
-              analysis: { summary: `Google Places respondió: ${status}` },
-            })
-            return
-          }
-
-          setSmartSuggestions({
-            id: `smart-${Date.now()}`,
-            city,
-            type: config.id,
-            category: config.category,
-            status: 'ready',
-            places: results.slice(0, 3),
-            analysis: {
-              summary: `Top ${Math.min(results.length, 3)} sugerencias de Google Maps para ${city}.`,
-            },
-          })
-        },
+      const { google, libraries } = await loadGoogleMapsLibraries(['places'])
+      const service = new libraries.places.PlacesService(document.createElement('div'))
+      const { places: browserPlaces, status } = await searchBrowserPlaces(
+        service,
+        google,
+        smartSuggestionQueries(config.label, config.notes, city),
+        placeSuggestionLimit,
+        city === 'Madrid' ? { region: 'es' } : {},
+        libraries.places,
       )
+      setSmartSuggestionsBusy(false)
+      if (!browserPlaces.length) {
+        setSmartSuggestions({
+          id: `smart-${Date.now()}`,
+          city,
+          type: config.id,
+          status: 'error',
+          places: [],
+          analysis: { summary: `Google Places respondió: ${status}` },
+        })
+        return
+      }
+
+      setSmartSuggestions({
+        id: `smart-${Date.now()}`,
+        city,
+        type: config.id,
+        category: config.category,
+        status: 'ready',
+        places: browserPlaces,
+        analysis: {
+          summary: `Top ${browserPlaces.length} sugerencias de Google Maps para ${city}.`,
+        },
+      })
     } catch (error) {
       setSmartSuggestionsBusy(false)
       setSmartSuggestions({
@@ -1686,11 +2550,48 @@ function App() {
     }
   }
 
+  function openPlaceOptionModal(
+    place,
+    category = 'food',
+    city = searchDraft.city || primaryTripCity(activeTrip),
+    includeBudget = false,
+  ) {
+    setPlaceDraft({
+      place,
+      category,
+      city,
+      includeBudget,
+      priceTotal: '',
+      pricePerPerson: '',
+      duration: '',
+      reservationRequired: false,
+      notes: '',
+    })
+  }
+
+  function updatePlaceDraft(field, value) {
+    setPlaceDraft((current) => current ? { ...current, [field]: value } : current)
+  }
+
+  async function confirmPlaceOption(event) {
+    event.preventDefault()
+    if (!placeDraft?.place) return
+    await addPlaceOption(
+      placeDraft.place,
+      placeDraft.category,
+      placeDraft.city,
+      placeDraft.includeBudget,
+      placeDraft,
+    )
+    setPlaceDraft(null)
+  }
+
   async function addPlaceOption(
     place,
     category = 'food',
     cityOverride = searchDraft.city || 'Madrid',
     includeBudget = false,
+    extra = {},
   ) {
     const name = getPlaceName(place)
     const placeId = getPlaceId(place)
@@ -1700,6 +2601,11 @@ function App() {
     const reviews = getPlaceReviews(place)
     const photo = getPlacePhoto(place)
     const photoCredit = getPlacePhotoCredit(place)
+    const priceTotal = Number(extra.priceTotal) || null
+    const pricePerPerson = Number(extra.pricePerPerson) || null
+    const duration = String(extra.duration || '').trim()
+    const notes = String(extra.notes || '').trim()
+    const reservationRequired = Boolean(extra.reservationRequired)
     const categoryCount = options.filter((option) => option.category === category).length + 1
     const visualIndex = options.length % 8
     const isFood = category === 'food'
@@ -1714,8 +2620,9 @@ function App() {
       url: getPlaceUrl(place),
       image: photo,
       imageCredit: photoCredit,
-      priceNight: null,
-      priceTotal: null,
+      priceNight: pricePerPerson,
+      priceTotal,
+      ...(pricePerPerson && !priceTotal ? { budgetMode: 'perPerson' } : {}),
       rating: place.rating ? `${place.rating}/5` : 'Sin rating',
       reviews: reviews || null,
       capacity: isFood ? 'Por validar reserva para grupo' : 'Plan familiar por validar',
@@ -1731,27 +2638,33 @@ function App() {
         address || 'Dirección pendiente',
         place.rating ? `${place.rating}/5 en Google Maps · ${reviews || 0} reseñas` : 'Sugerido con Google Maps Places',
         place.why || 'Recomendado por IA para revisar en familia',
-      ],
+        duration ? `Duración/horario: ${duration}` : '',
+        notes,
+      ].filter(Boolean),
       cautions: [
-        place.caution ||
-          (isFood
-            ? 'Verificar reserva, precio y comodidad para niños'
-            : 'Verificar horarios, entradas y ritmo para el grupo'),
-      ],
+        reservationRequired
+          ? 'Reservar antes de ir y confirmar condiciones del grupo'
+          : place.caution ||
+            (isFood
+              ? 'Verificar reserva, precio y comodidad para niños'
+              : 'Verificar horarios, entradas y ritmo para el grupo'),
+      ].filter(Boolean),
+      reservationRequired,
+      duration,
     }
 
     setOptions((current) => mergeOption(current, option))
     selectCityFilter(cityOverride)
     if (includeBudget) {
-      setBudgetOptionIds((current) => [...new Set([...current, option.id])])
+      addOptionToBudget(option.id)
       setActiveTab('budget')
     } else {
       setActiveTab(category)
     }
 
-    if (canSync) {
-      await saveTripOption(option, currentUser)
-    }
+	    if (canSync) {
+	      await saveTripOption(option, currentUser, activeTripId)
+	    }
   }
 
   function toggleVote(optionId) {
@@ -1764,8 +2677,8 @@ function App() {
       return { ...current, [optionId]: nextVotes }
     })
 
-    if (canSync) {
-      saveOptionVotes(optionId, nextVotes, currentUser).catch((error) => {
+	    if (canSync) {
+	      saveOptionVotes(optionId, nextVotes, currentUser, activeTripId).catch((error) => {
         setSyncStatus({
           label: 'Voto local',
           detail: error.message,
@@ -1781,8 +2694,11 @@ function App() {
         option.id === optionId ? { ...option, status: 'removed' } : option,
       ),
     )
-    if (canSync) {
-      updateTripOptionStatus(optionId, 'removed', currentUser).catch((error) => {
+    if (budgetOptionIds.includes(optionId)) {
+      removeOptionFromBudget(optionId)
+    }
+	    if (canSync) {
+	      updateTripOptionStatus(optionId, 'removed', currentUser, activeTripId).catch((error) => {
         setSyncStatus({
           label: 'Cambio local',
           detail: error.message,
@@ -1798,8 +2714,8 @@ function App() {
         option.id === optionId ? { ...option, status: 'active' } : option,
       ),
     )
-    if (canSync) {
-      updateTripOptionStatus(optionId, 'active', currentUser).catch((error) => {
+	    if (canSync) {
+	      updateTripOptionStatus(optionId, 'active', currentUser, activeTripId).catch((error) => {
         setSyncStatus({
           label: 'Cambio local',
           detail: error.message,
@@ -1810,10 +2726,15 @@ function App() {
   }
 
   async function generateSmartItinerary() {
+    const itinerarySubgroups = normalizedTravelGroups
+      .filter(isPlanningGroup)
+      .map((profile) => itinerarySubgroupPayload(profile, options, budgetNights, f1Crew.length))
+
     if (!canSync) {
       setGeneratedItinerary({
         title: 'Itinerario base',
         summary: 'Inicia sesión con Firebase activo para generar itinerarios con IA.',
+        subgroups: itinerarySubgroups,
         days: itineraryDraft.map((item) => ({
           date: item.day,
           city: item.city,
@@ -1824,6 +2745,18 @@ function App() {
           routeNotes: 'Por calcular',
           backup: 'Mantener plan flexible',
           energyLevel: 'Media',
+          subgroupPlans: itinerarySubgroups
+            .filter((group) => group.date)
+            .slice(0, 3)
+            .map((group) => ({
+              groupId: group.id,
+              groupName: group.name,
+              timeWindow: [group.startTime, group.endTime].filter(Boolean).join('-'),
+              plan: group.focus || 'Plan paralelo por concretar',
+              budgetNote: group.budgetOptions.length
+                ? `${group.budgetOptions.length} partidas en subpresupuesto`
+                : 'Sin subpresupuesto todavía',
+            })),
         })),
         openQuestions: ['Conectar IA para recalcular con opciones actuales'],
       })
@@ -1832,11 +2765,13 @@ function App() {
 
     setItineraryBusy(true)
     try {
-      const result = await generateItineraryWithAI({
-        city: effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity,
+	      const result = await generateItineraryWithAI({
+	        tripId: activeTripId,
+	        city: effectiveSelectedCity === 'Todas' ? 'Madrid' : effectiveSelectedCity,
         dates: searchDraft.dates,
         routeMode,
         groupProfile: currentTravelGroup,
+        subgroups: itinerarySubgroups,
       })
       setGeneratedItinerary(result)
       setActiveTab('itinerary')
@@ -1864,13 +2799,10 @@ function App() {
 
   if (!authReady) {
     return (
-      <main className="login-screen">
-        <div className="login-panel">
-          <Loader2 size={28} aria-hidden="true" />
-          <h1>Preparando el viaje familiar</h1>
-          <p>Estamos conectando Firebase y la app del viaje.</p>
-        </div>
-      </main>
+      <LoadingScreen
+        title="Preparando el viaje familiar"
+        detail="Estamos conectando Firebase y la app del viaje."
+      />
     )
   }
 
@@ -1884,18 +2816,89 @@ function App() {
     )
   }
 
+  // Phase 1: while we're loading the user's trips, show a splash
+  if (currentUser && tripsLoading) {
+    return (
+      <LoadingScreen
+        title="Cargando tus viajes"
+        detail="Un momento mientras sincronizamos tus planes."
+      />
+    )
+  }
+
+  // Phase 1: dashboard when no trip is selected (or when there is a pending join)
+  if (currentUser && (!activeTrip || pendingJoinCode)) {
+    return (
+      <Suspense
+        fallback={(
+          <LoadingScreen
+            title="Cargando tus viajes"
+            detail="Preparando el panel de viajes."
+          />
+        )}
+      >
+        <TripDashboard
+          currentUser={currentUser}
+          userTrips={userTrips}
+          tripsLoading={tripsLoading}
+          onEnterTrip={handleEnterTrip}
+          onSignOut={handleSignOut}
+        />
+        {pendingJoinCode && (
+          <JoinTripModal
+            joinCode={pendingJoinCode}
+            currentUser={currentUser}
+            onJoined={handleEnterTrip}
+            onDismiss={handleDismissJoinModal}
+          />
+        )}
+      </Suspense>
+    )
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Viaje familiar septiembre 2026</p>
-          <h1>Plan familiar septiembre 2026.</h1>
+          <p className="eyebrow">
+            {activeTrip
+              ? [activeTrip.destination, activeTrip.startDate ? `${activeTrip.startDate}${activeTrip.endDate ? ` → ${activeTrip.endDate}` : ''}` : null].filter(Boolean).join(' · ')
+              : 'Viaje familiar · septiembre 2026'}
+          </p>
+          <h1>
+            {activeTrip ? `${activeTrip.emoji || '✈️'} ${activeTrip.name}` : 'Plan familiar septiembre 2026.'}
+          </h1>
         </div>
+
+        <div className="topbar-controls">
+          <label className="topbar-select-wrap" aria-label="Quién opina">
+            <Users size={14} aria-hidden="true" />
+            <select onChange={(event) => setActiveMember(event.target.value)} value={activeMember}>
+              {familyMembers.map((member) => (
+                <option key={member.id} value={member.id}>{member.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="topbar-select-wrap" aria-label="Grupo activo">
+            <Heart size={14} aria-hidden="true" />
+            <select
+              onChange={(event) => setActiveTravelGroupId(event.target.value)}
+              value={currentTravelGroup.id}
+            >
+	              {normalizedTravelGroups.map((profile) => (
+	                <option key={profile.id} value={profile.id}>{profile.name}</option>
+	              ))}
+            </select>
+          </label>
+          {budgetTotalPerPerson ? (
+            <span className="budget-topbar-pill" title="Presupuesto estimado por persona (selecciones actuales)">
+              <CircleDollarSign size={14} aria-hidden="true" />
+              ~{currency(budgetTotalPerPerson)}/persona
+            </span>
+          ) : null}
+        </div>
+
         <div className="status-stack">
-          <div className={`firebase-pill ${firebaseStatus.ready ? 'ready' : ''}`}>
-            <CheckCircle2 size={18} aria-hidden="true" />
-            <span>{firebaseStatus.label}</span>
-          </div>
           <div className={`sync-pill ${displayedSyncStatus.online ? 'ready' : ''}`}>
             {displayedSyncStatus.online ? (
               <CheckCircle2 size={18} aria-hidden="true" />
@@ -1904,6 +2907,17 @@ function App() {
             )}
             <span>{displayedSyncStatus.label}</span>
           </div>
+          {currentUser && userTrips.length >= 2 && (
+            <button
+              className="auth-button"
+              onClick={handleBackToDashboard}
+              type="button"
+              title="Volver al listado de viajes"
+            >
+              <ChevronLeft size={17} aria-hidden="true" />
+              Mis viajes
+            </button>
+          )}
           {currentUser ? (
             <button className="auth-button" onClick={handleSignOut} type="button">
               <LogOut size={17} aria-hidden="true" />
@@ -1927,76 +2941,70 @@ function App() {
         </div>
       </header>
 
-      <section className="collab-strip" aria-label="Estado de colaboración">
-        <div>
-          <p className="eyebrow">Colaboración familiar</p>
-          <h2>{displayedSyncStatus.detail}</h2>
-        </div>
-        <div className="collab-actions">
-          <label className="compact-select">
-            <span>Quién opina</span>
-            <select onChange={(event) => setActiveMember(event.target.value)} value={activeMember}>
-              {familyMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="compact-select">
-            <span>Grupo</span>
-            <select
-              onChange={(event) => setActiveTravelGroupId(event.target.value)}
-              value={currentTravelGroup.id}
-            >
-              {travelGroups.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <details className="new-group-menu">
-            <summary>Nuevo grupo</summary>
-            <form className="mini-group-form" onSubmit={addTravelGroup}>
-              <input
-                onChange={(event) => updateFamilyProfileDraft('name', event.target.value)}
-                placeholder="Nombre"
-                type="text"
-                value={familyProfileDraft.name}
-              />
-              <input
-                min="1"
-                onChange={(event) => updateFamilyProfileDraft('adults', event.target.value)}
-                type="number"
-                value={familyProfileDraft.adults}
-              />
-              <input
-                onChange={(event) => updateFamilyProfileDraft('childrenAges', event.target.value)}
-                placeholder="Niños: 9, 5"
-                type="text"
-                value={familyProfileDraft.childrenAges}
-              />
-              <input
-                onChange={(event) => updateFamilyProfileDraft('note', event.target.value)}
-                placeholder="Nota"
-                type="text"
-                value={familyProfileDraft.note}
-              />
-              <button type="submit">
-                <Plus size={15} aria-hidden="true" />
-                Guardar
-              </button>
-            </form>
-          </details>
-          <strong>
-            {memberName(activeMember)} · {activeContributorIsAdult ? 'Agrega directo' : 'Requiere revisión'}
-          </strong>
-        </div>
-      </section>
 
       <section className="workspace">
         <section className="main-panel">
+          <div className="trip-status-bar" aria-label="Estado del viaje">
+            <div className="trip-countdown">
+              <strong>{daysUntilTrip}</strong>
+              <p>días para el viaje</p>
+            </div>
+            <div className="trip-stat-chips">
+              {['lodging', 'activities', 'food', 'transport'].map((cat) => {
+                const count = options.filter((o) => o.category === cat && o.status !== 'removed').length
+                const Icon = tabs.find((t) => t.id === cat)?.icon
+                const label = categoryConfig[cat]?.label || cat
+                return count > 0 ? (
+            <button
+                    className={`trip-stat-chip ${activeTab === cat ? 'active' : ''}`}
+                    key={cat}
+                    onClick={() => switchTab(cat)}
+                    type="button"
+                  >
+                    {Icon ? <Icon size={13} aria-hidden="true" /> : null}
+                    {count} {label.toLowerCase()}
+                  </button>
+                ) : null
+              })}
+            </div>
+            {budgetTotalPerPerson ? (
+              <button
+                className="trip-budget-chip"
+                onClick={() => setActiveTab('budget')}
+                title="Ver presupuesto detallado"
+                type="button"
+              >
+                <CircleDollarSign size={13} aria-hidden="true" />
+                ~{currency(budgetTotalPerPerson)}/persona estimado
+              </button>
+            ) : (
+              <button
+                className="trip-budget-chip empty"
+                onClick={() => setActiveTab('budget')}
+                title="Agrega opciones al presupuesto"
+                type="button"
+              >
+                <CircleDollarSign size={13} aria-hidden="true" />
+                Sin presupuesto estimado
+              </button>
+            )}
+            <span className="trip-contributor-badge">
+              {memberName(activeMember)} · {activeContributorIsAdult ? 'agrega directo' : 'requiere revisión'}
+            </span>
+          </div>
+
+          <FrontendUpdatePanel
+            activeMember={activeMember}
+            budgetOptionIds={budgetOptionIds}
+            currentTravelGroup={currentTravelGroup}
+            onAddOption={() => setShowAddModal(true)}
+            onOpenDecision={switchTab}
+            onPasteLink={pasteExternalLinkFromClipboard}
+            onVote={toggleVote}
+            options={options}
+            votes={votes}
+          />
+
           <nav className="tabbar" aria-label="Secciones">
             {tabs.map((tab) => {
               const Icon = tab.icon
@@ -2005,7 +3013,7 @@ function App() {
                 <button
                   className={activeTab === tab.id ? 'active' : ''}
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => switchTab(tab.id)}
                   type="button"
                 >
                   <Icon size={18} aria-hidden="true" />
@@ -2017,38 +3025,36 @@ function App() {
 
           {activeTab !== 'cities' ? (
             <div className="controls-row">
-              <div className="city-context">
-                <div>
-                  <p className="eyebrow">Ciudad activa</p>
-                  <h2>{effectiveSelectedCity === 'Todas' ? 'Todas las ciudades' : effectiveSelectedCity}</h2>
-                  <span>{activeCityHelp}</span>
-                </div>
+              <div className="city-filter-row">
                 <div className="city-filter" aria-label="Cambiar ciudad activa">
                   {cityFilters.map((city) => (
                     <CityFilterChip
                       active={effectiveSelectedCity === city}
                       city={city}
-                      key={city}
-                      onRemove={removeCityByName}
-                      onSelect={selectCityFilter}
-                      removable={city !== 'Todas' && city !== 'Madrid'}
-                    />
+	                      key={city}
+	                      onRemove={removeCityByName}
+	                      onSelect={selectCityFilter}
+	                      removable={city !== 'Todas' && city !== 'Madrid' && city !== primaryTripCity(activeTrip)}
+	                    />
                   ))}
+                  <button
+                    className="city-add-tab-hint"
+                    onClick={() => setActiveTab('cities')}
+                    type="button"
+                    title="Gestionar ciudades candidatas"
+                  >
+                    <Plus size={13} aria-hidden="true" />
+                    Ciudad
+                  </button>
                 </div>
-                <QuickCityAdd
-                  addCity={addCity}
-                  cityDraft={cityDraft}
-                  citySuggestionNames={citySuggestionNames}
-                  updateCityDraft={updateCityDraft}
-                />
               </div>
               <button
-                className="ghost-button"
+                className={`ghost-button icon-only ${showRemoved ? 'active' : ''}`}
                 onClick={() => setShowRemoved((value) => !value)}
+                title={showRemoved ? 'Ocultar opciones retiradas' : 'Ver opciones retiradas'}
                 type="button"
               >
                 <Trash2 size={16} aria-hidden="true" />
-                {showRemoved ? 'Ocultar retiradas' : 'Ver retiradas'}
               </button>
             </div>
           ) : null}
@@ -2056,33 +3062,49 @@ function App() {
           {['activities', 'food'].includes(activeTab) ? (
             <SmartSuggestionsBanner
               activeCity={currentMapCity.city}
+              availableTypes={[smartConfigForType(smartSuggestionTypeForTab)]}
               busy={smartSuggestionsBusy}
-              currentType={smartSuggestionType}
+              currentType={smartSuggestionTypeForTab}
               onAddToBudget={(place, category, city) =>
-                addPlaceOption(place, category, city, true)
+                openPlaceOptionModal(place, category, city, true)
               }
               onAddToMap={(place, category, city) =>
-                addPlaceOption(place, category, city, false)
+                openPlaceOptionModal(place, category, city, false)
               }
               onChangeType={setSmartSuggestionType}
+              onPageChange={setSmartSuggestionsPage}
               onRefresh={findSmartSuggestions}
+              page={smartSuggestionsPage}
               result={smartSuggestions}
             />
           ) : null}
 
           {activeTab === 'budget' ? (
             <BudgetPanel
+              allOptions={options}
               budgetOptions={budgetOptions}
               currentTravelGroup={currentTravelGroup}
               f1Count={f1Crew.length}
               nights={budgetNights}
               onRemove={toggleBudgetOption}
+              onToggleSubgroupBudget={toggleSubgroupBudgetOption}
+              subgroupBudgetOptions={subgroupBudgetOptions}
             />
           ) : activeTab === 'itinerary' ? (
             <ItineraryPanel
+              availableOptions={options}
               busy={itineraryBusy}
+              currentTravelGroup={currentTravelGroup}
+              f1Count={f1Crew.length}
+              nights={budgetNights}
+              onCreateSubgroup={createSubgroup}
               onGenerate={generateSmartItinerary}
+              onToggleDraftMember={toggleSubgroupDraftMember}
+              onUpdateDraft={updateSubgroupDraft}
+              onUpdateGroup={updateTravelGroup}
               plan={generatedItinerary}
+              subgroupDraft={subgroupDraft}
+              travelGroups={normalizedTravelGroups}
             />
           ) : activeTab === 'transport' ? (
             <TransportPanel
@@ -2106,29 +3128,43 @@ function App() {
             <NextCitiesPanel
               activeCity={effectiveSelectedCity}
               addCity={addCity}
+              canSync={canSync}
               cities={activeTravelCities}
               cityDraft={cityDraft}
               citySuggestionNames={citySuggestionNames}
               currentTravelGroup={currentTravelGroup}
+              onAutoFill={autoFillCityDates}
+              onAddDayTrip={addDayTrip}
               onPrepareLodging={prepareCityLodging}
               onPrepareTransfer={prepareCityTransfer}
               onRemoveCity={removeCity}
+              onRemoveDayTrip={removeDayTrip}
               onOpenMap={openCityMap}
+              onAssessPlan={assessPlan}
+              onChatPlanner={chatPlanner}
+              onSuggestDayTrips={suggestDayTrips}
+              onToggleBase={toggleCityBase}
+              onUpdateCity={updateCity}
               updateCityDraft={updateCityDraft}
             />
           ) : (
-            <OptionGrid
-              activeCategory={activeCategory}
-              activeMember={activeMember}
-              availabilityBusyId={availabilityBusyId}
+	            <OptionGrid
+	              activeCategory={activeCategory}
+	              activeMember={activeMember}
+	              activeTripId={activeTripId}
+	              availabilityBusyId={availabilityBusyId}
+              canSync={canSync}
+              currentTravelGroup={currentTravelGroup}
               onRemove={removeOption}
               onRestore={restoreOption}
               onToggleBudget={toggleBudgetOption}
               onVerifyAvailability={verifyAvailability}
               onVote={toggleVote}
+              onUpdateOption={(updated) => setOptions((cur) => mergeOption(cur, updated))}
               options={visibleOptions}
               budgetOptionIds={budgetOptionIds}
               nights={budgetNights}
+              subgroups={normalizedTravelGroups.filter((p) => p.kind === 'subgroup')}
               votes={votes}
             />
           )}
@@ -2137,435 +3173,192 @@ function App() {
 
       {showOptionWorkspace ? (
         <section className="decision-map-grid">
-          <section className="map-panel">
-            <div className="section-heading">
-              <MapPinned size={20} aria-hidden="true" />
-              <div>
-                <p className="eyebrow">Mapa de la ciudad activa</p>
-                <h2>{currentMapCity.city}: {mapOptions.length ? 'opciones ubicadas' : 'sin opciones guardadas todavía'}</h2>
-              </div>
-            </div>
-            <div className="route-mode-control" aria-label="Modo de ruta">
-              {Object.entries(routeModes).map(([mode, config]) => {
-                const Icon = config.icon
-                return (
-                  <button
-                    className={routeMode === mode ? 'active' : ''}
-                    key={mode}
-                    onClick={() => setRouteMode(mode)}
-                    type="button"
-                  >
-                    <Icon size={16} aria-hidden="true" />
-                    {config.label}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="map-status">
-              <strong>{currentMapCity.city}</strong>
-              <span>
-                Centro: {currentMapCity.coords
-                  ? `${currentMapCity.coords.lat.toFixed(3)}, ${currentMapCity.coords.lng.toFixed(3)}`
-                  : 'por definir'}
-              </span>
-              <span>{mapOptions.length} opciones visibles</span>
-            </div>
-            {mapOptions.length === 0 ? (
-              <div className="map-empty-callout">
-                <strong>{currentMapCity.city} ya puede mostrarse en el mapa.</strong>
-                <span>
-                  Falta agregar hospedajes, comida o planes de esta ciudad para que aparezcan
-                  marcadores y tiempos de desplazamiento.
-                </span>
-              </div>
-            ) : null}
-            <MadridMap
+          <Suspense fallback={<div className="map-loading">Cargando mapa...</div>}>
+            <MapPanel
+              budgetOptionIds={budgetOptionIds}
               city={currentMapCity.city}
               destinationCoords={currentMapCity.coords}
+              onRouteModeChange={setRouteMode}
               options={mapOptions}
               routeMode={routeMode}
+              votes={votes}
             />
-          </section>
+          </Suspense>
         </section>
       ) : null}
 
       {showOptionWorkspace ? (
-        <section className="add-panel">
-        <div className="section-heading">
+        <button
+          className="fab-add"
+          onClick={() => setShowAddModal(true)}
+          type="button"
+          aria-label="Agregar nueva sugerencia"
+        >
           <Plus size={20} aria-hidden="true" />
-          <div>
-            <p className="eyebrow">Nueva sugerencia</p>
-            <h2>Agregar link para analizar</h2>
-          </div>
-        </div>
-        <form className="suggestion-form" onSubmit={addOption}>
-          <label>
-            <span>Nombre</span>
-            <input
-              onChange={(event) => updateDraft('title', event.target.value)}
-              placeholder="Apartamento, restaurante, museo..."
-              type="text"
-              value={draft.title}
-            />
-          </label>
-          <label>
-            <span>Link</span>
-            <input
-              onChange={(event) => updateDraft('url', event.target.value)}
-              placeholder="https://..."
-              type="url"
-              value={draft.url}
-            />
-          </label>
-          <label>
-            <span>Tipo</span>
-            <select
-              onChange={(event) => updateDraft('category', event.target.value)}
-              value={draft.category}
-            >
-              <option value="lodging">Hospedaje</option>
-              <option value="activities">Plan</option>
-              <option value="food">Comida</option>
-            </select>
-          </label>
-          <label>
-            <span>Ciudad</span>
-            <select
-              onChange={(event) => updateDraft('city', event.target.value)}
-              value={draft.city}
-            >
-              {cityFilters.filter((city) => city !== 'Todas').map((city) => (
-                <option key={city}>{city}</option>
-              ))}
-              <option>España por decidir</option>
-            </select>
-          </label>
-          <label>
-            <span>Grupo</span>
-            <select
-              onChange={(event) => updateDraft('targetGroup', event.target.value)}
-              value={draft.targetGroup}
-            >
-              <option value="family">Toda la familia</option>
-              <option value="f1">Grupo F1</option>
-              <option value="non-f1">Planes sin F1</option>
-            </select>
-          </label>
-          <label>
-            <span>Precio total visto</span>
-            <input
-              min="0"
-              onChange={(event) => updateDraft('priceTotal', event.target.value)}
-              placeholder="Ej. 1781"
-              type="number"
-              value={draft.priceTotal}
-            />
-          </label>
-          <label>
-            <span>Precio/noche o persona</span>
-            <input
-              min="0"
-              onChange={(event) => updateDraft('priceNight', event.target.value)}
-              placeholder="Ej. 445"
-              type="number"
-              value={draft.priceNight}
-            />
-          </label>
-          <label className="wide">
-            <span>Notas</span>
-            <textarea
-              onChange={(event) => updateDraft('notes', event.target.value)}
-              placeholder="Por qué puede servir, restricciones, precio visto, dudas..."
-              value={draft.notes}
-            />
-          </label>
-          <button className="primary-button" disabled={aiBusy} type="submit">
-            {aiBusy ? (
-              <Loader2 size={18} aria-hidden="true" />
-            ) : (
-              <Sparkles size={18} aria-hidden="true" />
-            )}
-            {canSync ? 'Analizar y agregar' : 'Agregar opción'}
-          </button>
-        </form>
-        {aiFeedback ? (
-          <div className={`ai-feedback ${aiFeedback.tone}`}>
-            <Sparkles size={18} aria-hidden="true" />
-            <div>
-              <strong>{aiFeedback.title}</strong>
-              <p>{aiFeedback.detail}</p>
+          Agregar
+        </button>
+      ) : null}
+
+      {showAddModal ? (
+        <div
+          className="add-modal-overlay"
+          onClick={(event) => { if (event.target === event.currentTarget) setShowAddModal(false) }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Nueva sugerencia"
+        >
+          <section className="add-modal">
+            <div className="add-modal-header">
+              <div>
+                <p className="eyebrow">Nueva sugerencia</p>
+                <h2>Agregar opción al viaje</h2>
+              </div>
+              <button
+                className="add-modal-close"
+                onClick={() => setShowAddModal(false)}
+                type="button"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
             </div>
-          </div>
-        ) : null}
-        </section>
-      ) : null}
 
-      {showOptionWorkspace ? (
-        <section className="search-panel">
-        <div className="section-heading">
-          <Search size={20} aria-hidden="true" />
-          <div>
-            <p className="eyebrow">Búsqueda inteligente</p>
-            <h2>Hospedajes y comida por ciudad</h2>
-          </div>
+            <form className="suggestion-form" onSubmit={addOption}>
+              <label>
+                <span>Nombre</span>
+                <input
+                  onChange={(event) => updateDraft('title', event.target.value)}
+                  placeholder="Apartamento, restaurante, museo..."
+                  type="text"
+                  value={draft.title}
+                />
+              </label>
+              <label>
+                <span>Link</span>
+                <input
+                  onChange={(event) => updateDraft('url', event.target.value)}
+                  placeholder="https://..."
+                  type="url"
+                  value={draft.url}
+                />
+              </label>
+              <label>
+                <span>Tipo</span>
+                <select
+                  onChange={(event) => updateDraft('category', event.target.value)}
+                  value={draft.category}
+                >
+                  <option value="lodging">Hospedaje</option>
+                  <option value="activities">Plan</option>
+                  <option value="food">Comida</option>
+                </select>
+              </label>
+              <label>
+                <span>Ciudad</span>
+                <select
+                  onChange={(event) => updateDraft('city', event.target.value)}
+                  value={draft.city}
+                >
+                  {cityFilters.filter((city) => city !== 'Todas').map((city) => (
+                    <option key={city}>{city}</option>
+                  ))}
+                  <option>España por decidir</option>
+                </select>
+              </label>
+              <label>
+                <span>Grupo</span>
+                <select
+                  onChange={(event) => updateDraft('targetGroup', event.target.value)}
+                  value={draft.targetGroup}
+                >
+                  <option value="family">Toda la familia</option>
+                  <option value="f1">Grupo F1</option>
+                  <option value="non-f1">Planes sin F1</option>
+                </select>
+              </label>
+              <label>
+                <span>Precio total visto</span>
+                <input
+                  min="0"
+                  onChange={(event) => updateDraft('priceTotal', event.target.value)}
+                  placeholder="Ej. 1781"
+                  type="number"
+                  value={draft.priceTotal}
+                />
+              </label>
+              <label>
+                <span>Precio/noche o persona</span>
+                <input
+                  min="0"
+                  onChange={(event) => updateDraft('priceNight', event.target.value)}
+                  placeholder="Ej. 445"
+                  type="number"
+                  value={draft.priceNight}
+                />
+              </label>
+              <label className="wide">
+                <span>Notas</span>
+                <textarea
+                  onChange={(event) => updateDraft('notes', event.target.value)}
+                  placeholder="Por qué puede servir, restricciones, precio visto, dudas..."
+                  value={draft.notes}
+                />
+              </label>
+              <button className="primary-button" disabled={aiBusy} type="submit">
+                {aiBusy ? (
+                  <Loader2 size={18} aria-hidden="true" />
+                ) : (
+                  <Sparkles size={18} aria-hidden="true" />
+                )}
+                {canSync ? 'Analizar y agregar' : 'Agregar opción'}
+              </button>
+            </form>
+
+            {aiFeedback ? (
+              <div className={`ai-feedback ${aiFeedback.tone}`}>
+                <Sparkles size={18} aria-hidden="true" />
+                <div>
+                  <strong>{aiFeedback.title}</strong>
+                  <p>{aiFeedback.detail}</p>
+                </div>
+              </div>
+            ) : null}
+          </section>
         </div>
-        <form className="search-form" onSubmit={createLodgingSearch}>
-          <div className="search-context">
-            <span>Grupo usado en búsquedas</span>
-            <strong>{currentTravelGroup.name}</strong>
-            <p>{groupSummary(currentTravelGroup)}</p>
-          </div>
-          <label>
-            <span>Tipo</span>
-            <select
-              onChange={(event) => updateSearchDraft('type', event.target.value)}
-              value={searchDraft.type}
-            >
-              <option value="lodging">Hospedajes</option>
-              <option value="food">Comida</option>
-              <option value="transport">Traslados</option>
-            </select>
-          </label>
-          <label>
-            <span>Ciudad</span>
-            <select
-              onChange={(event) => selectCityFilter(event.target.value)}
-              value={searchDraft.city}
-            >
-              {cityFilters.filter((city) => city !== 'Todas').map((city) => (
-                <option key={city}>{city}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Fechas</span>
-            <input
-              onChange={(event) => updateSearchDraft('dates', event.target.value)}
-              type="text"
-              value={searchDraft.dates}
-            />
-          </label>
-          <label className="wide">
-            <span>Criterios</span>
-            <input
-              onChange={(event) => updateSearchDraft('notes', event.target.value)}
-              type="text"
-              value={searchDraft.notes}
-            />
-          </label>
-          <button className="primary-button compact" type="submit">
-            {searchDraft.type === 'transport' ? (
-              <TrainFront size={18} aria-hidden="true" />
-            ) : (
-              <Hotel size={18} aria-hidden="true" />
-            )}
-            {searchDraft.type === 'transport' ? 'Buscar traslado' : 'Preparar búsqueda'}
-          </button>
-          {searchDraft.type !== 'transport' ? (
-            <button
-              className="secondary-button compact"
-              onClick={findFoodPlaces}
-              type="button"
-            >
-              {placesBusy ? (
-                <Loader2 size={18} aria-hidden="true" />
-              ) : (
-                <Utensils size={18} aria-hidden="true" />
-              )}
-              Sugerir comida
-            </button>
-          ) : null}
-        </form>
-
-        {searchDraft.type === 'transport' ? (
-          <div className="transfer-box">
-            <label>
-              <span>Origen</span>
-              <input
-                onChange={(event) => updateTransferDraft('origin', event.target.value)}
-                type="text"
-                value={transferDraft.origin}
-              />
-            </label>
-            <label>
-              <span>Destino</span>
-              <input
-                onChange={(event) => updateTransferDraft('destination', event.target.value)}
-                type="text"
-                value={transferDraft.destination}
-              />
-            </label>
-            <label>
-              <span>Fecha</span>
-              <input
-                onChange={(event) => updateTransferDraft('date', event.target.value)}
-                type="text"
-                value={transferDraft.date}
-              />
-            </label>
-            <label>
-              <span>Precio/persona visto</span>
-              <input
-                min="0"
-                onChange={(event) => updateTransferDraft('pricePerPerson', event.target.value)}
-                placeholder="Opcional"
-                type="number"
-                value={transferDraft.pricePerPerson}
-              />
-            </label>
-            <label className="wide">
-              <span>Notas</span>
-              <input
-                onChange={(event) => updateTransferDraft('notes', event.target.value)}
-                type="text"
-                value={transferDraft.notes}
-              />
-            </label>
-          </div>
-        ) : null}
-
-        {searchResult ? (
-          <div className="search-result">
-            <strong>
-              {searchResult.status === 'ready'
-                ? 'Sugerencias listas'
-                : searchResult.status === 'error'
-                  ? 'Revisar búsqueda'
-                  : 'Búsqueda solicitada'}
-            </strong>
-            <p>{searchResult.notes}</p>
-            {searchResult.links?.length ? (
-              <div className="platform-links">
-                {searchResult.links.map((link) => (
-                  <a href={link.url} key={link.label} rel="noreferrer" target="_blank">
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-            {searchResult.analysis?.searchQueries?.length ? (
-              <div className="search-tips">
-                <span>Búsquedas sugeridas</span>
-                <ul>
-                  {searchResult.analysis.searchQueries.slice(0, 3).map((query) => (
-                    <li key={query}>{query}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {searchResult.analysis?.comparisonCriteria?.length ? (
-              <div className="search-tips">
-                <span>Criterios de comparación</span>
-                <ul>
-                  {searchResult.analysis.comparisonCriteria.slice(0, 4).map((criterion) => (
-                    <li key={criterion}>{criterion}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {transferResult ? (
-          <div className="search-result transfer-result">
-            <strong>
-              {transferResult.status === 'working'
-                ? 'Buscando traslado'
-                : `Traslado ${transferDraft.origin} → ${transferDraft.destination}`}
-            </strong>
-            <p>{transferResult.analysis?.summary || transferResult.notes}</p>
-            {transferResult.links?.length ? (
-              <div className="platform-links">
-                {transferResult.links.map((link) => (
-                  <a href={link.url} key={link.label} rel="noreferrer" target="_blank">
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-            {transferResult.analysis?.comparisonCriteria?.length ? (
-              <div className="search-tips">
-                <span>Qué comparar antes de comprar</span>
-                <ul>
-                  {transferResult.analysis.comparisonCriteria.slice(0, 4).map((criterion) => (
-                    <li key={criterion}>{criterion}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <button
-              className="primary-button compact"
-              disabled={transferBusy}
-              onClick={addTransferOption}
-              type="button"
-            >
-              <Plus size={18} aria-hidden="true" />
-              Agregar traslado al presupuesto
-            </button>
-          </div>
-        ) : null}
-
-        <form className="external-import" onSubmit={analyzeExternalLink}>
-          <div>
-            <strong>Traer una opción externa a la comparación</strong>
-            <p>
-              Cuando abras Booking, Airbnb o Google Travel, copia el link del hospedaje
-              que te guste y lo agrego a Hospedajes con análisis IA.
-            </p>
-          </div>
-          <input
-            onChange={(event) => setExternalLink(event.target.value)}
-            placeholder="Pega aquí el link del hospedaje"
-            type="url"
-            value={externalLink}
-          />
-          <label>
-            <span>Total visto</span>
-            <input
-              min="0"
-              onChange={(event) => setExternalPriceTotal(event.target.value)}
-              placeholder="Ej. 1781"
-              type="number"
-              value={externalPriceTotal}
-            />
-          </label>
-          <label>
-            <span>EUR/noche visto</span>
-            <input
-              min="0"
-              onChange={(event) => setExternalPriceNight(event.target.value)}
-              placeholder="Ej. 445"
-              type="number"
-              value={externalPriceNight}
-            />
-          </label>
-          <button className="primary-button compact" disabled={externalBusy} type="submit">
-            {externalBusy ? <Loader2 size={18} aria-hidden="true" /> : <Sparkles size={18} aria-hidden="true" />}
-            Analizar link
-          </button>
-        </form>
-
-        {places.length ? (
-          <div className="places-grid">
-            {places.map((place) => (
-              <article key={getPlaceId(place)}>
-                <h3>{getPlaceName(place)}</h3>
-                <p>{getPlaceAddress(place)}</p>
-                <span>
-                  {place.rating ? `${place.rating}/5` : 'Sin rating'} · {getPlaceReviews(place)} reseñas
-                </span>
-                {place.why ? <p className="place-meta">{place.why}</p> : null}
-                {place.caution ? <p className="place-meta caution">{place.caution}</p> : null}
-                <button onClick={() => addPlaceOption(place)} type="button">
-                  <Plus size={16} aria-hidden="true" />
-                  Agregar a comida
-                </button>
-              </article>
-            ))}
-          </div>
-        ) : null}
-        </section>
       ) : null}
+
+      {placeDraft ? (
+        <Suspense fallback={null}>
+          <PlaceSuggestionModal
+            categoryLabel={categoryConfig[placeDraft.category]?.shortLabel || 'Opción'}
+            draft={placeDraft}
+            onClose={() => setPlaceDraft(null)}
+            onSubmit={confirmPlaceOption}
+            onUpdate={updatePlaceDraft}
+            placeName={getPlaceName(placeDraft.place)}
+          />
+        </Suspense>
+      ) : null}
+
+      {aiFeedback && !showAddModal ? (
+        <div className={`ai-feedback-toast ${aiFeedback.tone}`} role="status">
+          <Sparkles size={16} aria-hidden="true" />
+          <div>
+            <strong>{aiFeedback.title}</strong>
+            <p>{aiFeedback.detail}</p>
+          </div>
+          <button
+            className="toast-close"
+            onClick={() => setAiFeedback(null)}
+            type="button"
+            aria-label="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
+
+      {/* search-panel removed */}
 
     </main>
   )
@@ -2591,49 +3384,28 @@ function CityFilterChip({ active, city, onRemove, onSelect, removable }) {
   )
 }
 
-function QuickCityAdd({ addCity, cityDraft, citySuggestionNames, updateCityDraft }) {
-  return (
-    <form className="quick-city-form" onSubmit={addCity}>
-      <label>
-        <span>Agregar ciudad</span>
-        <input
-          list="quick-city-suggestions"
-          onChange={(event) => updateCityDraft('city', event.target.value)}
-          placeholder="León, Valladolid, la que quieras..."
-          type="text"
-          value={cityDraft.city}
-        />
-        <datalist id="quick-city-suggestions">
-          {citySuggestionNames.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-      </label>
-      <button className="secondary-button compact" type="submit">
-        <Plus size={16} aria-hidden="true" />
-        Agregar
-      </button>
-    </form>
-  )
-}
-
 function SmartSuggestionsBanner({
   activeCity,
+  availableTypes = smartSuggestionTypes,
   busy,
   currentType,
   onAddToBudget,
   onAddToMap,
   onChangeType,
+  onPageChange,
   onRefresh,
+  page = 1,
   result,
 }) {
   const activeConfig =
     smartSuggestionTypes.find((item) => item.id === currentType) ||
     smartSuggestionTypes[0]
+  const ActiveIcon = activeConfig.icon
   const resultConfig =
     smartSuggestionTypes.find((item) => item.id === result?.type) || activeConfig
-  const resultMatchesCity = result?.city === activeCity
+  const resultMatchesCity = result?.city === activeCity && result?.type === currentType
   const places = resultMatchesCity ? result?.places || [] : []
+  const paged = pagedItems(places, page)
   const hasPlaces = places.length > 0
 
   return (
@@ -2653,8 +3425,9 @@ function SmartSuggestionsBanner({
       </div>
 
       <div className="smart-suggestion-actions">
-        <div className="smart-type-tabs" aria-label="Tipo de sugerencia">
-          {smartSuggestionTypes.map((type) => {
+        {availableTypes.length > 1 ? (
+          <div className="smart-type-tabs" aria-label="Tipo de sugerencia">
+            {availableTypes.map((type) => {
             const Icon = type.icon
             return (
               <button
@@ -2670,8 +3443,14 @@ function SmartSuggestionsBanner({
                 {type.label}
               </button>
             )
-          })}
-        </div>
+            })}
+          </div>
+        ) : (
+          <span className="smart-locked-type">
+            {ActiveIcon ? <ActiveIcon size={16} aria-hidden="true" /> : null}
+            {activeConfig.label}
+          </span>
+        )}
         <button
           className="primary-button compact"
           disabled={busy}
@@ -2690,8 +3469,9 @@ function SmartSuggestionsBanner({
       ) : null}
 
       {hasPlaces ? (
+        <>
         <div className="smart-place-row">
-          {places.map((place) => (
+          {paged.items.map((place) => (
             <article key={getPlaceId(place)}>
               <div>
                 <h3>{getPlaceName(place)}</h3>
@@ -2701,29 +3481,77 @@ function SmartSuggestionsBanner({
               </div>
               <p>{place.why || getPlaceAddress(place) || 'Recomendación de Google Maps'}</p>
               <div className="smart-place-actions">
-                <a href={getPlaceUrl(place)} rel="noreferrer" target="_blank">
-                  Maps
-                </a>
                 <button
+                  className="smart-add-primary"
                   onClick={() => onAddToMap(place, resultConfig.category, result?.city || activeCity)}
                   type="button"
                 >
-                  <MapPinned size={15} aria-hidden="true" />
-                  Mapa
+                  <Plus size={14} aria-hidden="true" />
+                  {resultConfig.actionLabel}
                 </button>
                 <button
+                  className="smart-add-budget"
                   onClick={() => onAddToBudget(place, resultConfig.category, result?.city || activeCity)}
                   type="button"
                 >
-                  <CircleDollarSign size={15} aria-hidden="true" />
-                  Presupuesto
+                  <CircleDollarSign size={14} aria-hidden="true" />
+                  {resultConfig.budgetLabel}
                 </button>
+                <a className="smart-maps-link" href={getPlaceUrl(place)} rel="noreferrer" target="_blank">
+                  <MapPinned size={14} aria-hidden="true" />
+                  Ver en Maps
+                </a>
               </div>
             </article>
           ))}
         </div>
+        <PaginationControl
+          label={`${places.length} sugerencias`}
+          onPageChange={onPageChange}
+          page={paged.page}
+          totalPages={paged.totalPages}
+        />
+        </>
       ) : null}
     </section>
+  )
+}
+
+function PaginationControl({ label, onPageChange, page, totalPages }) {
+  if (totalPages <= 1) return null
+
+  return (
+    <div className="pagination-control">
+      <span>{label} · página {page} de {totalPages}</span>
+      <div>
+        <button
+          disabled={page <= 1}
+          onClick={() => onPageChange?.(page - 1)}
+          type="button"
+          aria-label="Página anterior"
+        >
+          <ChevronLeft size={15} aria-hidden="true" />
+        </button>
+        {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+          <button
+            className={pageNumber === page ? 'active' : ''}
+            key={pageNumber}
+            onClick={() => onPageChange?.(pageNumber)}
+            type="button"
+          >
+            {pageNumber}
+          </button>
+        ))}
+        <button
+          disabled={page >= totalPages}
+          onClick={() => onPageChange?.(page + 1)}
+          type="button"
+          aria-label="Página siguiente"
+        >
+          <ChevronRight size={15} aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -2777,222 +3605,6 @@ function LoginScreen({ canLogin, firebaseStatus, onSignIn }) {
   )
 }
 
-function MadridMap({ city, destinationCoords, options, routeMode }) {
-  const mapRef = useRef(null)
-  const [mapError, setMapError] = useState('')
-  const [routeSummaries, setRouteSummaries] = useState({})
-  const hasDestination = Boolean(destinationCoords?.lat && destinationCoords?.lng)
-  const hasRealMap = hasMapsKey() && hasDestination
-
-  useEffect(() => {
-    if (!hasRealMap || !mapRef.current) return undefined
-
-    let cancelled = false
-    const mapItems = []
-    setMapError('')
-    setRouteSummaries({})
-
-    loadGoogleMaps()
-      .then((google) => {
-        if (cancelled || !mapRef.current) return
-
-        const map = new google.maps.Map(mapRef.current, {
-          center: destinationCoords,
-          zoom: 12,
-          mapTypeControl: false,
-          fullscreenControl: false,
-          streetViewControl: false,
-          clickableIcons: false,
-          styles: [
-            {
-              featureType: 'poi.business',
-              stylers: [{ visibility: 'off' }],
-            },
-          ],
-        })
-
-        const bounds = new google.maps.LatLngBounds()
-        const infoWindow = new google.maps.InfoWindow()
-        const directionsService = new google.maps.DirectionsService()
-        const destinationPosition = new google.maps.LatLng(destinationCoords.lat, destinationCoords.lng)
-        const isMadrid = city === 'Madrid'
-
-        const destinationMarker = new google.maps.Marker({
-          map,
-          position: destinationPosition,
-          title: isMadrid ? 'IFEMA / MADRING' : `Centro de ${city}`,
-          label: isMadrid ? 'F1' : 'C',
-        })
-        mapItems.push(destinationMarker)
-        bounds.extend(destinationPosition)
-
-        const locatedOptions = options.filter((option) => option.coords)
-
-        locatedOptions.forEach((option) => {
-          const position = new google.maps.LatLng(option.coords.lat, option.coords.lng)
-          const marker = new google.maps.Marker({
-            map,
-            position,
-            title: option.title,
-            label: option.code,
-          })
-          const fallbackLine = new google.maps.Polyline({
-            map,
-            path: [position, destinationPosition],
-            geodesic: true,
-            strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
-            strokeOpacity: 0.55,
-            strokeWeight: 3,
-          })
-
-          const routeLabel = routeModes[routeMode]?.label || 'Ruta'
-          marker.routeStatus = option.transit
-          setRouteSummaries((current) => ({
-            ...current,
-            [option.id]: {
-              title: option.title,
-              code: option.code,
-              status: option.id === 'f1-madring' ? 'Destino de referencia' : 'Calculando...',
-            },
-          }))
-
-          marker.addListener('click', () => {
-            infoWindow.setContent(
-              `<strong>${option.title}</strong><br>${routeLabel}<br>${marker.routeStatus || option.transit}<br>${option.aiScore}/100`,
-            )
-            infoWindow.open({ anchor: marker, map })
-          })
-
-          if (option.id !== 'f1-madring') {
-            directionsService.route(
-              {
-                origin: position,
-                destination: destinationPosition,
-                travelMode: google.maps.TravelMode[routeMode],
-              },
-              (result, status) => {
-                if (status !== google.maps.DirectionsStatus.OK || !result) {
-                  marker.routeStatus = 'Sin tiempo disponible'
-                  setRouteSummaries((current) => ({
-                    ...current,
-                    [option.id]: {
-                      title: option.title,
-                      code: option.code,
-                      status: 'Sin tiempo disponible',
-                    },
-                  }))
-                  return
-                }
-                const leg = result.routes?.[0]?.legs?.[0]
-                const duration = leg?.duration?.text || 'Tiempo no disponible'
-                const distance = leg?.distance?.text || ''
-                marker.routeStatus = `${duration}${distance ? ` · ${distance}` : ''}`
-                setRouteSummaries((current) => ({
-                  ...current,
-                  [option.id]: {
-                    title: option.title,
-                    code: option.code,
-                    duration,
-                    distance,
-                    status: `${duration}${distance ? ` · ${distance}` : ''}`,
-                  },
-                }))
-                fallbackLine.setMap(null)
-                const renderer = new google.maps.DirectionsRenderer({
-                  directions: result,
-                  map,
-                  preserveViewport: true,
-                  suppressMarkers: true,
-                  polylineOptions: {
-                    strokeColor: option.category === 'lodging' ? '#2563eb' : '#0f766e',
-                    strokeOpacity: 0.72,
-                    strokeWeight: 4,
-                  },
-                })
-                mapItems.push(renderer)
-              },
-            )
-          }
-
-          mapItems.push(marker, fallbackLine)
-          bounds.extend(position)
-        })
-
-        if (locatedOptions.length) {
-          map.fitBounds(bounds, 42)
-        } else {
-          map.setCenter(destinationCoords)
-          map.setZoom(isMadrid ? 11 : 12)
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) setMapError(error.message)
-      })
-
-    return () => {
-      cancelled = true
-      mapItems.forEach((item) => item.setMap(null))
-    }
-  }, [city, destinationCoords, hasRealMap, options, routeMode])
-
-  if (!hasRealMap || mapError) {
-    return <ConceptMap city={city} mapOptions={options} note={mapError} />
-  }
-
-  return (
-    <div className="real-map-wrap">
-      <div className="google-map" ref={mapRef} />
-      <div className="map-caption">
-        <CheckCircle2 size={16} aria-hidden="true" />
-        <span>
-          Rutas en modo {routeModes[routeMode]?.label || 'ruta'} hacia {city === 'Madrid' ? 'IFEMA / MADRING' : `centro de ${city}`}
-        </span>
-      </div>
-      <div className="route-summary-list">
-        {options
-          .filter((option) => option.coords && option.id !== 'f1-madring')
-          .map((option) => {
-            const summary = routeSummaries[option.id]
-            return (
-              <article key={option.id}>
-                <strong>{option.code}</strong>
-                <span>{option.title}</span>
-                <em>{summary?.status || 'Calculando...'}</em>
-              </article>
-            )
-          })}
-      </div>
-    </div>
-  )
-}
-
-function ConceptMap({ city, mapOptions, note }) {
-  return (
-    <div className="map-stage" aria-label={`Mapa conceptual de ${city}`}>
-      <div className="route-line route-one" />
-      <div className="route-line route-two" />
-      <div className="ifema-pin">
-        <Plane size={16} aria-hidden="true" />
-        <span>{city === 'Madrid' ? 'IFEMA' : city}</span>
-      </div>
-      {mapOptions.map((option) => (
-        <a
-          className={`map-pin ${option.category}`}
-          href={option.url || '#'}
-          key={option.id}
-          rel="noreferrer"
-          style={{ left: `${option.map.x}%`, top: `${option.map.y}%` }}
-          target={option.url ? '_blank' : undefined}
-          title={option.title}
-        >
-          {option.code}
-        </a>
-      ))}
-      {note ? <span className="map-note">{note}</span> : null}
-    </div>
-  )
-}
-
 function readinessText(value) {
   if (value >= 70) return 'Lista para decidir'
   if (value >= 45) return 'Comparar esta semana'
@@ -3003,180 +3615,517 @@ function readinessText(value) {
 function NextCitiesPanel({
   activeCity,
   addCity,
+  canSync = false,
   cities,
   cityDraft,
   citySuggestionNames,
   currentTravelGroup,
-  onOpenMap,
+  onAutoFill,
+  onAddDayTrip,
+  onAssessPlan,
+  onChatPlanner,
   onPrepareLodging,
   onPrepareTransfer,
   onRemoveCity,
+  onRemoveDayTrip,
+  onOpenMap,
+  onSuggestDayTrips,
+  onToggleBase,
+  onUpdateCity,
   updateCityDraft,
 }) {
-  const topCity = [...cities].sort((a, b) => b.readiness - a.readiness)[0]
-  const undecidedCount = cities.filter((city) => city.readiness < 50).length
+  // ── inline edit ──────────────────────────────────────────────────────────
+  const [editingId, setEditingId] = useState(null)
+  const [editDraft, setEditDraft] = useState({ dates: '', transfer: '', angle: '' })
 
+  // ── day-trips ────────────────────────────────────────────────────────────
+  const [dayTripBusyId, setDayTripBusyId] = useState(null)
+  const [newTripDraftId, setNewTripDraftId] = useState(null)
+  const [newTripDraft, setNewTripDraft] = useState({ route: '', notes: '' })
+
+  // ── analysis panel ───────────────────────────────────────────────────────
+  const [assessment, setAssessment] = useState(null)
+  const [assessBusy, setAssessBusy] = useState(false)
+  const [assessOpen, setAssessOpen] = useState(false)
+
+  // ── chatbox ──────────────────────────────────────────────────────────────
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatHistory, setChatHistory] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatBusy, setChatBusy] = useState(false)
+  const chatEndRef = React.useRef(null)
+
+  // scroll al último mensaje
+  React.useEffect(() => {
+    if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory, chatOpen])
+
+  // ── inline edit helpers ──────────────────────────────────────────────────
+  function startEdit(city) {
+    setEditingId(city.id)
+    setEditDraft({ dates: city.dates || '', transfer: city.transfer || '', angle: city.angle || '' })
+  }
+  function cancelEdit() {
+    setEditingId(null)
+    setEditDraft({ dates: '', transfer: '', angle: '' })
+  }
+  function saveEdit(city) {
+    onUpdateCity?.({
+      ...city,
+      dates: editDraft.dates.trim() || city.dates,
+      transfer: editDraft.transfer.trim() || city.transfer,
+      angle: editDraft.angle.trim() || city.angle,
+      readiness: city.isBase ? 100 : Math.min((city.readiness || 18) + 10, 70),
+    })
+    cancelEdit()
+  }
+
+  // ── day-trip helpers ─────────────────────────────────────────────────────
+  async function handleSuggestDayTrips(cityId) {
+    if (dayTripBusyId) return
+    setDayTripBusyId(cityId)
+    await onSuggestDayTrips?.(cityId)
+    setDayTripBusyId(null)
+  }
+  function startAddTripManual(cityId) {
+    setNewTripDraftId(cityId)
+    setNewTripDraft({ route: '', notes: '' })
+  }
+  function saveManualTrip(cityId) {
+    if (!newTripDraft.route.trim()) return
+    onAddDayTrip?.(cityId, {
+      id: `dt-${Date.now()}`,
+      label: newTripDraft.route.split('→')[1]?.trim() || newTripDraft.route,
+      route: newTripDraft.route.trim(),
+      notes: newTripDraft.notes.trim(),
+      durationHours: null,
+    })
+    setNewTripDraftId(null)
+    setNewTripDraft({ route: '', notes: '' })
+  }
+
+  // ── analysis helpers ─────────────────────────────────────────────────────
+  async function handleAssess() {
+    if (assessBusy) return
+    setAssessBusy(true)
+    setAssessOpen(true)
+    const result = await onAssessPlan?.()
+    if (result) setAssessment(result)
+    setAssessBusy(false)
+  }
+
+  // ── chat helpers ─────────────────────────────────────────────────────────
+  const QUICK_QUESTIONS = [
+    '¿Cuáles ciudades priorizo con el tiempo que tenemos?',
+    '¿Es viable visitar todas las ciudades del plan?',
+    '¿Cómo distribuyo los días entre ciudades?',
+    '¿Qué traslados recomiendas?',
+  ]
+
+  async function sendChat(msg) {
+    const text = (msg || chatInput).trim()
+    if (!text || chatBusy) return
+    setChatInput('')
+    const userMsg = { role: 'user', content: text }
+    const updatedHistory = [...chatHistory, userMsg]
+    setChatHistory(updatedHistory)
+    setChatBusy(true)
+    // Convert history to {role, content} format for the API
+    const apiHistory = chatHistory.map((m) => ({ role: m.role, content: m.content }))
+    const result = await onChatPlanner?.(text, apiHistory)
+    if (result?.reply) {
+      setChatHistory((h) => [...h, { role: 'assistant', content: result.reply }])
+    } else {
+      setChatHistory((h) => [...h, { role: 'assistant', content: 'No pude procesar la consulta. Intenta de nuevo.' }])
+    }
+    setChatBusy(false)
+  }
+
+  // ── derived ──────────────────────────────────────────────────────────────
+  const baseCities = cities.filter((c) => c.isBase)
+  const normalCities = cities.filter((c) => !c.isBase)
+  const topCity = [...normalCities].sort((a, b) => b.readiness - a.readiness)[0]
+  const undecidedCount = normalCities.filter((city) => city.readiness < 50).length
+
+  const viabilityIcon = { alta: '✅', media: '🟡', baja: '⚠️', 'no-recomendada': '❌' }
+
+  // ── city card renderer ───────────────────────────────────────────────────
+  function renderCityCard(city) {
+    const isEditing = editingId === city.id
+    const isBase = Boolean(city.isBase)
+    const dayTrips = city.dayTrips || []
+
+    return (
+      <article
+        className={[activeCity === city.city ? 'selected' : '', isBase ? 'base-city' : ''].filter(Boolean).join(' ')}
+        key={city.id}
+      >
+        <div className="next-city-card-head">
+          <div>
+            <span>
+              {city.country}
+              {isBase && <span className="base-badge">🏠 Base</span>}
+            </span>
+            <h3>{city.city}</h3>
+          </div>
+          {!isBase && <strong>{readinessText(city.readiness)}</strong>}
+        </div>
+
+        {isEditing ? (
+          <div className="city-inline-edit">
+            {!isBase && (
+              <>
+                <label className="city-edit-field">
+                  <span><CalendarDays size={12} aria-hidden="true" /> Fechas</span>
+                  <input autoFocus onChange={(e) => setEditDraft((d) => ({ ...d, dates: e.target.value }))} placeholder="14-17 sep 2026" type="text" value={editDraft.dates} />
+                </label>
+                <label className="city-edit-field">
+                  <span><TrainFront size={12} aria-hidden="true" /> Traslado</span>
+                  <input onChange={(e) => setEditDraft((d) => ({ ...d, transfer: e.target.value }))} placeholder="AVE desde Madrid" type="text" value={editDraft.transfer} />
+                </label>
+              </>
+            )}
+            <label className="city-edit-field wide">
+              <span>Idea del plan</span>
+              <input autoFocus={isBase} onChange={(e) => setEditDraft((d) => ({ ...d, angle: e.target.value }))} placeholder="Qué tiene esta zona" type="text" value={editDraft.angle} />
+            </label>
+            <div className="city-edit-actions">
+              <button className="primary-button compact" onClick={() => saveEdit(city)} type="button">
+                <CheckCircle2 size={14} aria-hidden="true" /> Guardar
+              </button>
+              <button className="secondary-button compact" onClick={cancelEdit} type="button">Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p>{city.angle}</p>
+            {!isBase && (
+              <div className="next-city-facts">
+                <span><CalendarDays size={14} aria-hidden="true" />{city.dates}</span>
+                <span><TrainFront size={14} aria-hidden="true" />{city.transfer}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Day-trips — solo ciudades base */}
+        {isBase && (
+          <div className="day-trips-section">
+            {dayTrips.length > 0 && (
+              <ul className="day-trip-list">
+                {dayTrips.map((trip) => (
+                  <li className="day-trip-item" key={trip.id}>
+                    <div className="day-trip-info">
+                      <strong>{trip.label}</strong>
+                      <span className="day-trip-route">{trip.route}</span>
+                      {trip.notes && <p className="day-trip-notes">{trip.notes}</p>}
+                      {trip.durationHours && <span className="day-trip-duration">~{trip.durationHours}h</span>}
+                    </div>
+                    <button className="danger compact" onClick={() => onRemoveDayTrip?.(city.id, trip.id)} title="Eliminar" type="button">
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {newTripDraftId === city.id ? (
+              <div className="new-day-trip-form">
+                <input autoFocus className="day-trip-input" onChange={(e) => setNewTripDraft((d) => ({ ...d, route: e.target.value }))} placeholder={`${city.city} → destino → ${city.city}`} type="text" value={newTripDraft.route} />
+                <input className="day-trip-input" onChange={(e) => setNewTripDraft((d) => ({ ...d, notes: e.target.value }))} placeholder="Qué hacer, dónde comer..." type="text" value={newTripDraft.notes} />
+                <div className="city-edit-actions">
+                  <button className="primary-button compact" disabled={!newTripDraft.route.trim()} onClick={() => saveManualTrip(city.id)} type="button">
+                    <CheckCircle2 size={14} aria-hidden="true" /> Guardar excursión
+                  </button>
+                  <button className="secondary-button compact" onClick={() => setNewTripDraftId(null)} type="button">Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <div className="day-trip-actions">
+                <button className="secondary-button compact" onClick={() => startAddTripManual(city.id)} type="button">
+                  <Plus size={14} aria-hidden="true" /> Agregar excursión
+                </button>
+                {canSync && (
+                  <button className="secondary-button compact ai-btn" disabled={dayTripBusyId === city.id} onClick={() => handleSuggestDayTrips(city.id)} type="button">
+                    <Sparkles size={14} aria-hidden="true" />
+                    {dayTripBusyId === city.id ? 'Buscando...' : 'Sugerir con IA'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isBase && <div className="progress"><i style={{ width: `${city.readiness}%` }} /></div>}
+
+        <div className="next-city-actions">
+          {!isEditing && (
+            <button onClick={() => startEdit(city)} type="button">
+              <Route size={15} aria-hidden="true" />
+              {isBase ? 'Editar' : 'Editar fechas'}
+            </button>
+          )}
+          <button className={isBase ? 'active-toggle' : ''} onClick={() => onToggleBase?.(city.id)} title={isBase ? 'Quitar como base' : 'Marcar como ciudad base'} type="button">
+            <Home size={15} aria-hidden="true" />
+            {isBase ? 'Es base' : 'Base'}
+          </button>
+          <button onClick={() => onOpenMap(city.city)} type="button">
+            <MapPinned size={15} aria-hidden="true" />
+            Ver mapa
+          </button>
+          {!isBase && (
+            <>
+              <button onClick={() => onPrepareLodging(city)} type="button">
+                <Hotel size={15} aria-hidden="true" /> Hospedaje
+              </button>
+              <button onClick={() => onPrepareTransfer(city)} type="button">
+                <TrainFront size={15} aria-hidden="true" /> Omio
+              </button>
+            </>
+          )}
+          <button className="danger" onClick={() => onRemoveCity(city.id)} type="button">
+            <Trash2 size={15} aria-hidden="true" /> Quitar
+          </button>
+        </div>
+      </article>
+    )
+  }
+
+  // ── main render ──────────────────────────────────────────────────────────
   return (
     <section className="next-cities-panel">
+      {/* Hero */}
       <div className="next-city-hero">
         <div>
           <p className="eyebrow">Después de Madrid · 14-24 septiembre</p>
           <h2>Elegir la siguiente base del viaje</h2>
-          <p>
-            Esta sección queda para una sola decisión: qué ciudad vale la pena
-            investigar, qué falta cerrar y cuál es el siguiente paso concreto.
-          </p>
+          <p>Agrega ciudades, marca tu base y deja que la IA analice el plan, sugiera prioridades y organice los días.</p>
         </div>
         <div className="next-city-kpis" aria-label="Estado de decisión">
-          <article>
-            <span>Candidatas</span>
-            <strong>{cities.length}</strong>
-          </article>
-          <article>
-            <span>Más avanzada</span>
-            <strong>{topCity?.city || 'Por definir'}</strong>
-          </article>
-          <article>
-            <span>Por madurar</span>
-            <strong>{undecidedCount}</strong>
-          </article>
+          <article><span>Candidatas</span><strong>{normalCities.length}</strong></article>
+          <article><span>Bases</span><strong>{baseCities.length}</strong></article>
+          <article><span>Más avanzada</span><strong>{topCity?.city || 'Por definir'}</strong></article>
+          <article><span>Por madurar</span><strong>{undecidedCount}</strong></article>
+        </div>
+        <div className="next-city-hero-actions">
+          {cities.length > 0 && onAutoFill ? (
+            <button className="secondary-button compact" onClick={onAutoFill} type="button">
+              <CalendarDays size={16} aria-hidden="true" /> Autocompletar fechas
+            </button>
+          ) : null}
+          {cities.length > 0 && canSync ? (
+            <button className="primary-button compact" disabled={assessBusy} onClick={handleAssess} type="button">
+              <Sparkles size={16} aria-hidden="true" />
+              {assessBusy ? 'Analizando...' : 'Analizar viaje con IA'}
+            </button>
+          ) : null}
         </div>
       </div>
 
+      {/* Roadmap */}
       <div className="decision-roadmap">
-        <article>
-          <span>1</span>
-          <strong>Ciudad base</strong>
-          <p>Reducir a 1 o 2 candidatas reales.</p>
-        </article>
-        <article>
-          <span>2</span>
-          <strong>Traslado</strong>
-          <p>Comparar tren, bus y avión en Omio.</p>
-        </article>
-        <article>
-          <span>3</span>
-          <strong>Hospedaje</strong>
-          <p>Buscar opciones para {groupSummary(currentTravelGroup)}.</p>
-        </article>
-        <article>
-          <span>4</span>
-          <strong>Plan familiar</strong>
-          <p>Definir 2-3 planes que funcionen con niños.</p>
-        </article>
+        <article><span>1</span><strong>Ciudad base</strong><p>Reducir a 1 o 2 candidatas reales.</p></article>
+        <article><span>2</span><strong>Traslado</strong><p>Comparar tren, bus y avión en Omio.</p></article>
+        <article><span>3</span><strong>Hospedaje</strong><p>Buscar opciones para {groupSummary(currentTravelGroup)}.</p></article>
+        <article><span>4</span><strong>Plan familiar</strong><p>Definir 2-3 planes que funcionen con niños.</p></article>
       </div>
 
-      <div className="next-city-grid">
-        {cities.map((city) => (
-          <article className={activeCity === city.city ? 'selected' : ''} key={city.id}>
-            <div className="next-city-card-head">
-              <div>
-                <span>{city.country}</span>
-                <h3>{city.city}</h3>
-              </div>
-              <strong>{readinessText(city.readiness)}</strong>
-            </div>
-            <p>{city.angle}</p>
-            <div className="next-city-facts">
-              <span>
-                <CalendarDays size={14} aria-hidden="true" />
-                {city.dates}
-              </span>
-              <span>
-                <TrainFront size={14} aria-hidden="true" />
-                {city.transfer}
-              </span>
-            </div>
-            <div className="progress">
-              <i style={{ width: `${city.readiness}%` }} />
-            </div>
-            <div className="next-city-actions">
-              <button onClick={() => onOpenMap(city.city)} type="button">
-                <MapPinned size={15} aria-hidden="true" />
-                Ver mapa
-              </button>
-              <button onClick={() => onPrepareLodging(city)} type="button">
-                <Hotel size={15} aria-hidden="true" />
-                Hospedaje
-              </button>
-              <button onClick={() => onPrepareTransfer(city)} type="button">
-                <TrainFront size={15} aria-hidden="true" />
-                Omio
-              </button>
-              <button className="danger" onClick={() => onRemoveCity(city.id)} type="button">
-                <Trash2 size={15} aria-hidden="true" />
-                Quitar
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+      {/* ── Panel de Análisis IA ─────────────────────────────────────────── */}
+      {assessOpen && (
+        <div className="planner-assessment">
+          <div className="planner-assessment-head">
+            <h3><Sparkles size={16} aria-hidden="true" /> Análisis del plan</h3>
+            <button className="icon-close" onClick={() => setAssessOpen(false)} type="button">✕</button>
+          </div>
 
+          {assessBusy ? (
+            <p className="assess-loading">La IA está analizando tu plan… puede tardar unos segundos.</p>
+          ) : assessment ? (
+            <>
+              {assessment.overview && <p className="assess-overview">{assessment.overview}</p>}
+
+              {assessment.warnings?.length > 0 && (
+                <div className="assess-warnings">
+                  {assessment.warnings.map((w, i) => (
+                    <p key={i}><span>⚠️</span> {w}</p>
+                  ))}
+                </div>
+              )}
+
+              {assessment.priorities?.length > 0 && (
+                <ul className="assess-priorities">
+                  {assessment.priorities.map((item) => (
+                    <li key={item.city} className={`viability-${item.viability}`}>
+                      <div className="assess-city-head">
+                        <span className="assess-icon">{viabilityIcon[item.viability] || '🔵'}</span>
+                        <strong>{item.city}</strong>
+                        {item.suggestedDays > 0 && (
+                          <span className="assess-days">{item.suggestedDays} día{item.suggestedDays !== 1 ? 's' : ''}</span>
+                        )}
+                      </div>
+                      <p className="assess-reasoning">{item.reasoning}</p>
+                      {item.transfers?.length > 0 && (
+                        <p className="assess-transfers">
+                          <TrainFront size={12} aria-hidden="true" /> {item.transfers.join(' · ')}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {/* Ciudades base */}
+      {baseCities.length > 0 && (
+        <>
+          <p className="eyebrow base-section-label"><Home size={14} aria-hidden="true" /> Ciudades base (sin hospedaje)</p>
+          <div className="next-city-grid">{baseCities.map(renderCityCard)}</div>
+        </>
+      )}
+
+      {/* Ciudades normales */}
+      {normalCities.length > 0 && (
+        <>
+          {baseCities.length > 0 && (
+            <p className="eyebrow base-section-label" style={{ marginTop: '1.5rem' }}>
+              <Hotel size={14} aria-hidden="true" /> Ciudades con hospedaje
+            </p>
+          )}
+          <div className="next-city-grid">{normalCities.map(renderCityCard)}</div>
+        </>
+      )}
+
+      {/* ── Mini-chatbox ─────────────────────────────────────────────────── */}
+      {cities.length > 0 && (
+        <div className="planner-chat-wrap">
+          <button
+            className={`planner-chat-toggle ${chatOpen ? 'open' : ''}`}
+            onClick={() => setChatOpen((v) => !v)}
+            type="button"
+          >
+            <MessageCircle size={16} aria-hidden="true" />
+            {chatOpen ? 'Cerrar planificador' : 'Consultar al planificador IA'}
+            <ChevronDown size={14} aria-hidden="true" className={chatOpen ? 'rotated' : ''} />
+          </button>
+
+          {chatOpen && (
+            <div className="planner-chat">
+              {chatHistory.length === 0 && (
+                <div className="chat-intro">
+                  <p>Pregúntame sobre tu plan: viabilidad, días, traslados, qué priorizar…</p>
+                  <div className="chat-quick-questions">
+                    {QUICK_QUESTIONS.map((q) => (
+                      <button
+                        className="chat-quick-btn"
+                        disabled={chatBusy}
+                        key={q}
+                        onClick={() => sendChat(q)}
+                        type="button"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {chatHistory.length > 0 && (
+                <div className="chat-messages">
+                  {chatHistory.map((msg, i) => (
+                    <div className={`chat-msg ${msg.role}`} key={i}>
+                      <span className="chat-bubble">{msg.content}</span>
+                    </div>
+                  ))}
+                  {chatBusy && (
+                    <div className="chat-msg assistant">
+                      <span className="chat-bubble chat-typing">Pensando…</span>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+              )}
+
+              <form
+                className="chat-input-row"
+                onSubmit={(e) => { e.preventDefault(); sendChat(); }}
+              >
+                <input
+                  className="chat-input"
+                  disabled={chatBusy || !canSync}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder={canSync ? '¿Qué quieres saber sobre el plan?' : 'Necesitas sesión para chatear con la IA'}
+                  type="text"
+                  value={chatInput}
+                />
+                <button
+                  className="primary-button compact"
+                  disabled={chatBusy || !chatInput.trim() || !canSync}
+                  type="submit"
+                >
+                  <Sparkles size={14} aria-hidden="true" />
+                </button>
+                {chatHistory.length > 0 && (
+                  <button
+                    className="secondary-button compact"
+                    onClick={() => setChatHistory([])}
+                    title="Borrar conversación"
+                    type="button"
+                  >
+                    ✕
+                  </button>
+                )}
+              </form>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Form para agregar ciudad */}
       <div className="next-city-add">
         <div>
           <p className="eyebrow">Nueva ciudad candidata</p>
           <h2>Agregar ciudad con intención</h2>
           <p>
-            Lo importante no es llenar una lista: es guardar por qué esa ciudad
-            podría funcionar y qué traslado habría que revisar.
+            Si es tu base (casa o alojamiento fijo), activa el toggle —
+            la IA sabrá que no necesitas hospedaje y sugerirá excursiones desde ahí.
           </p>
         </div>
         <form className="city-form" onSubmit={addCity}>
           <label>
             <span>Ciudad</span>
-            <input
-              list="city-suggestions"
-              onChange={(event) => updateCityDraft('city', event.target.value)}
-              placeholder="Lisboa, Bilbao..."
-              required
-              type="text"
-              value={cityDraft.city}
-            />
+            <input list="city-suggestions" onChange={(e) => updateCityDraft('city', e.target.value)} placeholder="Lisboa, Guardo, Bilbao..." required type="text" value={cityDraft.city} />
             <datalist id="city-suggestions">
-              {citySuggestionNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
+              {citySuggestionNames.map((name) => <option key={name} value={name} />)}
             </datalist>
           </label>
           <label>
             <span>País</span>
-            <input
-              onChange={(event) => updateCityDraft('country', event.target.value)}
-              placeholder="Portugal, España..."
-              type="text"
-              value={cityDraft.country}
-            />
+            <input onChange={(e) => updateCityDraft('country', e.target.value)} placeholder="Portugal, España..." type="text" value={cityDraft.country} />
           </label>
-          <label>
-            <span>Fechas</span>
-            <input
-              onChange={(event) => updateCityDraft('dates', event.target.value)}
-              placeholder="19-24 sep"
-              type="text"
-              value={cityDraft.dates}
-            />
-          </label>
-          <label>
-            <span>Traslado</span>
-            <input
-              onChange={(event) => updateCityDraft('transfer', event.target.value)}
-              placeholder="Tren, vuelo, coche..."
-              type="text"
-              value={cityDraft.transfer}
-            />
-          </label>
+          {!cityDraft.isBase && (
+            <>
+              <label>
+                <span>Fechas</span>
+                <input onChange={(e) => updateCityDraft('dates', e.target.value)} placeholder="19-24 sep" type="text" value={cityDraft.dates} />
+              </label>
+              <label>
+                <span>Traslado</span>
+                <input onChange={(e) => updateCityDraft('transfer', e.target.value)} placeholder="Tren, vuelo, coche..." type="text" value={cityDraft.transfer} />
+              </label>
+            </>
+          )}
           <label className="wide">
             <span>Idea del plan</span>
-            <input
-              onChange={(event) => updateCityDraft('angle', event.target.value)}
-              placeholder="Por qué puede funcionar para todos"
-              type="text"
-              value={cityDraft.angle}
-            />
+            <input onChange={(e) => updateCityDraft('angle', e.target.value)} placeholder="Por qué puede funcionar para todos" type="text" value={cityDraft.angle} />
+          </label>
+          <label className="base-toggle-label">
+            <input checked={Boolean(cityDraft.isBase)} onChange={(e) => updateCityDraft('isBase', e.target.checked)} type="checkbox" />
+            <span><Home size={14} aria-hidden="true" /> Es mi base / casa (sin hospedaje)</span>
           </label>
           <button className="primary-button compact" type="submit">
-            <Plus size={18} aria-hidden="true" />
-            Agregar ciudad
+            <Plus size={18} aria-hidden="true" /> Agregar ciudad
           </button>
         </form>
       </div>
@@ -3313,17 +4262,47 @@ function TransportPanel({
 function OptionGrid({
   activeCategory,
   activeMember,
+  activeTripId,
   availabilityBusyId = '',
   budgetOptionIds,
+  canSync = false,
+  currentTravelGroup,
   nights,
   onRemove,
   onRestore,
   onToggleBudget,
   onVerifyAvailability,
   onVote,
+  onUpdateOption,
   options,
+  subgroups = [],
   votes,
 }) {
+  const [selectedOption, setSelectedOption] = useState(null)
+  const [reanalyzeBusy, setReanalyzeBusy] = useState(false)
+
+  async function handleReanalyze(option) {
+    if (!canSync || reanalyzeBusy) return
+    setReanalyzeBusy(true)
+    try {
+	      const result = await reanalyzeOptionWithAI({
+	        tripId: activeTripId,
+	        optionId: option.id,
+        groupProfile: currentTravelGroup,
+        subgroups,
+      })
+      if (result?.patch) {
+        const updated = { ...option, ...result.patch }
+        setSelectedOption(updated)
+        onUpdateOption?.(updated)
+      }
+    } catch (err) {
+      console.error('reanalyze error', err)
+    } finally {
+      setReanalyzeBusy(false)
+    }
+  }
+
   if (!options.length) {
     return (
       <div className="empty-state">
@@ -3334,197 +4313,325 @@ function OptionGrid({
     )
   }
 
+  const sel = selectedOption
+    ? {
+        option: selectedOption,
+        optionVotes: votes[selectedOption.id] || [],
+        hasVote: (votes[selectedOption.id] || []).includes(activeMember),
+        inBudget: budgetOptionIds.includes(selectedOption.id),
+        price: priceBreakdown(selectedOption, nights),
+      }
+    : null
+
   return (
-    <div className="option-grid">
-      {options.map((option) => {
-        const optionVotes = votes[option.id] || []
-        const hasVote = optionVotes.includes(activeMember)
-        const inBudget = budgetOptionIds.includes(option.id)
-        const price = priceBreakdown(option, nights)
-        return (
-          <article className={`option-card ${option.status}`} key={option.id}>
-            <div className="option-media">
-              <OptionImage option={option} />
-              <span
-                className={`score-badge ${!option.aiScore || option.aiScore <= 30 ? 'pending' : ''}`}
-                title={aiScoreTitle(option.aiScore)}
-              >
-                {aiScoreLabel(option.aiScore)}
-              </span>
-              {option.imageCredit ? <span className="photo-credit">{option.imageCredit}</span> : null}
-            </div>
-            <div className="option-body">
-              <div className="option-title-row">
-                <span className="code-badge">{option.code}</span>
-                <div>
-                  <p>{option.source} · {option.city}</p>
-                  <h2>{option.title}</h2>
-                </div>
-              </div>
-
-              <div className="metric-row">
-                <span>
-                  <CircleDollarSign size={16} aria-hidden="true" />
-                  <span>
-                    <strong>{price.primary}</strong>
-                    {price.secondary ? <small>{price.secondary}</small> : null}
-                  </span>
-                </span>
-                <span>
-                  <Users size={16} aria-hidden="true" />
-                  {option.capacity}
-                </span>
-                <span>
-                  <Route size={16} aria-hidden="true" />
-                  {option.transit}
-                </span>
-              </div>
-
-              <div className="tag-row">
-                <span>{activeCategory.shortLabel}</span>
-                <span>{targetLabels[option.targetGroup]}</span>
-                <span>{option.rating}</span>
-              </div>
-
-              {option.category === 'lodging' && option.availability ? (
-                <div className={`availability-card ${availabilityTone(option.availability.status)}`}>
-                  <strong>{option.availability.label || 'Disponibilidad revisada'}</strong>
-                  <span>
-                    {formatAvailabilityDate(option.availability.checkedAt)
-                      ? `Revisado ${formatAvailabilityDate(option.availability.checkedAt)}`
-                      : 'Revisión guardada'}
-                    {option.availability.confidence
-                      ? ` · confianza ${option.availability.confidence}`
-                      : ''}
-                  </span>
-                  <p>{option.availability.summary}</p>
-                </div>
-              ) : null}
-
-              <ul className="signal-list">
-                {option.highlights.slice(0, 2).map((highlight) => (
-                  <li key={highlight}>{highlight}</li>
-                ))}
-              </ul>
-
-              <div className="card-actions desktop-actions">
-                <button
-                  className={hasVote ? 'liked' : ''}
-                  onClick={() => onVote(option.id)}
-                  type="button"
+    <>
+      <div className="option-grid">
+        {options.map((option) => {
+          const optionVotes = votes[option.id] || []
+          const hasVote = optionVotes.includes(activeMember)
+          const inBudget = budgetOptionIds.includes(option.id)
+          const price = priceBreakdown(option, nights)
+          return (
+            <article
+              className={`option-card ${option.status}`}
+              key={option.id}
+              onClick={() => setSelectedOption(option)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && setSelectedOption(option)}
+            >
+              <div className="option-media">
+                <OptionImage option={option} />
+                <span
+                  className={`score-badge ${!option.aiScore || option.aiScore <= 30 ? 'pending' : ''}`}
+                  title={aiScoreTitle(option.aiScore)}
                 >
-                  <Heart size={17} aria-hidden="true" />
-                  {optionVotes.length}
-                </button>
-                {option.url ? (
-                  <a href={option.url} rel="noreferrer" target="_blank">
-                    Ver link
-                  </a>
-                ) : null}
-                <details className="desktop-card-menu">
-                  <summary>Más</summary>
-                  <div>
-                    {option.category === 'lodging' && option.url && onVerifyAvailability ? (
-                      <button
-                        className="availability-action"
-                        disabled={availabilityBusyId === option.id}
-                        onClick={() => onVerifyAvailability(option)}
-                        type="button"
-                      >
-                        {availabilityBusyId === option.id ? (
-                          <Loader2 size={16} aria-hidden="true" />
-                        ) : (
-                          <CheckCircle2 size={16} aria-hidden="true" />
-                        )}
-                        Disponible?
-                      </button>
-                    ) : null}
-                    {option.category === 'lodging' && option.availability?.checkUrl ? (
-                      <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
-                        Confirmar fechas
-                      </a>
-                    ) : null}
-                    <button
-                      className={inBudget ? 'budgeted' : ''}
-                      onClick={() => onToggleBudget(option.id)}
-                      type="button"
-                    >
-                      <CircleDollarSign size={16} aria-hidden="true" />
-                      {inBudget ? 'En presupuesto' : 'Presupuesto'}
-                    </button>
-                    {option.status === 'removed' ? (
-                      <button onClick={() => onRestore(option.id)} type="button">
-                        Restaurar
-                      </button>
-                    ) : (
-                      <button onClick={() => onRemove(option.id)} type="button">
-                        <Trash2 size={16} aria-hidden="true" />
-                        Quitar
-                      </button>
-                    )}
-                  </div>
-                </details>
+                  {aiScoreLabel(option.aiScore)}
+                </span>
+                {inBudget ? <span className="budget-badge-overlay">💰</span> : null}
               </div>
-
-              <details className="mobile-card-menu">
-                <summary>Acciones</summary>
-                <div>
+              <div className="option-body">
+                <div className="option-title-row">
+                  <span className="code-badge">{option.code}</span>
+                  <div>
+                    <p>{option.source} · {option.city}</p>
+                    <h2>{option.title}</h2>
+                  </div>
+                </div>
+                <div className="metric-row compact-metric">
+                  <span>
+                    <CircleDollarSign size={14} aria-hidden="true" />
+                    <strong>{price.primary}</strong>
+                  </span>
+                  <span>{option.rating}</span>
+                  {option.availability ? (
+                    <span className={`avail-dot ${availabilityTone(option.availability.status)}`} title={option.availability.label}>●</span>
+                  ) : null}
+                </div>
+                <div className="card-actions compact-actions" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                   <button
                     className={hasVote ? 'liked' : ''}
                     onClick={() => onVote(option.id)}
                     type="button"
+                    title="Votar"
                   >
-                    <Heart size={16} aria-hidden="true" />
-                    Favorito ({optionVotes.length})
+                    <Heart size={15} aria-hidden="true" />
+                    <span>{optionVotes.length}</span>
                   </button>
                   {option.url ? (
-                    <a href={option.url} rel="noreferrer" target="_blank">
-                      Ver link
+                    <a href={option.url} rel="noreferrer" target="_blank" title="Ver link">
+                      <ExternalLink size={14} aria-hidden="true" />
                     </a>
                   ) : null}
-                  {option.category === 'lodging' && option.url && onVerifyAvailability ? (
-                    <button
-                      disabled={availabilityBusyId === option.id}
-                      onClick={() => onVerifyAvailability(option)}
-                      type="button"
-                    >
-                      {availabilityBusyId === option.id ? (
-                        <Loader2 size={16} aria-hidden="true" />
-                      ) : (
-                        <CheckCircle2 size={16} aria-hidden="true" />
-                      )}
-                      Disponibilidad
-                    </button>
-                  ) : null}
-                  {option.category === 'lodging' && option.availability?.checkUrl ? (
-                    <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
-                      Confirmar fechas
-                    </a>
-                  ) : null}
-                  <button
-                    className={inBudget ? 'budgeted' : ''}
-                    onClick={() => onToggleBudget(option.id)}
-                    type="button"
-                  >
-                    <CircleDollarSign size={16} aria-hidden="true" />
-                    {inBudget ? 'En presupuesto' : 'Presupuesto'}
+                  <button className="detail-btn" onClick={() => setSelectedOption(option)} type="button">
+                    Ver detalles
                   </button>
-                  {option.status === 'removed' ? (
-                    <button onClick={() => onRestore(option.id)} type="button">
-                      Restaurar
-                    </button>
-                  ) : (
-                    <button onClick={() => onRemove(option.id)} type="button">
-                      <Trash2 size={16} aria-hidden="true" />
-                      Quitar
-                    </button>
-                  )}
                 </div>
-              </details>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {sel ? (
+        <OptionDetailModal
+          activeCategory={activeCategory}
+          availabilityBusyId={availabilityBusyId}
+          canSync={canSync}
+          hasVote={sel.hasVote}
+          inBudget={sel.inBudget}
+          onClose={() => setSelectedOption(null)}
+          onReanalyze={handleReanalyze}
+          onRemove={(id) => { onRemove(id); setSelectedOption(null) }}
+          onRestore={(id) => { onRestore(id); setSelectedOption(null) }}
+          onToggleBudget={onToggleBudget}
+          onVerifyAvailability={onVerifyAvailability}
+          onVote={onVote}
+          option={sel.option}
+          optionVotes={sel.optionVotes}
+          price={sel.price}
+          reanalyzeBusy={reanalyzeBusy}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function OptionDetailModal({
+  activeCategory,
+  availabilityBusyId,
+  canSync,
+  hasVote,
+  inBudget,
+  onClose,
+  onReanalyze,
+  onRemove,
+  onRestore,
+  onToggleBudget,
+  onVerifyAvailability,
+  onVote,
+  option,
+  optionVotes,
+  price,
+  reanalyzeBusy,
+}) {
+  // Close on ESC key
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
+  return (
+    <div className="option-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="option-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="option-modal-header">
+          <div className="option-modal-code-row">
+            <span className="code-badge">{option.code}</span>
+            <div>
+              <p className="option-modal-source">{option.source} · {option.city}</p>
+              <h2 className="option-modal-title">{option.title}</h2>
             </div>
-          </article>
-        )
-      })}
+          </div>
+          <button className="option-modal-close" onClick={onClose} type="button" aria-label="Cerrar">
+            <X size={20} aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Image carousel */}
+        <div className="option-modal-image">
+          <PhotoCarousel option={option} />
+          <span
+            className={`score-badge modal-score-badge ${!option.aiScore || option.aiScore <= 30 ? 'pending' : ''}`}
+            title={aiScoreTitle(option.aiScore)}
+          >
+            {aiScoreLabel(option.aiScore)}
+          </span>
+          {option.imageCredit ? <span className="photo-credit">{option.imageCredit}</span> : null}
+        </div>
+
+        {/* Metrics */}
+        <div className="option-modal-body">
+          <div className="metric-row">
+            <span>
+              <CircleDollarSign size={16} aria-hidden="true" />
+              <span>
+                <strong>{price.primary}</strong>
+                {price.secondary ? <small>{price.secondary}</small> : null}
+              </span>
+            </span>
+            <span>
+              <Users size={16} aria-hidden="true" />
+              {option.capacity}
+            </span>
+            {extractBathrooms(option) ? (
+              <span>
+                <span aria-hidden="true">🚿</span>
+                {extractBathrooms(option)} {extractBathrooms(option) === 1 ? 'baño' : 'baños'}
+              </span>
+            ) : null}
+            <span>
+              <Route size={16} aria-hidden="true" />
+              {option.transit}
+            </span>
+          </div>
+
+          <div className="tag-row">
+            <span>{activeCategory.shortLabel}</span>
+            <span>{targetLabels[option.targetGroup]}</span>
+            <span>{option.rating}</span>
+          </div>
+
+          {/* Availability */}
+          {option.category === 'lodging' && option.availability ? (
+            <div className={`availability-card ${availabilityTone(option.availability.status)}`}>
+              <strong>{option.availability.label || 'Disponibilidad revisada'}</strong>
+              <span>
+                {formatAvailabilityDate(option.availability.checkedAt)
+                  ? `Revisado ${formatAvailabilityDate(option.availability.checkedAt)}`
+                  : 'Revisión guardada'}
+                {option.availability.confidence ? ` · confianza ${option.availability.confidence}` : ''}
+              </span>
+              <p>{option.availability.summary}</p>
+            </div>
+          ) : null}
+
+          {/* Highlights */}
+          {option.highlights?.length > 0 ? (
+            <ul className="signal-list modal-signal-list">
+              {option.highlights.map((h) => <li key={h}>{h}</li>)}
+            </ul>
+          ) : null}
+
+          {/* AI Analysis */}
+          {(option.aiSummary || option.cautions?.length > 0 || option.aiQuestions?.length > 0) ? (
+            <div className="ai-analysis-block ai-analysis-open">
+              <div className="ai-analysis-label">
+                <span className="ai-chip">IA {option.aiScore || '—'}</span>
+                Análisis de IA
+              </div>
+              <div className="ai-analysis-body">
+                {option.aiSummary ? (
+                  <p className="ai-analysis-summary">{option.aiSummary}</p>
+                ) : null}
+                {option.cautions?.length > 0 ? (
+                  <div className="ai-analysis-section cautions">
+                    <strong>⚠️ Precauciones</strong>
+                    <ul>
+                      {option.cautions.map((c) => <li key={c}>{c}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
+                {option.aiQuestions?.length > 0 ? (
+                  <div className="ai-analysis-section questions">
+                    <strong>❓ Por verificar</strong>
+                    <ul>
+                      {option.aiQuestions.map((q) => <li key={q}>{q}</li>)}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Actions */}
+          <div className="option-modal-actions">
+            <button
+              className={hasVote ? 'liked' : ''}
+              onClick={() => onVote(option.id)}
+              type="button"
+            >
+              <Heart size={16} aria-hidden="true" />
+              {hasVote ? 'Guardado' : 'Guardar'} ({optionVotes.length})
+            </button>
+
+            {option.url ? (
+              <a href={option.url} rel="noreferrer" target="_blank">
+                <ExternalLink size={15} aria-hidden="true" />
+                Ver link
+              </a>
+            ) : null}
+
+            <button
+              className={inBudget ? 'budgeted' : ''}
+              onClick={() => onToggleBudget(option.id)}
+              type="button"
+            >
+              <CircleDollarSign size={16} aria-hidden="true" />
+              {inBudget ? 'En presupuesto ✓' : 'Agregar al presupuesto'}
+            </button>
+
+            {option.category === 'lodging' && option.url && onVerifyAvailability ? (
+              <button
+                className="availability-action"
+                disabled={availabilityBusyId === option.id}
+                onClick={() => onVerifyAvailability(option)}
+                type="button"
+              >
+                {availabilityBusyId === option.id ? (
+                  <Loader2 size={16} aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                )}
+                Verificar disponibilidad
+              </button>
+            ) : null}
+
+            {option.category === 'lodging' && option.availability?.checkUrl ? (
+              <a href={option.availability.checkUrl} rel="noreferrer" target="_blank">
+                Confirmar fechas
+              </a>
+            ) : null}
+
+            {canSync ? (
+              <button
+                className="reanalyze-btn"
+                disabled={reanalyzeBusy}
+                onClick={() => onReanalyze(option)}
+                type="button"
+                title="Re-ejecutar análisis de IA para actualizar baños, fotos, resumen y puntuación"
+              >
+                {reanalyzeBusy ? <Loader2 size={15} className="spin" aria-hidden="true" /> : <Sparkles size={15} aria-hidden="true" />}
+                {reanalyzeBusy ? 'Analizando...' : 'Actualizar con IA'}
+              </button>
+            ) : null}
+
+            {option.status === 'removed' ? (
+              <button className="restore-btn" onClick={() => onRestore(option.id)} type="button">
+                Restaurar opción
+              </button>
+            ) : (
+              <button className="remove-btn" onClick={() => onRemove(option.id)} type="button">
+                <Trash2 size={15} aria-hidden="true" />
+                Quitar opción
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -3559,61 +4666,253 @@ function OptionImage({ option }) {
   )
 }
 
-function BudgetPanel({ budgetOptions, currentTravelGroup, f1Count, nights, onRemove }) {
+function PhotoCarousel({ option }) {
+  // Build photo list: prefer option.photos[] array; fall back to image/alternateImage
+  const photos = useMemo(() => {
+    if (option.photos?.length > 0) return option.photos
+    const list = [option.image, option.alternateImage].filter(Boolean)
+    return list.length > 0 ? list : null
+  }, [option])
+
+  const [carouselState, setCarouselState] = useState({
+    optionId: option.id,
+    index: 0,
+    imgError: {},
+  })
+  const currentState =
+    carouselState.optionId === option.id
+      ? carouselState
+      : { optionId: option.id, index: 0, imgError: {} }
+
+  if (!photos) {
+    return (
+      <div className="missing-photo photo-carousel-missing">
+        <span>{fallbackImage(option) ? null : '📷'}</span>
+        <img
+          alt={option.title}
+          src={fallbackImage(option)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      </div>
+    )
+  }
+
+  const validPhotos = photos.filter((_, i) => !currentState.imgError[i])
+  const safeIndex = Math.min(currentState.index, Math.max(0, validPhotos.length - 1))
+  const currentSrc = validPhotos[safeIndex] ? displayImage(validPhotos[safeIndex]) : fallbackImage(option)
+
+  function prev(e) {
+    e.stopPropagation()
+    setCarouselState((current) => {
+      const base = current.optionId === option.id ? current : currentState
+      return {
+        ...base,
+        index: (base.index - 1 + validPhotos.length) % validPhotos.length,
+      }
+    })
+  }
+  function next(e) {
+    e.stopPropagation()
+    setCarouselState((current) => {
+      const base = current.optionId === option.id ? current : currentState
+      return {
+        ...base,
+        index: (base.index + 1) % validPhotos.length,
+      }
+    })
+  }
+  function handleError() {
+    const actualIdx = photos.indexOf(validPhotos[safeIndex])
+    setCarouselState((current) => {
+      const base = current.optionId === option.id ? current : currentState
+      return {
+        ...base,
+        imgError: { ...base.imgError, [actualIdx]: true },
+      }
+    })
+  }
+
+  return (
+    <div className="photo-carousel">
+      <img
+        key={currentSrc}
+        alt={`${option.title} ${safeIndex + 1}/${validPhotos.length}`}
+        className="photo-carousel-img"
+        onError={handleError}
+        referrerPolicy="no-referrer"
+        src={currentSrc}
+      />
+      {validPhotos.length > 1 && (
+        <>
+          <button
+            aria-label="Foto anterior"
+            className="carousel-arrow carousel-prev"
+            onClick={prev}
+            type="button"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            aria-label="Foto siguiente"
+            className="carousel-arrow carousel-next"
+            onClick={next}
+            type="button"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <div className="carousel-dots">
+            {validPhotos.map((_, i) => (
+              <button
+                key={i}
+                aria-label={`Foto ${i + 1}`}
+                className={`carousel-dot${i === safeIndex ? ' active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCarouselState((current) => ({
+                    ...(current.optionId === option.id ? current : currentState),
+                    index: i,
+                  }))
+                }}
+                type="button"
+              />
+            ))}
+          </div>
+          <span className="carousel-counter">{safeIndex + 1}/{validPhotos.length}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+function BudgetPanel({
+  allOptions,
+  budgetOptions,
+  currentTravelGroup,
+  f1Count,
+  nights,
+  onRemove,
+  onToggleSubgroupBudget,
+  subgroupBudgetOptions,
+}) {
   const rows = budgetOptions.map((option) => ({
     option,
     budget: optionBudget(option, currentTravelGroup, f1Count, nights),
   }))
   const knownRows = rows.filter((row) => !row.budget.missing)
   const total = knownRows.reduce((sum, row) => sum + (row.budget.total || 0), 0)
-  const travelers =
+  const travelers = currentTravelGroup.totalTravelers ||
     (Number(currentTravelGroup.adults) || 0) + (currentTravelGroup.childrenAges?.length || 0)
   const perPerson = travelers ? total / travelers : 0
-
-  if (!budgetOptions.length) {
-    return (
-      <div className="empty-state">
-        <CircleDollarSign size={26} aria-hidden="true" />
-        <h2>No hay partidas en el presupuesto</h2>
-        <p>Agrega hospedajes, planes, comida o traslados desde sus tarjetas.</p>
-      </div>
-    )
-  }
+  const subgroupRows = subgroupBudgetOptions.map((option) => ({
+    option,
+    budget: optionBudget(option, currentTravelGroup, f1Count, nights),
+  }))
+  const subgroupKnownRows = subgroupRows.filter((row) => !row.budget.missing)
+  const subgroupTotal = subgroupKnownRows.reduce((sum, row) => sum + (row.budget.total || 0), 0)
+  const subgroupPerPerson = travelers && subgroupTotal ? subgroupTotal / travelers : 0
+  const subgroupIds = new Set(currentTravelGroup.budgetOptionIds || [])
+  const subgroupCandidates = allOptions
+    .filter((option) => option.status !== 'removed' && !subgroupIds.has(option.id))
+    .slice()
+    .sort((a, b) => (b.aiScore || 0) - (a.aiScore || 0))
+    .slice(0, 10)
 
   return (
     <div className="budget-panel">
-      <div className="budget-summary">
-        <article>
-          <span>Total estimado</span>
-          <strong>{currency(total)}</strong>
-        </article>
-        <article>
-          <span>Por persona</span>
-          <strong>{currency(perPerson)}</strong>
-        </article>
-        <article>
-          <span>Grupo</span>
-          <strong>{groupSummary(currentTravelGroup)}</strong>
-        </article>
-      </div>
-      <div className="budget-list">
-        {rows.map(({ option, budget }) => (
-          <article key={option.id}>
-            <div>
-              <span>{categoryConfig[option.category]?.shortLabel || 'Opción'}</span>
-              <h2>{option.title}</h2>
-              <p>{budget.travelers} personas consideradas</p>
-            </div>
-            <div className="budget-money">
-              <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
-              <span>{budget.missing ? 'Falta precio' : `${currency(budget.perPerson)} por persona`}</span>
-            </div>
-            <button onClick={() => onRemove(option.id)} type="button">
-              Quitar
-            </button>
-          </article>
-        ))}
-      </div>
+      {budgetOptions.length ? (
+        <>
+          <div className="budget-summary">
+            <article>
+              <span>Total estimado</span>
+              <strong>{currency(total)}</strong>
+            </article>
+            <article>
+              <span>Por persona</span>
+              <strong>{currency(perPerson)}</strong>
+            </article>
+            <article>
+              <span>Grupo</span>
+              <strong>{groupSummary(currentTravelGroup)}</strong>
+            </article>
+          </div>
+          <div className="budget-list">
+            {rows.map(({ option, budget }) => (
+              <article key={option.id}>
+                <div>
+                  <span>{categoryConfig[option.category]?.shortLabel || 'Opción'}</span>
+                  <h2>{option.title}</h2>
+                  <p>{budget.travelers} personas consideradas</p>
+                </div>
+                <div className="budget-money">
+                  <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
+                  <span>{budget.missing ? 'Falta precio' : `${currency(budget.perPerson)} por persona`}</span>
+                </div>
+                <button onClick={() => onRemove(option.id)} type="button">
+                  Quitar
+                </button>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="empty-state budget-empty-inline">
+          <CircleDollarSign size={26} aria-hidden="true" />
+          <h2>No hay partidas en el presupuesto general</h2>
+          <p>Agrega hospedajes, planes, comida o traslados desde sus tarjetas.</p>
+        </div>
+      )}
+
+      <section className="subbudget-panel">
+        <div className="subbudget-head">
+          <div>
+            <p className="eyebrow">Subpresupuesto</p>
+            <h2>{currentTravelGroup.name}</h2>
+            <p>{groupSummary(currentTravelGroup)}</p>
+          </div>
+          <div className="subbudget-total">
+            <span>Total del subgrupo</span>
+            <strong>{subgroupTotal ? currency(subgroupTotal) : 'Por estimar'}</strong>
+            {subgroupPerPerson ? <small>{currency(subgroupPerPerson)} por persona</small> : null}
+          </div>
+        </div>
+
+        {subgroupRows.length ? (
+          <div className="budget-list subgroup-budget-list">
+            {subgroupRows.map(({ option, budget }) => (
+              <article key={option.id}>
+                <div>
+                  <span>{categoryConfig[option.category]?.shortLabel || 'Opción'}</span>
+                  <h2>{option.title}</h2>
+                  <p>{budget.travelers} personas del subgrupo</p>
+                </div>
+                <div className="budget-money">
+                  <strong>{budget.missing ? 'Por estimar' : currency(budget.total)}</strong>
+                  <span>{budget.missing ? 'Falta precio' : `${currency(budget.perPerson)} por persona`}</span>
+                </div>
+                <button onClick={() => onToggleSubgroupBudget(option.id)} type="button">
+                  Quitar
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="subbudget-empty">
+            Este grupo todavía no tiene partidas propias. Agrega opciones abajo para que la IA sepa qué presupuesto cuidar.
+          </p>
+        )}
+
+        {subgroupCandidates.length ? (
+          <div className="subbudget-picker">
+            {subgroupCandidates.map((option) => (
+              <button key={option.id} onClick={() => onToggleSubgroupBudget(option.id)} type="button">
+                <Plus size={14} aria-hidden="true" />
+                <span>{option.code}</span>
+                {option.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </section>
       {rows.some((row) => row.budget.missing) ? (
         <p className="budget-note">
           Algunas partidas no tienen precio. Pega el link o escribe el precio visto para que entren en el cálculo.
@@ -3623,7 +4922,21 @@ function BudgetPanel({ budgetOptions, currentTravelGroup, f1Count, nights, onRem
   )
 }
 
-function ItineraryPanel({ busy, onGenerate, plan }) {
+function ItineraryPanel({
+  availableOptions,
+  busy,
+  currentTravelGroup,
+  f1Count,
+  nights,
+  onCreateSubgroup,
+  onGenerate,
+  onToggleDraftMember,
+  onUpdateDraft,
+  onUpdateGroup,
+  plan,
+  subgroupDraft,
+  travelGroups,
+}) {
   const days = plan?.days?.length
     ? plan.days
     : itineraryDraft.map((item) => ({
@@ -3651,6 +4964,18 @@ function ItineraryPanel({ busy, onGenerate, plan }) {
           Generar con IA
         </button>
       </div>
+      <SubgroupPlanner
+        availableOptions={availableOptions}
+        currentTravelGroup={currentTravelGroup}
+        f1Count={f1Count}
+        groups={travelGroups}
+        nights={nights}
+        onCreate={onCreateSubgroup}
+        onToggleDraftMember={onToggleDraftMember}
+        onUpdateDraft={onUpdateDraft}
+        onUpdateGroup={onUpdateGroup}
+        subgroupDraft={subgroupDraft}
+      />
       {days.map((item) => (
         <article key={`${item.date}-${item.title}`}>
           <div className="date-chip">{item.date}</div>
@@ -3675,6 +5000,18 @@ function ItineraryPanel({ busy, onGenerate, plan }) {
                 {item.energyLevel ? <span>Energía: {item.energyLevel}</span> : null}
               </div>
             ) : null}
+            {item.subgroupPlans?.length ? (
+              <div className="subgroup-day-plans">
+                {item.subgroupPlans.map((subplan) => (
+                  <span key={`${item.date}-${subplan.groupId || subplan.groupName}`}>
+                    <strong>{subplan.groupName}</strong>
+                    {subplan.timeWindow ? ` · ${subplan.timeWindow}` : ''}
+                    <small>{subplan.plan}</small>
+                    {subplan.budgetNote ? <small>{subplan.budgetNote}</small> : null}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         </article>
       ))}
@@ -3688,6 +5025,150 @@ function ItineraryPanel({ busy, onGenerate, plan }) {
           </ul>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function SubgroupPlanner({
+  availableOptions,
+  currentTravelGroup,
+  f1Count,
+  groups,
+  nights,
+  onCreate,
+  onToggleDraftMember,
+  onUpdateDraft,
+  onUpdateGroup,
+  subgroupDraft,
+}) {
+  const planningGroups = groups.filter(isPlanningGroup)
+
+  return (
+    <div className="subgroup-preview">
+      <div>
+        <p className="eyebrow">Subgrupos</p>
+        <h3>Carriles con horario, foco y subpresupuesto propio.</h3>
+      </div>
+      <form className="subgroup-form" onSubmit={onCreate}>
+        <label>
+          <span>Nombre</span>
+          <input
+            onChange={(event) => onUpdateDraft('name', event.target.value)}
+            placeholder="Ej. F1 viernes, plan niños..."
+            type="text"
+            value={subgroupDraft.name}
+          />
+        </label>
+        <label>
+          <span>Fecha</span>
+          <input
+            onChange={(event) => onUpdateDraft('date', event.target.value)}
+            type="date"
+            value={subgroupDraft.date}
+          />
+        </label>
+        <label>
+          <span>Inicio</span>
+          <input
+            onChange={(event) => onUpdateDraft('startTime', event.target.value)}
+            type="time"
+            value={subgroupDraft.startTime}
+          />
+        </label>
+        <label>
+          <span>Fin</span>
+          <input
+            onChange={(event) => onUpdateDraft('endTime', event.target.value)}
+            type="time"
+            value={subgroupDraft.endTime}
+          />
+        </label>
+        <label className="wide">
+          <span>Foco</span>
+          <input
+            onChange={(event) => onUpdateDraft('focus', event.target.value)}
+            placeholder="Qué debe cuidar la IA: ritmo, reservas, traslados, presupuesto..."
+            type="text"
+            value={subgroupDraft.focus}
+          />
+        </label>
+        <div className="member-picker wide" aria-label="Integrantes del subgrupo">
+          {familyMembers.map((member) => (
+            <button
+              className={subgroupDraft.memberIds.includes(member.id) ? 'active' : ''}
+              key={member.id}
+              onClick={() => onToggleDraftMember(member.id)}
+              type="button"
+            >
+              {member.name}
+            </button>
+          ))}
+        </div>
+        <button className="primary-button compact" type="submit">
+          <Plus size={18} aria-hidden="true" />
+          Crear subgrupo
+        </button>
+      </form>
+      <div className="subgroup-rails">
+        {planningGroups.map((group) => {
+          const subgroupRows = (group.budgetOptionIds || [])
+            .map((optionId) => availableOptions.find((option) => option.id === optionId))
+            .filter(Boolean)
+            .map((option) => optionBudget(option, group, f1Count, nights))
+          const total = subgroupRows.reduce((sum, budget) => sum + (budget.total || 0), 0)
+          return (
+          <article className={group.id === currentTravelGroup.id ? 'active' : ''} key={group.id}>
+            <div className="subgroup-rail-head">
+              <strong>{group.name}</strong>
+              <span>{groupSummary(group)}</span>
+            </div>
+            <div className="decision-avatar-row">
+              {group.memberIds.slice(0, 9).map((memberId) => (
+                <MiniAvatar
+                  active
+                  key={memberId}
+                  member={familyMembers.find((member) => member.id === memberId)}
+                />
+              ))}
+            </div>
+            <div className="subgroup-schedule">
+              <label>
+                <span>Fecha</span>
+                <input
+                  onChange={(event) => onUpdateGroup(group.id, { date: event.target.value })}
+                  type="date"
+                  value={group.date || ''}
+                />
+              </label>
+              <label>
+                <span>Inicio</span>
+                <input
+                  onChange={(event) => onUpdateGroup(group.id, { startTime: event.target.value })}
+                  type="time"
+                  value={group.startTime || ''}
+                />
+              </label>
+              <label>
+                <span>Fin</span>
+                <input
+                  onChange={(event) => onUpdateGroup(group.id, { endTime: event.target.value })}
+                  type="time"
+                  value={group.endTime || ''}
+                />
+              </label>
+            </div>
+            <textarea
+              onChange={(event) => onUpdateGroup(group.id, { focus: event.target.value, note: event.target.value })}
+              placeholder="Foco para el itinerario IA"
+              value={group.focus || group.note || ''}
+            />
+            <p>
+              {total ? `Subpresupuesto: ${currency(total)}` : 'Subpresupuesto sin partidas todavía.'}
+            </p>
+          </article>
+          )
+        })}
+      </div>
     </div>
   )
 }

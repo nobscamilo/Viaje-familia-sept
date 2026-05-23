@@ -5,6 +5,10 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "tripId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "category",
           "order": "ASCENDING"
         },
@@ -15,6 +19,20 @@
         {
           "fieldPath": "aiScore",
           "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tripOptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "tripId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
         }
       ]
     }

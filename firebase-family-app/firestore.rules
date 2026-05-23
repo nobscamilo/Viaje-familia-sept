@@ -6,50 +6,120 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner() {
-      return signedIn() && request.auth.uid == resource.data.createdBy;
+    function isTripAdmin() {
+      return signedIn() &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() in [
+          'juancamilo.sarmiento@gmail.com',
+          'julianabueno042017@gmail.com'
+        ];
+    }
+
+    function hasTripId(data) {
+      return data.keys().hasAll(['tripId']) && data.tripId is string;
+    }
+
+    function tripPath(tripId) {
+      return /databases/$(database)/documents/trips/$(tripId);
+    }
+
+    function isTripMember(tripId) {
+      return signedIn() &&
+        exists(tripPath(tripId)) &&
+        get(tripPath(tripId)).data.keys().hasAll(['memberIds']) &&
+        request.auth.uid in get(tripPath(tripId)).data.memberIds;
+    }
+
+    function canReadScopedDoc() {
+      return isTripAdmin() || (hasTripId(resource.data) && isTripMember(resource.data.tripId));
+    }
+
+    function canCreateScopedDoc() {
+      return hasTripId(request.resource.data) && isTripMember(request.resource.data.tripId);
+    }
+
+    function canUpdateScopedDoc() {
+      return hasTripId(resource.data) &&
+        hasTripId(request.resource.data) &&
+        request.resource.data.tripId == resource.data.tripId &&
+        isTripMember(resource.data.tripId);
+    }
+
+    function canReadLegacyForMadridMigration() {
+      return isTripAdmin() && !resource.data.keys().hasAny(['tripId']);
     }
 
     match /familyMembers/{memberId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == memberId;
+    }
+
+    match /trips/{tripId} {
+      allow read: if signedIn() && (
+        isTripAdmin() ||
+        (
+          resource.data.keys().hasAll(['memberIds']) &&
+          request.auth.uid in resource.data.memberIds
+        )
+      );
+
+      allow create: if isTripAdmin() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.keys().hasAll(['memberIds', 'members', 'joinCode']) &&
+        request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if isTripAdmin();
+
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
     }
 
     match /tripOptions/{optionId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn();
-      allow delete: if isOwner();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
+      allow delete: if canUpdateScopedDoc() && resource.data.createdBy == request.auth.uid;
     }
 
     match /votes/{voteId} {
-      allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update, delete: if canUpdateScopedDoc();
     }
 
     match /itineraries/{itineraryId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
     }
 
     match /travelCities/{cityId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
     }
 
     match /travelGroups/{groupId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
     }
 
     match /searchRequests/{requestId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
+    }
+
+    match /tripBudgets/{budgetId} {
+      allow read: if canReadScopedDoc();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
     }
 
     match /analysisJobs/{jobId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canReadScopedDoc() || canReadLegacyForMadridMigration();
+      allow create: if canCreateScopedDoc();
+      allow update: if canUpdateScopedDoc();
     }
   }
 }
