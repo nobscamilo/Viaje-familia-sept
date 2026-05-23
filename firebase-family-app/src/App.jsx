@@ -17,9 +17,11 @@ import {
   Loader2,
   LogIn,
   LogOut,
+  MapPin,
   MapPinned,
   Menu,
   MessageCircle,
+  Navigation,
   Plane,
   Plus,
   Route,
@@ -114,8 +116,8 @@ const tabs = [
   { id: 'budget', icon: CircleDollarSign },
 ]
 
-const optionWorkspaceTabs = ['lodging', 'activities', 'food']
-const placeSuggestionLimit = 20
+const optionWorkspaceTabs = ['lodging', 'food', 'activities']
+const placeSuggestionLimit = 50
 const suggestionPageSize = 5
 
 const targetLabels = {
@@ -1378,6 +1380,7 @@ function App() {
   const [topbarChatInput, setTopbarChatInput] = useState('')
   const [topbarChatHistory, setTopbarChatHistory] = useState([])
   const [topbarChatBusy, setTopbarChatBusy] = useState(false)
+  const [gpsLoading, setGPSLoading] = useState(false)
   const topbarChatEndRef = useRef(null)
 
   async function handleTopbarChat(e) {
@@ -1398,6 +1401,145 @@ function App() {
     } finally {
       setTopbarChatBusy(false)
       topbarChatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  function getCurrentGPSLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('La geolocalización no está soportada en este navegador.'))
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          })
+        },
+        (error) => {
+          let msg = 'Error al obtener la ubicación.'
+          if (error.code === 1) msg = 'Permiso de ubicación denegado por el usuario.'
+          else if (error.code === 2) msg = 'La ubicación no está disponible.'
+          else if (error.code === 3) msg = 'Tiempo de espera agotado al buscar ubicación.'
+          reject(new Error(msg))
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    })
+  }
+
+  async function handleQuickGPSNearby() {
+    if (topbarChatBusy || gpsLoading) return
+    setGPSLoading(true)
+    const tempHistory = [...topbarChatHistory, { role: 'user', content: '🔍 Buscando mi ubicación GPS actual...' }]
+    setTopbarChatHistory(tempHistory)
+    
+    try {
+      const loc = await getCurrentGPSLocation()
+      const prompt = `Estoy en la ubicación GPS (Latitud: ${loc.lat.toFixed(6)}, Longitud: ${loc.lng.toFixed(6)}). Por favor, recomiéndame 10 lugares de interés turístico, restaurantes, o actividades interesantes cerca de mí para disfrutar en familia en nuestro viaje.`
+      
+      const updatedHistory = [...topbarChatHistory, { role: 'user', content: prompt }]
+      setTopbarChatHistory(updatedHistory)
+      setGPSLoading(false)
+      setTopbarChatBusy(true)
+      
+      const result = await chatPlanner(prompt, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...updatedHistory, { role: 'assistant', content: result.reply }])
+      }
+    } catch (err) {
+      console.error(err)
+      const errorPrompt = `No pude obtener tu ubicación automáticamente (${err.message}). Por favor, sugiéreme qué lugares interesantes de interés general o actividades en familia podemos hacer hoy en Madrid.`
+      const errorHistory = [...topbarChatHistory, { role: 'user', content: 'Recomendar sitios de interés general cerca de mí (GPS no disponible)' }]
+      setTopbarChatHistory(errorHistory)
+      setGPSLoading(false)
+      setTopbarChatBusy(true)
+      
+      const result = await chatPlanner(errorPrompt, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...errorHistory, { role: 'assistant', content: result.reply }])
+      }
+    } finally {
+      setGPSLoading(false)
+      setTopbarChatBusy(false)
+      setTimeout(() => topbarChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
+  }
+
+  async function handleQuickGPSRoute() {
+    if (topbarChatBusy || gpsLoading) return
+    setGPSLoading(true)
+    const tempHistory = [...topbarChatHistory, { role: 'user', content: '📍 Calculando ruta desde mi ubicación GPS...' }]
+    setTopbarChatHistory(tempHistory)
+    
+    try {
+      const loc = await getCurrentGPSLocation()
+      const prompt = `Estoy en la ubicación GPS (Latitud: ${loc.lat.toFixed(6)}, Longitud: ${loc.lng.toFixed(6)}). Por favor, explícame la mejor ruta de transporte (líneas de metro, cercanías o transporte público preferente, coche o caminando si está cerca) para llegar al recinto IFEMA Madrid (o el circuito de F1 si aplica) o al centro de Madrid desde mi ubicación actual. Dame detalles sobre estaciones y tiempos estimados.`
+      
+      const updatedHistory = [...topbarChatHistory, { role: 'user', content: prompt }]
+      setTopbarChatHistory(updatedHistory)
+      setGPSLoading(false)
+      setTopbarChatBusy(true)
+      
+      const result = await chatPlanner(prompt, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...updatedHistory, { role: 'assistant', content: result.reply }])
+      }
+    } catch (err) {
+      console.error(err)
+      const errorPrompt = `No pude obtener tu ubicación automáticamente (${err.message}). Sugiéreme la mejor combinación de rutas y transporte público habitual (Metro o Cercanías) para movernos hacia el recinto de IFEMA y el circuito de F1 en Madrid desde la zona centro o las áreas de alojamiento más recomendadas.`
+      const errorHistory = [...topbarChatHistory, { role: 'user', content: 'Sugerir rutas de transporte público hacia IFEMA (GPS no disponible)' }]
+      setTopbarChatHistory(errorHistory)
+      setGPSLoading(false)
+      setTopbarChatBusy(true)
+      
+      const result = await chatPlanner(errorPrompt, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...errorHistory, { role: 'assistant', content: result.reply }])
+      }
+    } finally {
+      setGPSLoading(false)
+      setTopbarChatBusy(false)
+      setTimeout(() => topbarChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
+  }
+
+  async function handleQuickSuggest50Restaurants() {
+    if (topbarChatBusy || gpsLoading) return
+    const prompt = `Sugiéreme un listado de al menos 50 excelentes restaurantes, cafeterías, taperías y sitios emblemáticos para comer en Madrid, clasificados por zonas recomendadas para el viaje (cerca de IFEMA, zona centro/Gran Vía, Retiro, Barrio de Salamanca, etc.) que sean adecuados para una familia de 9 personas con niños.`
+    const newHistory = [...topbarChatHistory, { role: 'user', content: 'Sugerir 50 excelentes sitios para comer en Madrid por zonas' }]
+    setTopbarChatHistory(newHistory)
+    setTopbarChatBusy(true)
+    try {
+      const result = await chatPlanner(prompt, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...newHistory, { role: 'assistant', content: result.reply }])
+      }
+    } catch {
+      setTopbarChatHistory([...newHistory, { role: 'assistant', content: 'Error al conectar con el planificador.' }])
+    } finally {
+      setTopbarChatBusy(false)
+      setTimeout(() => topbarChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
+  }
+
+  async function handleQuickSuggest50Hotels() {
+    if (topbarChatBusy || gpsLoading) return
+    const prompt = `Recomienda un listado de al menos 50 opciones de alojamiento (hoteles con encanto, villas, grandes apartamentos y apartoteles) en Madrid que sean aptos y cómodos para hospedar a una familia numerosa de 9 personas con niños del 10 al 14 de septiembre de 2026.`
+    const newHistory = [...topbarChatHistory, { role: 'user', content: 'Recomendar 50 alojamientos en Madrid para familia de 9 personas' }]
+    setTopbarChatHistory(newHistory)
+    setTopbarChatBusy(true)
+    try {
+      const result = await chatPlanner(prompt, topbarChatHistory)
+      if (result?.reply) {
+        setTopbarChatHistory([...newHistory, { role: 'assistant', content: result.reply }])
+      }
+    } catch {
+      setTopbarChatHistory([...newHistory, { role: 'assistant', content: 'Error al conectar con el planificador.' }])
+    } finally {
+      setTopbarChatBusy(false)
+      setTimeout(() => topbarChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     }
   }
 
@@ -3316,15 +3458,7 @@ function App() {
           <button
             className="sidebar-nav-item sidebar-ai-item"
             onClick={() => {
-              const searchTabs = ['lodging', 'food', 'activities']
-              if (searchTabs.includes(activeTab)) {
-                // Already on a searchable tab — run suggestions for that tab
-                findSmartSuggestions(smartSuggestionTypeForTab)
-              } else {
-                // Navigate to lodging first, then trigger suggestions
-                switchTab('lodging')
-                setTimeout(() => findSmartSuggestions('lodging'), 150)
-              }
+              setShowTopbarChat(true)
               setSidebarOpen(false)
             }}
             type="button"
@@ -3506,7 +3640,62 @@ function App() {
               </div>
               <div className="topbar-chat-messages">
                 {topbarChatHistory.length === 0 && (
-                  <p className="topbar-chat-empty">Pregúntame sobre fechas, presupuesto, lugares o cualquier duda del viaje.</p>
+                  <div className="topbar-chat-welcome-container">
+                    <p className="topbar-chat-empty">Pregúntame sobre fechas, presupuesto, lugares o cualquier duda del viaje.</p>
+                    <div className="chat-quick-suggestions">
+                      <button
+                        className="chat-suggest-btn"
+                        onClick={handleQuickGPSNearby}
+                        disabled={topbarChatBusy || gpsLoading}
+                        type="button"
+                      >
+                        {gpsLoading ? <Loader2 size={16} className="spin text-violet" /> : <MapPin size={16} className="text-violet" />}
+                        <div className="chat-suggest-text">
+                          <span className="chat-suggest-title">Buscar sitios cerca</span>
+                          <span className="chat-suggest-desc">Usa tu GPS actual para buscar atracciones o comida</span>
+                        </div>
+                      </button>
+                      
+                      <button
+                        className="chat-suggest-btn"
+                        onClick={handleQuickGPSRoute}
+                        disabled={topbarChatBusy || gpsLoading}
+                        type="button"
+                      >
+                        <Navigation size={16} className="text-violet" />
+                        <div className="chat-suggest-text">
+                          <span className="chat-suggest-title">Ruta a IFEMA / Madrid</span>
+                          <span className="chat-suggest-desc">Cómo llegar desde tu ubicación GPS viva</span>
+                        </div>
+                      </button>
+                      
+                      <button
+                        className="chat-suggest-btn"
+                        onClick={handleQuickSuggest50Restaurants}
+                        disabled={topbarChatBusy || gpsLoading}
+                        type="button"
+                      >
+                        <Utensils size={16} className="text-emerald" />
+                        <div className="chat-suggest-text">
+                          <span className="chat-suggest-title">50 Sitios para Comer</span>
+                          <span className="chat-suggest-desc">Sugerir al menos 50 excelentes restaurantes por zona</span>
+                        </div>
+                      </button>
+                      
+                      <button
+                        className="chat-suggest-btn"
+                        onClick={handleQuickSuggest50Hotels}
+                        disabled={topbarChatBusy || gpsLoading}
+                        type="button"
+                      >
+                        <Hotel size={16} className="text-emerald" />
+                        <div className="chat-suggest-text">
+                          <span className="chat-suggest-title">50 Hoteles y Villas</span>
+                          <span className="chat-suggest-desc">Sugerir al menos 50 hospedajes para toda la familia</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {topbarChatHistory.map((msg, i) => (
                   <div key={i} className={`topbar-chat-msg ${msg.role}`}>

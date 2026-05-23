@@ -37,9 +37,9 @@ const cityCenters = {
 const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT
 const vertexLocation = process.env.VERTEX_LOCATION || 'europe-west1'
 const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-const suggestionResultLimit = 10
-const maxSuggestionResultLimit = 50
-const placesTextSearchLimit = 20
+const suggestionResultLimit = 50
+const maxSuggestionResultLimit = 100
+const placesTextSearchLimit = 50
 
 const functionOptions = {
   region: 'europe-west1',
