@@ -4,8 +4,17 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
 import { initializeApp } from 'firebase-admin/app'
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
-import { SchemaType, VertexAI } from '@google-cloud/vertexai'
+import { GoogleGenAI } from '@google/genai'
 import * as cheerio from 'cheerio'
+
+const SchemaType = {
+  OBJECT: 'OBJECT',
+  STRING: 'STRING',
+  NUMBER: 'NUMBER',
+  ARRAY: 'ARRAY',
+  INTEGER: 'INTEGER',
+  BOOLEAN: 'BOOLEAN',
+}
 
 initializeApp()
 
@@ -15,6 +24,7 @@ setGlobalOptions({
 })
 
 const mapsApiKey = defineSecret('GOOGLE_MAPS_API_KEY')
+const geminiApiKey = defineSecret('GEMINI_API_KEY')
 const db = getFirestore()
 
 const ifemaCoords = { latitude: 40.4625, longitude: -3.6155 }
@@ -45,7 +55,7 @@ const functionOptions = {
   region: 'europe-west1',
   timeoutSeconds: 120,
   memory: '512MiB',
-  secrets: [mapsApiKey],
+  secrets: [mapsApiKey, geminiApiKey],
 }
 
 const tripsCollection = 'trips'
@@ -1371,35 +1381,34 @@ function buildTripContext(groupProfile, subgroups = [], city = '') {
 }
 
 async function generateJson(schema, prompt, fallback, { maxTokens = 4096 } = {}) {
-  if (!projectId) return fallback
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    console.error('[generateJson] GEMINI_API_KEY is not defined in process.env')
+    return fallback
+  }
 
   try {
-    const vertex = new VertexAI({ project: projectId, location: vertexLocation })
-    const model = vertex.getGenerativeModel({
+    const ai = new GoogleGenAI({ apiKey })
+    const result = await ai.models.generateContent({
       model: geminiModel,
-      generationConfig: {
+      contents: prompt,
+      config: {
         temperature: 0.25,
         maxOutputTokens: maxTokens,
         responseMimeType: 'application/json',
         responseSchema: schema,
       },
     })
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }],
-        },
-      ],
-    })
     const text =
+      result.text ||
       result.response?.candidates?.[0]?.content?.parts
         ?.map((part) => part.text || '')
         .join('')
-        .trim() || ''
+        .trim() ||
+      ''
     return JSON.parse(text.replace(/^```json|```$/g, '').trim())
   } catch (error) {
-    console.error('[generateJson] Vertex AI error:', error?.message || error)
+    console.error('[generateJson] Google Gen AI error:', error?.message || error)
     return {
       ...fallback,
       aiFallbackReason: error.message,
@@ -2321,28 +2330,41 @@ Devuelve JSON con el esquema indicado.
 // ─── generateText ────────────────────────────────────────────────────────────
 // Like generateJson but returns a plain string; used by chatWithPlanner.
 async function generateText(systemPrompt, history = [], userMessage = '', fallback = '') {
-  if (!projectId) return fallback
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    console.error('[generateText] GEMINI_API_KEY is not defined in process.env')
+    return fallback
+  }
+
   try {
-    const vertex = new VertexAI({ project: projectId, location: vertexLocation })
-    const model = vertex.getGenerativeModel({
-      model: geminiModel,
-      generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
-      systemInstruction: systemPrompt,
-    })
-    // Build multi-turn contents from history + new message
+    const ai = new GoogleGenAI({ apiKey })
+    
+    // Map standard roles: assistant -> model
     const contents = [
       ...history.map((turn) => ({
-        role: turn.role,
+        role: turn.role === 'assistant' ? 'model' : turn.role,
         parts: [{ text: turn.content }],
       })),
       { role: 'user', parts: [{ text: userMessage }] },
     ]
-    const result = await model.generateContent({ contents })
+
+    const result = await ai.models.generateContent({
+      model: geminiModel,
+      contents,
+      config: {
+        temperature: 0.5,
+        maxOutputTokens: 1024,
+        systemInstruction: systemPrompt,
+      },
+    })
+
     return (
+      result.text ||
       result.response?.candidates?.[0]?.content?.parts
         ?.map((part) => part.text || '')
         .join('')
-        .trim() || fallback
+        .trim() ||
+      fallback
     )
   } catch (error) {
     return `${fallback} (error: ${error.message})`
