@@ -1,0 +1,270 @@
+/* ============================================================
+   Anotar un gasto.
+
+   La versión anterior era una hoja de móvil sin ancho máximo: en
+   un portátil se estiraba a 1.900 px, con campos de un metro y
+   el ojo cruzando la pantalla entre la etiqueta y el dato. Un
+   formulario no mejora por ser más ancho.
+
+   Móvil  → hoja anclada abajo, donde llega el pulgar.
+   Grande → diálogo centrado de 460 px.
+   ============================================================ */
+
+.ng-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-items: end;
+  justify-items: stretch;
+  background: rgb(0 0 0 / .66);
+  backdrop-filter: blur(3px);
+}
+
+.ng {
+  display: grid;
+  /* `minmax(0, 1fr)` y no la columna `auto` implícita.
+     Una pista `auto` de grid se dimensiona al MAX-CONTENT del hijo más ancho
+     y desborda el contenedor aunque este tenga ancho fijo: la fila de cinco
+     categorías medía 534 px dentro de una hoja de 460, y arrastraba con ella
+     al resto de los hijos —en móvil, 156 px fuera de la pantalla por la
+     izquierda—. El `minmax(0, …)` es lo que permite que los hijos encojan.
+     No se vio en dos capturas seguidas; se vio midiendo. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-3);
+  max-height: 92vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  padding: var(--sp-4) var(--sp-3) calc(var(--sp-4) + env(safe-area-inset-bottom));
+  background: var(--s-raised);
+  border-top: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: var(--shadow-pop);
+}
+
+@media (min-width: 640px) {
+  .ng-fondo { align-items: center; justify-items: center; }
+  .ng {
+    width: min(460px, calc(100vw - var(--sp-4) * 2));
+    max-height: min(88vh, 760px);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: var(--sp-4);
+  }
+}
+
+.ng-head { display: flex; align-items: center; justify-content: space-between; }
+.ng-head h2 { font-size: .9375rem; font-weight: 600; color: var(--ink); }
+.ng-x {
+  min-width: 40px; min-height: 40px;
+  background: none; border: 0; color: var(--ink-faint);
+  font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+.ng-x:hover { color: var(--ink); }
+
+/* --- El dinero. Es el campo protagonista y se teclea primero. --- */
+.ng-dinero {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  background: var(--s-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.ng-dinero:focus-within { border-color: var(--accent); }
+
+/* La moneda como interruptor segmentado, encima del número y de su mismo
+   ancho. Antes iba en vertical a la izquierda del campo y se leía como una
+   etiqueta: se podía teclear una cifra en pesos creyendo estar en euros, y
+   al cambiar salían novecientos millones. */
+.ng-monedas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  background: var(--s-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.ng-moneda {
+  min-height: 34px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: .75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ng-moneda:hover:not(:disabled) { color: var(--ink-soft); }
+.ng-moneda:disabled { opacity: .35; cursor: not-allowed; }
+.ng-moneda.is-on { background: var(--accent-wash); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.ng-cifra {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding: 0 var(--sp-2);
+}
+.ng-cifra:focus { outline: none; }
+
+/* La unidad pegada al número: un importe sin moneda al lado es exactamente
+   lo que hubo que aclarar. */
+.ng-unidad {
+  flex: none;
+  align-self: center;
+  color: var(--ink-muted);
+  font-size: 1rem;
+  font-weight: 500;
+  padding-right: var(--sp-1);
+}
+
+.ng-cambio { font-size: .7rem; color: var(--ink-faint); min-height: 1em; line-height: 1.5; }
+.ng-cambio strong { color: var(--ok); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+
+/* --- Campos normales --- */
+.ng-campo { display: grid; gap: var(--sp-1); min-width: 0; }
+.ng-label { font-size: .68rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: var(--track-label); }
+
+.ng-campo input, .ng-campo select {
+  min-height: var(--touch);
+  padding: 0 var(--sp-2);
+  background: var(--s-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font-size: .875rem;
+  width: 100%;
+}
+.ng-campo input:focus, .ng-campo select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.ng-fila { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+
+.ng-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+
+/* `flex: 1` es `flex-basis: 0`, y con base 0 el navegador cree que caben
+   todos en una linea: reparte, luego el `min-width` del contenido los empuja
+   y la fila DESBORDA en vez de envolverse. Con cinco categorias sacaba la
+   hoja entera fuera de la pantalla, en movil y en escritorio.
+   `flex: 0 1 auto` calcula el ajuste con el ancho real y sí envuelve. */
+.ng-chip {
+  flex: 0 1 auto;
+  min-height: 38px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: .75rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ng-chip:hover { color: var(--ink); border-color: var(--line-strong); }
+.ng-chip.is-on { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); }
+
+.ng-pista { font-size: .68rem; color: var(--ink-faint); }
+.ng-mal { font-size: .72rem; color: var(--danger); }
+
+.ng-ok {
+  min-height: 50px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: .9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.ng-ok:disabled { opacity: .3; cursor: not-allowed; }
+
+/* --- Editar: avisos y borrado --- */
+.ng-aviso {
+  font-size: .72rem;
+  color: var(--ink-muted);
+  padding: var(--sp-2);
+  background: var(--s-overlay);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-sm);
+}
+.ng-aviso code { font-size: .68rem; color: var(--ink-soft); }
+
+.ng-quitar {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: .8125rem;
+  cursor: pointer;
+}
+.ng-quitar:hover { color: var(--danger); border-color: var(--danger); }
+
+/* Confirmar antes de borrar: cada fila de esa lista es dinero de alguien. */
+.ng-confirmar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  background: var(--danger-wash);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-sm);
+  font-size: .8125rem;
+  color: var(--ink-soft);
+}
+.ng-confirmar span { flex: 1; min-width: 0; }
+.ng-no, .ng-si {
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: .8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ng-no { border: 1px solid var(--line); background: transparent; color: var(--ink-muted); }
+.ng-si { border: 0; background: var(--danger); color: var(--s-base); font-weight: 600; }
+.ng-si:disabled { opacity: .5; }
+
+/* Solo lectura: se ve, no se toca. Un campo escribible que no se puede
+   guardar es una promesa rota. */
+.ng input[readonly], .ng select:disabled {
+  color: var(--ink-muted);
+  background: var(--s-overlay);
+  cursor: default;
+}
+.ng .ng-chip:disabled, .ng .ng-moneda:disabled { opacity: .6; cursor: default; }
+.ng .ng-chip:disabled:hover { color: var(--ink-muted); border-color: var(--line); }
+
+/* Elegir personas sueltas: los siete adultos, con su color. */
+.ng-gente { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-1); }
+.ng-quien {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: .72rem;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ng-quien:hover:not(:disabled) { color: var(--ink-soft); border-color: var(--line-strong); }
+.ng-quien.is-on { background: var(--s-overlay); font-weight: 600; }
+.ng-quien:disabled { opacity: .6; cursor: default; }
+
+/* El punto de color: `display` explícito, que un <i> es inline y una caja
+   inline ignora width y height. Ya cayó una vez esta misma trampa. */
+.ng-punto { display: block; width: 8px; height: 8px; border-radius: var(--r-pill); flex: none; }

@@ -1,0 +1,29 @@
+<!doctype html><meta charset=utf-8><title>marco</title>
+<!--
+  Marco de movil de verdad.
+
+  `chrome --headless --window-size=430,940 --screenshot` NO fija el viewport a
+  430: renderiza mas ancho y recorta la imagen, asi que todo parece cortado por
+  la derecha aunque la app este bien. Este iframe si da un viewport real de
+  430 px CSS, que es lo que ve un telefono.
+
+  Uso: copiar a la carpeta servida, abrir /_marco.html?r=/decisiones y capturar.
+-->
+<style>
+  html,body{margin:0;background:#000;display:grid;place-items:start start}
+  iframe{border:0;display:block}
+</style>
+<iframe id="f"></iframe>
+<script>
+  const q = new URLSearchParams(location.search)
+  // `h` da el alto del iframe. Por defecto 2400 px para ver la pagina entera
+  // de un tiron; con `h=932` se ve lo que cabe en un movil de verdad — y eso
+  // importa, porque una barra anclada abajo en un iframe de 2400 px sale
+  // fuera de la foto y parece que no existe.
+  document.getElementById('f').style.height = (q.get('h') || 2400) + 'px'
+  // `w` da el ancho. 430 es un iPhone grande; con `w=375` sale un iPhone SE,
+  // que es donde de verdad se rompen las filas de una tabla de importes.
+  // Probar solo con el ancho comodo es no probar.
+  document.getElementById('f').style.width = (q.get('w') || 430) + 'px'
+  document.getElementById('f').src = q.get('r') || '/'
+</script>

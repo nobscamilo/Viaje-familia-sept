@@ -1,0 +1,99 @@
+.entrar {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-5);
+  /* Dos lavados que se cruzan: da profundidad sin poner una foto de stock,
+     que es lo que hace toda app de viajes. */
+  background:
+    radial-gradient(90% 60% at 15% 0%, var(--accent-wash) 0%, transparent 60%),
+    radial-gradient(70% 50% at 100% 100%, var(--info-wash) 0%, transparent 60%),
+    var(--s-base);
+}
+
+.entrar-caja {
+  width: 100%;
+  max-width: 380px;
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.entrar-eyebrow {
+  font: var(--t-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.entrar-titulo {
+  font-size: 2.1rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+
+.entrar-lede {
+  font: var(--t-small);
+  color: var(--ink-muted);
+  max-width: 32ch;
+  margin-bottom: var(--sp-2);
+}
+
+.entrar-btn {
+  min-height: var(--touch);
+  border-radius: var(--r-md);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: .9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+.entrar-btn:hover:not(:disabled) { background: var(--accent-strong); }
+.entrar-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.entrar-campo {
+  min-height: var(--touch);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--s-raised);
+  color: var(--ink);
+  padding: 0 var(--sp-3);
+  font-size: .9375rem;
+}
+
+.entrar-nota { font: var(--t-small); color: var(--ink-faint); }
+
+.entrar-fallo {
+  font: var(--t-small);
+  color: var(--warn);
+  background: var(--warn-wash);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+}
+
+.entrar-link {
+  min-height: 34px;
+  background: none;
+  border: 0;
+  color: var(--ink-faint);
+  font-size: .8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 0;
+  justify-self: start;
+}
+.entrar-link:hover { color: var(--ink-soft); }
+
+/* El campo del codigo: monoespaciado, grande y separado. Se teclea a mano
+   desde un WhatsApp, y una O y un 0 juntos en una tipografia normal se
+   confunden. (El generador ya evita ambas, pero el campo tambien ayuda.) */
+.entrar-codigo {
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  letter-spacing: .18em;
+  text-align: center;
+  text-transform: uppercase;
+}

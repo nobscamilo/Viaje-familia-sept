@@ -1,0 +1,16 @@
+/* El mapa de las sugerencias, dentro del hilo del copiloto.
+   Bajo a proposito: compite con las fotos de las tarjetas, y la foto es lo
+   que decide donde se cena. Esto solo dice si caen cerca o no. */
+.mm {
+  width: 100%;
+  height: 180px;
+  margin-top: var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--s-sunken);
+  overflow: hidden;
+}
+
+@media (min-width: 700px) {
+  .mm { height: 220px; }
+}

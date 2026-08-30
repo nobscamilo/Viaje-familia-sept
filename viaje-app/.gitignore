@@ -1,0 +1,26 @@
+node_modules
+dist
+.firebase
+*.log
+preview-shots
+scratch
+
+# --- Secretos. Este repositorio es publico (publica GitHub Pages). ---
+# Nada que sirva para entrar en Firebase puede vivir aqui dentro.
+.env
+.env.local
+.env.*.local
+
+# Claves de cuenta de servicio: dan acceso de ADMINISTRADOR y se saltan
+# todas las reglas de seguridad. Van fuera del repositorio, en ~/.config/.
+*serviceaccount*.json
+*service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+*adminsdk*.json
+*-key.json
+credentials.json
+vistas
+
+# Copia temporal del build para medir desbordes (scripts/medir.mjs)
+.medir/

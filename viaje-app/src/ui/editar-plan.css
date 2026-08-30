@@ -1,0 +1,75 @@
+/* Corregir un plan desde su propia tarjeta.
+   Se abre DENTRO de la tarjeta, no en una pantalla aparte: cambiar una hora
+   no merece perder de vista el resto del dia. Y por eso mismo tiene que caber
+   en 375 px sin que nada se salga: `minmax(0, 1fr)` en la rejilla, porque la
+   pista `auto` se dimensiona al contenido y ya nos costo una iteracion. */
+.ed {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-top: 1px solid var(--line-subtle);
+  background: var(--s-sunken);
+}
+
+.ed-campo { display: grid; gap: var(--sp-1); min-width: 0; }
+.ed-campo > span {
+  font: var(--t-label); letter-spacing: var(--track-label);
+  text-transform: uppercase; color: var(--ink-faint);
+}
+
+.ed-txt, .ed-hora {
+  width: 100%; min-width: 0; min-height: var(--touch);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink);
+  font: var(--t-body);
+}
+.ed-txt:focus-visible, .ed-hora:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.ed-pista { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); font-style: normal; }
+
+.ed-dias {
+  display: flex; gap: var(--sp-2); overflow-x: auto;
+  margin: 0 calc(-1 * var(--sp-3)); padding: 0 var(--sp-3);
+  scrollbar-width: none;
+}
+.ed-dias::-webkit-scrollbar { display: none; }
+
+.ed-dia {
+  flex: 0 0 auto; min-height: 34px; padding: 0 var(--sp-3);
+  border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink-muted);
+  font: var(--t-small); font-size: .8125rem; white-space: nowrap; cursor: pointer;
+}
+.ed-dia.es-activo { background: var(--accent-wash); border-color: var(--accent); color: var(--ink); }
+
+/* Dos columnas cuando hay sitio y una cuando no. `flex: 0 1 auto` y no
+   `flex: 1`: con base 0 el navegador cree que caben y desborda en vez de
+   partir la fila. */
+.ed-fila { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.ed-corto { flex: 0 1 auto; min-width: 0; }
+
+.ed-tipos { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.ed-tipo {
+  flex: 0 1 auto; min-height: 34px; padding: 0 var(--sp-2);
+  border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink-muted);
+  font: var(--t-small); font-size: .8125rem; white-space: nowrap; cursor: pointer;
+}
+.ed-tipo.es-activo { background: var(--accent-wash); border-color: var(--accent); color: var(--ink); }
+
+.ed-botones { display: flex; gap: var(--sp-2); }
+.ed-guardar {
+  flex: 1 1 auto; min-height: var(--touch); padding: 0 var(--sp-3);
+  border: 0; border-radius: var(--r-md);
+  background: var(--accent); color: var(--on-accent, #0b0d12);
+  font: var(--t-small); font-weight: 700; cursor: pointer;
+}
+.ed-guardar[disabled] { opacity: .6; cursor: default; }
+.ed-cancelar {
+  flex: 0 0 auto; min-height: var(--touch); padding: 0 var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: transparent; color: var(--ink-muted);
+  font: var(--t-small); cursor: pointer;
+}
+
+.ed-aviso { font: var(--t-small); color: var(--warn, #f0a05a); }

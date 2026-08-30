@@ -6,3 +6,17 @@ dist/
 .env.local
 .env.*.local
 npm-debug.log*
+
+# --- Secretos (anadido 2026-08-26) ---
+# El repo es publico. Las claves de cuenta de servicio dan acceso de
+# administrador y se saltan las reglas de Firestore: nunca aqui dentro.
+.env
+.env.local
+.env.*.local
+*serviceaccount*.json
+*service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+*adminsdk*.json
+*-key.json
+credentials.json

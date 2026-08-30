@@ -1,0 +1,63 @@
+/* Meter un sitio en la agenda desde la tarjeta. Vive dentro de la tarjeta del
+   lugar, asi que no puede pesar mas que la foto: es una accion, no un
+   formulario. */
+.ap-abrir {
+  width: 100%; min-height: var(--touch);
+  border: 0; border-top: 1px solid var(--line-subtle);
+  background: transparent; color: var(--accent);
+  font: var(--t-small); font-weight: 600; cursor: pointer;
+}
+.ap-abrir:hover { background: var(--accent-wash); }
+
+.ap {
+  display: grid; gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-top: 1px solid var(--line-subtle);
+  background: var(--s-sunken);
+}
+
+.ap-titulo {
+  font: var(--t-label); letter-spacing: var(--track-label);
+  text-transform: uppercase; color: var(--ink-faint);
+}
+
+.ap-dias {
+  display: flex; gap: var(--sp-2); overflow-x: auto;
+  margin: 0 calc(-1 * var(--sp-3)); padding: 0 var(--sp-3);
+  scrollbar-width: none;
+}
+.ap-dias::-webkit-scrollbar { display: none; }
+
+.ap-dia {
+  flex: 0 0 auto; min-height: 34px; padding: 0 var(--sp-3);
+  border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink-muted);
+  font: var(--t-small); font-size: .8125rem; white-space: nowrap; cursor: pointer;
+}
+.ap-dia.es-activo { background: var(--accent-wash); border-color: var(--accent); color: var(--ink); }
+
+.ap-fila { display: flex; gap: var(--sp-2); align-items: center; }
+
+.ap-hora {
+  flex: 1 1 auto; min-width: 0; min-height: var(--touch);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink);
+  font: var(--t-small); font-family: var(--font-mono);
+}
+
+.ap-guardar {
+  flex: 0 0 auto; min-height: var(--touch); padding: 0 var(--sp-4);
+  border-radius: var(--r-md); border: 1px solid var(--accent);
+  background: var(--accent); color: var(--on-accent);
+  font: var(--t-small); font-weight: 600; cursor: pointer;
+}
+.ap-guardar:disabled { opacity: .45; cursor: not-allowed; }
+
+.ap-cancelar {
+  flex: 0 0 auto; min-height: var(--touch); padding: 0 var(--sp-2);
+  border: 0; background: none; color: var(--ink-faint);
+  font: var(--t-small); cursor: pointer;
+}
+
+.ap-fallo { font: var(--t-small); font-size: .75rem; color: var(--danger); }

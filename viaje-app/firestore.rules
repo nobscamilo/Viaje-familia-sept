@@ -1,0 +1,307 @@
+rules_version = '2';
+
+// Modelo: todo cuelga del viaje.
+//   trips/{tripId}
+//     .roles          { uid: 'owner' | 'adult' | 'viewer' }
+//     .uidToTraveler  { uid: travelerId }
+//     /travelers/{travelerId}
+//     /timeline/{eventId}
+//     /decisions/{decisionId}
+//       /votes/{uid}          <- un documento POR PERSONA
+//       /comments/{commentId}
+//
+// El voto vive en su propio documento y su id es el uid de quien vota. Esa
+// sola decision arregla de raiz el bug del proyecto anterior, donde el mapa
+// de votos se reescribia entero desde el cliente y dos personas votando a la
+// vez se pisaban. Aqui es imposible: nadie puede escribir el voto de otro.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function trip(tripId) {
+      return get(/databases/$(database)/documents/trips/$(tripId)).data;
+    }
+
+    function role(tripId) {
+      return trip(tripId).roles[request.auth.uid];
+    }
+
+    function isMember(tripId) {
+      return signedIn() && request.auth.uid in trip(tripId).roles;
+    }
+
+    function isOwner(tripId) {
+      return isMember(tripId) && role(tripId) == 'owner';
+    }
+
+    // Quien puede proponer, comentar y votar. `viewer` ve pero no toca.
+    function isAdult(tripId) {
+      return isMember(tripId) && role(tripId) in ['owner', 'adult'];
+    }
+
+    function unchanged(campo) {
+      return !(campo in request.resource.data) ||
+             request.resource.data[campo] == resource.data[campo];
+    }
+
+    // Alguien que entra por primera vez y se apunta a si mismo.
+    //
+    // Sin esto solo el owner podria enlazar a nadie, y como el uid solo existe
+    // DESPUES de entrar por primera vez, el resto de la familia se quedaria
+    // fuera para siempre. El codigo del viaje hace de puerta: no se puede leer
+    // el documento sin ser miembro, asi que hay que sabertelo de antemano.
+    /**
+     * El codigo del viaje es PERSONAL, uno por adulto.
+     *
+     * Antes habia un solo codigo para todos, asi que cualquiera que lo tuviera
+     * podia escoger cualquier nombre libre y votar como el padre de otro. No
+     * se podia dar poderes de owner, pero suplantar a alguien en una votacion
+     * ya es suficiente. Ahora el codigo tiene que ser el del viajero que dice
+     * ser: se lo mandas a cada uno por separado.
+     */
+    function codigoDe(tripId, travelerId) {
+      return get(/databases/$(database)/documents/trips/$(tripId)/codes/$(travelerId)).data.joinCode;
+    }
+
+    function seApuntaSolo(tripId) {
+      let antes = resource.data;
+      let ahora = request.resource.data;
+      let mio = request.auth.uid;
+      let quiero = ahora.uidToTraveler[mio];
+      let clave = ahora.joinCodeAttempt;
+      return signedIn()
+        // Solo puede tocar estos tres campos, nada mas.
+        && ahora.diff(antes).affectedKeys().hasOnly(['roles', 'uidToTraveler', 'joinCodeAttempt'])
+        // Y dentro de los mapas, solo su propia entrada.
+        && ahora.roles.diff(antes.roles).affectedKeys().hasOnly([mio])
+        && ahora.uidToTraveler.diff(antes.uidToTraveler).affectedKeys().hasOnly([mio])
+        // No puede darse a si mismo poderes de owner.
+        && ahora.roles[mio] in ['adult', 'viewer']
+        // Solo la primera vez: si ya estaba, que lo cambie un owner.
+        && !(mio in antes.roles)
+        // No puede hacerse pasar por un viajero que ya tiene dueno.
+        && !(quiero in antes.uidToTraveler.values())
+        // Y tiene que saberse SU codigo, no el del viaje.
+        // Un viajero sin codigo no lo puede reclamar nadie: `codigoDe` da null
+        // y esta comparacion falla contra cualquier cadena.
+        && clave is string
+        && clave.size() >= 6
+        && clave == codigoDe(tripId, quiero);
+    }
+
+    match /trips/{tripId} {
+      allow read: if isMember(tripId);
+      // Crear un viaje: quien lo crea queda como owner de si mismo. Sin esto,
+      // el primer documento seria imposible de escribir.
+      allow create: if signedIn() &&
+        request.resource.data.roles[request.auth.uid] == 'owner';
+      allow update: if isOwner(tripId) || seApuntaSolo(tripId);
+      allow delete: if false;
+
+      // --- Los codigos personales. NADIE los lee desde el cliente, ni
+      // siquiera un miembro del viaje.
+      //
+      // Vivian en `travelers/{id}`, que todo miembro puede leer: cualquiera
+      // podia leer el codigo de su padre y, como «el codigo manda», entrar
+      // como el. El agujero lo abrio el propio arreglo de la suplantacion.
+      // Para repartirlos hay una funcion que solo responde a un owner.
+      match /codes/{travelerId} {
+        allow read, write: if false;
+      }
+
+      // --- Intentos de entrada: los cuenta la Cloud Function para frenar la
+      // fuerza bruta. Desde el cliente, ni leer ni escribir: poder leerlos
+      // seria poder saber cuantos intentos te quedan, y poder escribirlos
+      // seria poder borrarlos.
+      match /joinAttempts/{uid} {
+        allow read, write: if false;
+      }
+
+      // --- Viajeros: los nueve, ninos incluidos. Solo los owners los tocan.
+      match /travelers/{travelerId} {
+        allow read: if isMember(tripId);
+        allow write: if isOwner(tripId);
+      }
+
+      // --- Linea de tiempo: vuelos, alojamientos, planes.
+      match /timeline/{eventId} {
+        allow read: if isMember(tripId);
+
+        // Los vuelos y los hoteles NO se crean desde el navegador: los
+        // escribe `scripts/seed.mjs` con el SDK de administrador, que no pasa
+        // por estas reglas. Lo unico que se crea desde aqui son propuestas, y
+        // firmadas.
+        allow create: if isOwner(tripId) ||
+          (isAdult(tripId) &&
+           request.resource.data.status == 'propuesto' &&
+           request.resource.data.createdBy == request.auth.uid);
+
+        // Antes esto era `isAdult` a secas: cualquier adulto podia reescribir
+        // el localizador del Vueling desde la consola del navegador. Ahora un
+        // adulto solo toca lo que salio de la app — lo que tiene autor.
+        allow update: if isOwner(tripId) ||
+          (isAdult(tripId) && resource.data.createdBy != null);
+
+        allow delete: if isOwner(tripId);
+
+        // --- Votar un plan propuesto. Misma forma que los votos de una
+        // decision: un documento por persona, con su uid de id.
+        match /votes/{uid} {
+          allow read: if isMember(tripId);
+          allow create, update: if isAdult(tripId) &&
+            uid == request.auth.uid &&
+            request.resource.data.value in ['si', 'no', 'igual'] &&
+            request.resource.data.travelerId == trip(tripId).uidToTraveler[request.auth.uid];
+          allow delete: if uid == request.auth.uid && isAdult(tripId);
+        }
+      }
+
+      // --- El hilo del copiloto: uno por persona y SOLO suyo.
+      //
+      // No es un chat de grupo. Cada uno le pregunta lo suyo —cuanto debe,
+      // que regalarle a alguien, donde comer sin los ninos— y eso no tiene
+      // por que leerlo el resto de la familia. Ni siquiera un owner: mandar
+      // en el viaje no es mandar en las conversaciones ajenas.
+      match /hilos/{travelerId}/mensajes/{mensajeId} {
+        function esMio() {
+          return isMember(tripId) &&
+                 trip(tripId).uidToTraveler[request.auth.uid] == travelerId;
+        }
+        allow read, create, delete: if esMio();
+        allow update: if false;   // un mensaje dicho no se reescribe
+      }
+
+      // --- Las cuentas.
+      //
+      // Un gasto lo puede anotar cualquier adulto y lo ve todo el mundo: unas
+      // cuentas que solo ve quien organiza no son unas cuentas compartidas.
+      //
+      // Los importes van en CENTIMOS ENTEROS. La regla lo exige: si entrara
+      // un 12.5 en euros, el reparto seguiria cuadrando pero la lista y los
+      // saldos mezclarian dos unidades sin que nadie lo notara hasta que el
+      // total saliera cien veces mas pequeño.
+      match /gastos/{gastoId} {
+        allow read: if isMember(tripId);
+        allow create: if isAdult(tripId)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.importeCent is int
+          && request.resource.data.importeCent > 0
+          // Diez mil euros de tope en UN gasto: no es un limite de gasto, es
+          // un cortafuegos contra el dedo gordo. 25000 en vez de 250,00.
+          && request.resource.data.importeCent <= 1000000
+          && request.resource.data.concepto is string
+          && request.resource.data.concepto.size() > 0
+          && request.resource.data.concepto.size() <= 140;
+
+        // Editar: solo quien lo anoto, o quien organiza. Y NUNCA se puede
+        // cambiar quien lo creo.
+        //
+        // Lo sembrado NO se edita desde la app, ni siendo owner: la siembra es
+        // un espejo y `set()` sin merge, asi que el siguiente `npm run
+        // publicar` devolveria el valor de `src/data/` y la correccion
+        // desapareceria sin que nadie se enterara. Esos importes se corrigen
+        // en el codigo, donde al lado queda escrito de que correo salieron.
+        //
+        // `get('createdBy', '')` y no `resource.data.createdBy`: leer un campo
+        // que no existe hace fallar la expresion entera. Ya paso una vez con
+        // `origen` y nadie podia borrar su propio gasto.
+        allow update: if resource.data.get('origen', '') != 'seed'
+          && (isOwner(tripId) || resource.data.get('createdBy', '') == request.auth.uid)
+          && unchanged('createdBy')
+          && request.resource.data.importeCent is int
+          && request.resource.data.importeCent > 0
+          && request.resource.data.importeCent <= 1000000;
+
+        // Borrar: igual, y solo lo que salio de la app. Las reservas
+        // sembradas llevan `origen: 'seed'` y se corrigen en el codigo, donde
+        // queda escrito de que correo salio cada importe.
+        //
+        // `get('origen', '')` y no `resource.data.origen`: un gasto normal NO
+        // tiene ese campo, y en las reglas leer un campo que no existe hace
+        // fallar la expresion entera, o sea DENY. Con la version ingenua
+        // nadie podia borrar un gasto suyo, y no lo habria contado nadie
+        // hasta el viaje. Lo cazo `scripts/probar-reglas.mjs`.
+        allow delete: if resource.data.get('origen', '') != 'seed'
+          && (isOwner(tripId) || resource.data.createdBy == request.auth.uid);
+      }
+
+      // --- Transferencias entre subfamilias para saldar. Coleccion aparte a
+      // proposito: un Bizum de 200 euros entre hermanos NO es un gasto del
+      // viaje, y si viviera en la misma coleccion acabaria sumando en el total.
+      match /liquidaciones/{liqId} {
+        allow read: if isMember(tripId);
+        allow create: if isAdult(tripId)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.importeCent is int
+          && request.resource.data.importeCent > 0
+          && request.resource.data.de != request.resource.data.a;
+        // Se puede corregir el importe —un Bizum de 200 que en realidad fueron
+        // 180—, pero NO a quien va dirigida: la direccion la decide el saldo,
+        // no una persona. Si la direccion esta mal es que los gastos estan
+        // mal, y eso se arregla en los gastos.
+        allow update: if (isOwner(tripId) || resource.data.get('createdBy', '') == request.auth.uid)
+          && unchanged('createdBy') && unchanged('de') && unchanged('a')
+          && request.resource.data.importeCent is int
+          && request.resource.data.importeCent > 0;
+        allow delete: if isOwner(tripId) || resource.data.get('createdBy', '') == request.auth.uid;
+      }
+
+      // --- Decisiones.
+      match /decisions/{decisionId} {
+        allow read: if isMember(tripId);
+        allow create: if isAdult(tripId) &&
+          request.resource.data.status == 'propuesto' &&
+          request.resource.data.createdBy == request.auth.uid;
+
+        // Un adulto edita el contenido, pero solo un owner mueve el estado a
+        // los sitios que cuestan dinero.
+        allow update: if isOwner(tripId) ||
+          (isAdult(tripId) && unchanged('status'));
+
+        allow delete: if isOwner(tripId) && resource.data.status == 'propuesto';
+
+        // --- Votos: un documento por persona, con su uid como id.
+        match /votes/{uid} {
+          allow read: if isMember(tripId);
+          // Solo tu propio voto. Nunca el de otro. Y solo si eres adulto:
+          // los ninos no tienen cuenta, asi que aqui no llegan nunca.
+          // El valor es 'si' | 'no' | 'igual', o el id de una opcion cuando
+          // la decision trae varias. Aqui NO se comprueba que ese id exista:
+          // haria falta un get() de la decision en cada voto, y a cambio de
+          // ese coste solo evitariamos que alguien se guarde a si mismo un
+          // voto a una opcion inventada — que el recuento ya ignora en
+          // silencio, igual que ignora el voto de quien salio del grupo.
+          allow create, update: if isAdult(tripId) &&
+            uid == request.auth.uid &&
+            request.resource.data.value is string &&
+            request.resource.data.value.size() >= 2 &&
+            request.resource.data.value.size() <= 60 &&
+            request.resource.data.travelerId == trip(tripId).uidToTraveler[request.auth.uid];
+          allow delete: if uid == request.auth.uid && isAdult(tripId);
+        }
+
+        // --- Comentarios: se editan y se borran solo por quien los escribio.
+        match /comments/{commentId} {
+          allow read: if isMember(tripId);
+          allow create: if isMember(tripId) &&
+            request.resource.data.authorUid == request.auth.uid &&
+            request.resource.data.text is string &&
+            request.resource.data.text.size() > 0 &&
+            request.resource.data.text.size() <= 2000;
+          allow update: if resource.data.authorUid == request.auth.uid && unchanged('authorUid');
+          allow delete: if resource.data.authorUid == request.auth.uid || isOwner(tripId);
+        }
+      }
+    }
+
+    // Perfil propio, para el nombre y la foto de la sesion.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+  }
+}

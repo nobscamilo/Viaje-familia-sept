@@ -1,0 +1,83 @@
+/* ============================================================
+   El saldo. Lo primero de la pantalla y lo único que casi todo
+   el mundo va a mirar: cuánto debo o cuánto me deben.
+   ============================================================ */
+
+.sal {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--s-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.sal-mio { font-size: 1rem; color: var(--ink-soft); }
+.sal-mio strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.sal-mio.es-acreedor strong { color: var(--ok); }
+.sal-mio.es-deudor strong { color: var(--warn); }
+
+.sal-hogares { display: grid; gap: var(--sp-1); list-style: none; margin: 0; padding: 0; }
+
+.sal-h {
+  display: grid;
+  grid-template-columns: 8px 1fr auto auto;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  border-top: 1px solid var(--line-subtle);
+}
+.sal-h-punto { width: 8px; height: 8px; border-radius: var(--r-pill); }
+.sal-h-nombre { font-size: .8125rem; color: var(--ink-soft); }
+.sal-h-puso { font-size: .7rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+.sal-h-saldo {
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+  text-align: right;
+}
+.sal-h-saldo.es-mas { color: var(--ok); }
+.sal-h-saldo.es-menos { color: var(--warn); }
+.sal-h.es-mio .sal-h-nombre { color: var(--ink); font-weight: 550; }
+
+/* Un saldo no se arregla solo: alguien tiene que hacer el Bizum. */
+.sal-pagos { display: grid; gap: var(--sp-1); list-style: none; margin: 0; padding: 0; }
+
+.sal-pago {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  background: var(--s-overlay);
+  border-radius: var(--r-sm);
+  font-size: .75rem;
+  color: var(--ink-muted);
+}
+.sal-pago strong { color: var(--ink-soft); font-weight: 550; }
+.sal-flecha { color: var(--accent); }
+.sal-pago { flex-wrap: wrap; }
+.sal-pago-quien { display: flex; align-items: center; gap: var(--sp-2); flex: 1 1 auto; min-width: 0; }
+/* Importe y botón como un solo bloque: o caben los dos arriba, o bajan los
+   dos juntos. Nunca un botón suelto en una línea para él. */
+.sal-pago-fin { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.sal-cuanto { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* «Ya está»: sin esto las cuentas no cierran nunca. */
+.sal-hecho {
+  min-height: 30px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: .7rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sal-hecho:hover:not(:disabled) { color: var(--ok); border-color: var(--ok); }
+.sal-hecho:disabled { opacity: .5; cursor: not-allowed; }
+.sal-fallo { flex-basis: 100%; font-size: .68rem; color: var(--danger); }

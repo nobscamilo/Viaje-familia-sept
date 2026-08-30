@@ -1,0 +1,62 @@
+.com {
+  border-top: 1px solid var(--line-subtle);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-3);
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.com-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+
+.com-item {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--s-overlay);
+  border-radius: var(--r-sm);
+  /* Lo mío se marca con el acento, no con la posición: alinear a la derecha
+     en una lista de nueve personas hace ilegible quién dice qué. */
+  border-left: 2px solid transparent;
+}
+.com-item.es-mio { border-left-color: var(--accent); }
+
+.com-autor {
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.com-texto { font: var(--t-small); color: var(--ink-soft); overflow-wrap: anywhere; }
+
+.com-vacio { font: var(--t-small); font-size: .8125rem; color: var(--ink-faint); }
+
+.com-form { display: flex; gap: var(--sp-2); }
+
+.com-campo {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--s-base);
+  color: var(--ink);
+  padding: 0 var(--sp-3);
+  font-size: .875rem;
+}
+.com-campo::placeholder { color: var(--ink-faint); }
+
+.com-enviar {
+  min-height: var(--touch);
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: .8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.com-enviar:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
+.com-enviar:disabled { opacity: .4; cursor: not-allowed; }

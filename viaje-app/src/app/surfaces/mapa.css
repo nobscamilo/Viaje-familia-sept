@@ -1,0 +1,100 @@
+/* La pantalla del mapa.
+   El mapa manda arriba; la lista de abajo es la que sigue sirviendo cuando el
+   mapa no carga, no hay cobertura o la clave no esta puesta. Esa lista no es
+   un adorno: es el plan B. */
+.mapa { display: flex; flex-direction: column; gap: var(--sp-4); padding-bottom: var(--sp-6); }
+
+.mapa-dias {
+  display: flex; gap: var(--sp-2); overflow-x: auto;
+  padding: var(--sp-4) var(--sp-4) 0; scrollbar-width: none;
+}
+.mapa-dias::-webkit-scrollbar { display: none; }
+
+.mapa-dia {
+  flex: 0 0 auto; min-height: 34px; padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink-muted);
+  font: var(--t-small); white-space: nowrap; cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.mapa-dia:hover { color: var(--ink-soft); border-color: var(--line-strong); }
+.mapa-dia.es-activo {
+  background: var(--accent-wash); border-color: var(--accent); color: var(--ink);
+}
+
+.mapa-lienzo {
+  height: min(52vh, 420px); margin: 0 var(--sp-4);
+  border-radius: var(--r-lg); overflow: hidden;
+  border: 1px solid var(--line); background: var(--s-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.mapa-error {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-2); height: 180px; padding: var(--sp-5); text-align: center;
+  color: var(--ink-muted); font: var(--t-small);
+}
+
+.mapa-lista {
+  list-style: none; margin: 0; padding: 0 var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+
+.mapa-item {
+  width: 100%; min-height: var(--touch);
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: var(--sp-3); border-radius: var(--r-md);
+  border: 1px solid var(--line); background: var(--s-raised);
+  box-shadow: var(--shadow-card);
+  color: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.mapa-item:hover { border-color: var(--line-strong); background: var(--s-overlay); }
+.mapa-item.es-activo { border-color: var(--accent); background: var(--accent-wash); }
+
+.mapa-num {
+  flex: 0 0 auto; width: 24px; height: 24px; border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  font: var(--t-label); font-size: .75rem; color: var(--on-accent);
+}
+
+.mapa-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mapa-txt strong { font: var(--t-small); font-weight: 600; color: var(--ink); }
+.mapa-txt em { font-style: normal; font: var(--t-small); font-size: .8125rem; color: var(--ink-muted); }
+
+.mapa-vacio {
+  padding: var(--sp-5); color: var(--ink-muted); font: var(--t-small); text-align: center;
+}
+
+@media (min-width: 900px) {
+  .mapa-lienzo { height: min(60vh, 560px); }
+}
+
+.mapa-fila { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* El salto a Google Maps. Sale solo en el punto elegido: si estuviera en
+   todas las filas, la lista dejaria de leerse de un vistazo. */
+.mapa-ir {
+  min-height: var(--touch); display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); border: 1px solid var(--accent);
+  background: var(--accent-wash); color: var(--ink);
+  font: var(--t-small); font-weight: 600; text-decoration: none;
+}
+.mapa-ir:hover { background: var(--accent); color: var(--on-accent); }
+
+.mapa-tag {
+  flex: 0 0 auto; align-self: flex-start;
+  padding: 2px var(--sp-2); border-radius: var(--r-pill);
+  border: 1px solid var(--line); color: var(--ink-muted);
+  font: var(--t-label); text-transform: uppercase; letter-spacing: var(--track-label);
+}
+
+/* De que recorrido es una parada. Deliberadamente discreto: es una etiqueta
+   de contexto, no un titulo, y en un dia con ruta aparece seis veces. */
+.mapa-ruta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: var(--texto-3, #8b93a7);
+}

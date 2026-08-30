@@ -1,0 +1,50 @@
+/* El recibo de una ruta. Vive dentro del hilo del copiloto y compite con las
+   tarjetas de sitios, que llevan foto: por eso no lleva ninguna. Lo que aporta
+   son horas y avisos, y eso se lee, no se mira. */
+.rr {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2);
+  margin-top: var(--sp-2); padding: var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--s-raised);
+}
+
+.rr-cab { display: flex; gap: var(--sp-2); align-items: flex-start; font: var(--t-small); }
+.rr-cab > span { display: grid; gap: 2px; min-width: 0; }
+.rr-cuando { font: var(--t-small); font-size: .75rem; color: var(--ink-muted); }
+.rr-cab em { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); font-style: normal; }
+
+.rr-paradas { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; }
+
+/* Hora en columna fija para que las paradas se lean como un horario y no
+   como una lista: los minutos alineados son la mitad de la informacion. */
+.rr-parada {
+  display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+  gap: var(--sp-2); align-items: baseline;
+  padding: var(--sp-1) 0;
+  border-top: 1px solid var(--line-subtle);
+}
+.rr-hora { font: var(--t-small); font-variant-numeric: tabular-nums; color: var(--ink-muted); }
+.rr-txt { display: grid; gap: 1px; min-width: 0; }
+.rr-txt strong { font: var(--t-small); font-weight: 600; overflow-wrap: anywhere; }
+.rr-nota { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); font-style: normal; }
+.rr-traslado {
+  font: var(--t-small); font-size: .75rem; color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.rr-avisos { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; }
+.rr-avisos li {
+  display: flex; gap: var(--sp-1); align-items: flex-start;
+  font: var(--t-small); font-size: .75rem; color: var(--warn);
+}
+.rr-avisos span { min-width: 0; overflow-wrap: anywhere; }
+
+.rr-quitar {
+  min-height: var(--touch); padding: 0 var(--sp-3);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: transparent; color: var(--ink-faint);
+  font: var(--t-small); cursor: pointer;
+}
+.rr-quitar:hover { color: var(--danger, #f87171); border-color: currentColor; }
+
+.rr-fallo { font: var(--t-small); font-size: .75rem; color: var(--warn); }

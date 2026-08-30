@@ -1,0 +1,121 @@
+/* ============================================================
+   Tokens — la fuente de verdad visual del proyecto.
+   Las reglas que antes vivian en prosa dentro de AGENTS.md
+   ahora son variables. Si una regla no esta aqui, no existe.
+   Ningun componente escribe un color, un radio o una sombra
+   literal: todo sale de este archivo.
+   ============================================================ */
+
+:root {
+  /* --- Superficies (escala zinc, incrementos deliberados) --- */
+  --s-base:        #09090b;   /* fondo de la app */
+  --s-raised:      #121215;   /* tarjetas, paneles */
+  --s-overlay:     #1a1a1f;   /* modales, popovers, estados hover */
+  --s-sunken:      #050506;   /* pozos: bloques de codigo, campos */
+
+  /* --- Bordes ---
+     AGENTS.md: nunca #27272a, siempre zinc-700, o las tarjetas
+     desaparecen sobre el fondo en pantallas de movil al sol. */
+  --line:          #3f3f46;
+  --line-strong:   #52525b;
+  --line-subtle:   #2a2a30;   /* solo para separadores DENTRO de una tarjeta */
+
+  /* --- Texto --- */
+  --ink:           #fafafa;
+  --ink-soft:      #d4d4d8;
+  --ink-muted:     #a1a1aa;
+  --ink-faint:     #71717a;   /* solo metadatos; nunca texto que haya que leer */
+
+  /* --- Acento --- */
+  --accent:        #a78bfa;
+  --accent-strong: #8b5cf6;
+  --accent-wash:   #241f3d;
+  --on-accent:     #0b0713;
+
+  /* --- Semantica de estado. Separada del acento a proposito:
+         el acento significa "interactivo", esto significa "que pasa". --- */
+  --ok:            #34d399;
+  --ok-wash:       #10261f;
+  --warn:          #fbbf24;
+  --warn-wash:     #2a2110;
+  --danger:        #f87171;
+  --danger-wash:   #2c1616;
+  --info:          #60a5fa;
+  --info-wash:     #10203a;
+
+  /* --- Estados de una decision. Un color por estado, siempre el mismo,
+         en toda la app. Es lo que permite leer una pantalla de un vistazo. --- */
+  --st-propuesto:  var(--ink-muted);
+  --st-votando:    var(--info);
+  --st-decidido:   var(--accent);
+  --st-reservado:  var(--ok);
+  --st-pagado:     var(--ok);
+  --st-descartado: var(--ink-faint);
+
+  /* --- Elevacion ---
+     AGENTS.md: prohibido `box-shadow: none` en tarjetas y paneles.
+     La profundidad tactil es parte de la identidad de la app. */
+  --shadow-card:   0 4px 20px -2px rgb(0 0 0 / .45), 0 2px 8px -1px rgb(0 0 0 / .25);
+  --shadow-pop:    0 16px 48px -8px rgb(0 0 0 / .6), 0 4px 12px -2px rgb(0 0 0 / .4);
+
+  /* --- Radios --- */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* --- Espaciado (escala de 4) --- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* --- Ergonomia tactil ---
+     AGENTS.md: 44px minimo en todo lo que se toca. Aqui es una variable,
+     asi que un boton que no la use es un bug visible en revision. */
+  --touch: 44px;
+  --topbar-h: 56px;
+  --topbar-h-compact: 48px;
+  --navbar-h: 60px;
+
+  /* --- Tipografia --- */
+  --font-ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --t-display: 700 1.75rem/1.15 var(--font-ui);
+  --t-title:   600 1.25rem/1.25 var(--font-ui);
+  --t-body:    400 1rem/1.55 var(--font-ui);
+  --t-small:   400 .875rem/1.5 var(--font-ui);
+  --t-label:   500 .6875rem/1.3 var(--font-mono);
+
+  --track-tight: -.02em;   /* titulares */
+  --track-label: .1em;     /* etiquetas en mayuscula */
+
+  /* --- Movimiento ---
+     Una sola curva y tres duraciones. Mas variedad se nota como ruido. */
+  --ease: cubic-bezier(.2, .7, .3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* --- Capas --- */
+  --z-nav: 10;
+  --z-sticky: 20;
+  --z-overlay: 40;
+  --z-toast: 60;
+}
+
+/* La app es oscura por diseno (regla explicita de AGENTS.md: nunca fondos
+   claros). No hay tema claro. Si algun dia lo hay, se redefine este bloque
+   y nada mas: ningun componente conoce un color literal. */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+}

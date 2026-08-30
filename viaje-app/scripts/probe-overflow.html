@@ -1,0 +1,24 @@
+<!doctype html><meta charset=utf-8><title>probe</title>
+<body style="font:12px monospace;background:#111;color:#eee;margin:0">
+<pre id=out>midiendo...</pre>
+<iframe id=f src="/" style="width:430px;height:900px;border:0;position:absolute;left:-9999px"></iframe>
+<script>
+document.getElementById('f').onload = () => {
+  setTimeout(() => {
+    const d = document.getElementById('f').contentDocument
+    const vw = 430, malos = []
+    for (const el of d.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect()
+      if (r.right > vw + 1) {
+        const p = el.parentElement
+        malos.push((Math.round(r.right - vw)) + 'px  ' +
+          el.tagName.toLowerCase() + '.' + String(el.className || '-') +
+          '  w=' + Math.round(r.width) +
+          '  padre=' + (p ? p.tagName.toLowerCase() + '.' + String(p.className || '-') : '-'))
+      }
+    }
+    document.getElementById('out').textContent =
+      'DESBORDAN: ' + malos.length + '\n' + malos.slice(0, 10).join('\n')
+  }, 500)
+}
+</script>

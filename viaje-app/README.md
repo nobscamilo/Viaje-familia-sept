@@ -1,0 +1,1142 @@
+# viaje-app
+
+App de viaje familiar, reconstruida desde cero en agosto de 2026.
+
+**Antes de tocar nada**, lee en este orden:
+1. `../firebase-family-app/docs/reinvencion.md` — qué se está construyendo y por qué.
+2. `../firebase-family-app/docs/datos-viaje.md` — los datos reales del viaje.
+3. `docs/rescate.md` — qué se trajo del proyecto anterior y qué se descartó.
+4. `docs/configuracion.md` — **credenciales de Firebase: cuál es secreta y cuál no.**
+
+## Arrancar
+
+```bash
+npm install
+npm install --prefix functions
+npm run dev
+```
+
+Sin `.env.local` arranca en **modo local** con los datos de `src/data/`: funciona recién clonado, sin credenciales. Copia `.env.example` a `.env.local` para conectarlo a Firebase.
+
+## Comprobaciones
+
+```bash
+npm run check         # tamano de archivo + referencias colgando + 40 pruebas
+npm test              # solo las pruebas
+npm run build         # la entrada debe quedarse en ~280 kB
+```
+
+`check:dangling` existe porque una constante que se usaba pero no se declaraba
+(`placesTextSearchLimit`) hizo que Places devolviera **cero resultados sin dar
+ningun error**. Un `undefined` silencioso cuesta mas de encontrar que un fallo.
+
+## Publicar
+
+```bash
+npm run publicar      # comprobaciones + datos a Firestore + web
+```
+
+**`npm run deploy:web` NO actualiza lo que ve la familia.** En produccion la app
+lee la agenda de **Firestore**, no de `src/data/`; `src/data/` solo manda en
+modo local, que es como arranca sin credenciales. El 26 de agosto de 2026 se
+desplego la web cinco veces con Santander, Guardo y el AV027 en el codigo
+mientras Firestore seguia sirviendo un viaje que acababa el 19. Las capturas de
+verificacion tampoco lo cazaron, porque se hacian en modo local.
+
+Regla: **si cambia algo de `src/data/`, toca `npm run publicar`.**
+
+```bash
+npm run seed          # simulacro: no escribe nada
+npm run seed:write    # solo los datos, sin desplegar la web
+npm run rules         # reglas e indices
+```
+
+`scripts/seed.mjs` es un **espejo**, no un volcado: lo que se quita de
+`src/data/` se borra de Firestore. Nunca toca lo que ha creado una persona (un
+plan que el copiloto agrego lleva `createdBy` con un uid y `origen` distinto de
+`seed`), ni pisa el estado de una decision que la familia ya haya votado. Las
+decisiones resueltas no se borran: viven en `DECISIONES_CERRADAS` con el motivo
+por el que se cerraron, y salen bajo el filtro *Cerradas*.
+
+Credenciales: vale con `gcloud auth application-default login`. No hace falta
+una clave de cuenta de servicio en disco.
+
+Modelo: todo cuelga de `trips/{tripId}`. Los votos son **un documento por persona**, con el uid como id — nadie puede escribir el voto de otro, ni siquiera manipulando el cliente.
+
+## Entrar: solo el código, sin Google
+
+**No hay pantalla de Google.** El código personal **es** la sesión: la Cloud
+Function `unirse` comprueba de quién es y devuelve un token de sesión a nombre
+de ese viajero, que el navegador canjea con `signInWithCustomToken`.
+
+Antes había que pasar por Google antes de poder hacer nada. Eso era pedirle a
+siete personas dos pasos para entrar a mirar un itinerario, y ya sabemos cómo
+acabó la app anterior: «entraron una vez y no volvieron».
+
+El uid es **estable y sale del viajero** (`viajero_julian-padre`), no de la
+cuenta. Quien mete su código en otro teléfono es la misma persona y hereda sus
+votos; un uid anónimo por dispositivo habría dejado votos huérfanos.
+
+**El código manda.** Si el viajero ya estaba enganchado a otro uid — el de
+Google de antes, o un móvil viejo — se le mueve y se limpia el anterior. Tener
+el código es la prueba de identidad: si no fuera así, cambiar de móvil te
+dejaría fuera para siempre.
+
+Google se queda como salida de emergencia, escondida en un enlace pequeño, para
+las cuentas que ya estaban enlazadas. **Un cambio de identidad sin puerta
+trasera deja a alguien fuera, siempre.**
+
+El precio, dicho claro: **quien tenga el código es esa persona.** No hay segundo
+factor. Para nueve familiares es un intercambio razonable; para algo más serio,
+no lo sería.
+
+```bash
+npm run probar:entrada   # 8 comprobaciones contra la funcion desplegada
+```
+
+## Ajustes
+
+Detrás del avatar de la barra de arriba, en `/ajustes`. **No está en la barra
+de abajo a propósito**: ahí caben cuatro cosas que se usan todos los días, y
+esto se usa dos veces en todo el viaje.
+
+Solo el owner ve la lista: quién ha entrado, el código de cada uno (copiable de
+un toque, que es para lo único que sirve la pantalla) y **Soltar**, que
+desengancha a alguien de su viajero sin borrarle nada — sus votos y sus planes
+siguen ahí. Hasta hoy, si alguien se apuntaba con el nombre equivocado la única
+salida era la consola de Firebase o el terminal.
+
+Todo pasa por Cloud Functions (`gente`, `desvincular`) porque los códigos **no
+se pueden leer desde el cliente**, ni siendo miembro.
+
+### 🔴 Un agujero que abrió el propio arreglo de la suplantación
+
+Los códigos personales vivían en `travelers/{id}.joinCode`, y esa colección la
+puede leer **cualquier miembro del viaje**. O sea: cualquiera podía leer el
+código de su padre y, como «el código manda», entrar como él. El arreglo de la
+suplantación abrió otro agujero más pequeño en el mismo sitio.
+
+Ahora viven en `codes/{id}` con `allow read, write: if false`: nadie los lee
+desde el cliente. `npm run mover:codigos --write` hizo la migración, y hay una
+prueba que falla si vuelven a `travelers`.
+
+⚠️ **La migración tiene un orden delicado.** `unirse` busca en las **dos**
+colecciones a propósito: sin esa doble búsqueda, entre desplegar la función y
+mover los códigos hay unos segundos en los que nadie puede entrar.
+
+## Un código por persona
+
+Cada adulto tiene **su propio código**, guardado en
+`trips/{tripId}/travelers/{id}.joinCode`. **Nunca en el repositorio**: este
+publica GitHub Pages. Los niños no tienen código, así que nadie puede
+suplantarlos.
+
+```bash
+npm run codigos          # simulacro: enseña cómo serían
+npm run codigos:write    # escribe los que falten y los imprime una vez
+node scripts/codigos.mjs --write --rehacer   # cambia TODOS (invalida los viejos)
+```
+
+Antes había **un solo código para todos**, así que cualquiera que lo tuviera
+podía escoger cualquier nombre libre y votar como el padre de otro.
+
+**Se entra solo con el código: no hay que escoger el nombre.** Lo resuelve la
+Cloud Function `unirse`, no el navegador, porque antes de entrar no eres
+miembro y un no-miembro **no puede leer la lista de viajeros**: desde el cliente
+es imposible saber de quién es un código.
+
+Esa función da además algo que las reglas no podían: **freno a la fuerza bruta**.
+Diez intentos por hora y uid, contados en `joinAttempts/{uid}`, una colección
+que el cliente no puede ni leer ni escribir. Y no distingue en el mensaje entre
+«ese código no existe» y «ese código ya se usó»: decirlo sería confirmarle a un
+desconocido cuáles son válidos.
+
+Las reglas se prueban antes de desplegarse, contra el motor de Google:
+
+```bash
+npm run probar:reglas    # 6 casos: quién entra y quién no
+npm run rules            # los pruebas Y despliega (no despliega si fallan)
+```
+
+Ese test no es decorativo. La primera versión de la regla **compilaba y no
+dejaba entrar a nadie**: el `get()` del código hay que simularlo en las pruebas,
+y sin ese mock todo salía DENY. Sin el test se habría desplegado.
+
+## Diagnosticar el acceso
+
+Si *Entrar con Google* falla con `auth/requests-from-referer-...-are-blocked`:
+
+```bash
+python3 scripts/diagnostico-auth.py
+```
+
+Dice si el bloqueo viene de la restricción de la clave o de los dominios autorizados. El arreglo está en `docs/configuracion.md` §6.
+
+## Ver cualquier dia del viaje sin esperar
+
+La pantalla **Ahora** cambia segun el momento: antes del viaje es una cuenta
+atras, durante el viaje es «que esta pasando y que sigue». A 15 dias de la
+salida no hay forma de ver la segunda... salvo simular el reloj:
+
+```
+/?hoy=2026-09-11T14:00     # viernes del circuito, a las dos de la tarde
+/?hoy=2026-09-10           # se asume mediodia, hora de Madrid
+```
+
+Con `?hoy=` el reloj queda **congelado** y sale un aviso amarillo en pantalla
+para que nadie confunda la vista previa con la realidad. Lo implementa
+`src/hooks/useAhora.js`; toda la logica que depende del reloj recibe `ahora`
+como parametro (`src/domain/agenda.js`), nunca lo lee por su cuenta — por eso
+se puede probar y previsualizar.
+
+Para verlo con ancho real de movil:
+
+```bash
+VITE_FIREBASE_API_KEY='' VITE_FIREBASE_PROJECT_ID='' \
+  npx vite build --outDir /tmp/local-dist --base ./
+cp scripts/marco-movil.html /tmp/local-dist/_marco.html
+cd /tmp/local-dist && python3 -m http.server 4319
+# captura http://localhost:4319/_marco.html?r=/?hoy=2026-09-11T14:00
+```
+
+`chrome --headless --window-size` **no** fija el viewport: renderiza mas ancho
+y recorta, asi que todo parece cortado aunque este bien. El iframe de
+`marco-movil.html` si da un viewport real de 430 px.
+
+Todo eso está en `scripts/capturar.sh`:
+
+```bash
+rm -rf /tmp/local-dist                       # ← IMPRESCINDIBLE
+ALTO=2400 scripts/capturar.sh '/?hoy=2026-09-11T09:00' /tmp/x.png
+ALTO=1600 scripts/capturar.sh '/decisiones?demo=1'     /tmp/y.png
+```
+
+Dos trampas que costaron una vuelta cada una:
+
+- El script **reutiliza `/tmp/local-dist`**. Sin borrarlo estás mirando la
+  compilación de ayer. La barra de acciones «no funcionaba» durante dos
+  capturas por esto.
+- `python3 -m http.server` devuelve **404 en `/decisiones`**: no es un archivo,
+  es una ruta de la SPA, y la captura sale en negro. Por eso hay
+  `scripts/servir.py`, que cae a `index.html`.
+
+`?demo=1` en Decisiones añade una decisión de opciones de mentira
+(`src/data/demo-opciones.js`) para revisar esa pantalla **sin dejar basura en
+el viaje de la familia** — que es exactamente lo que pasó con el «Prueba
+automática» del 11 de septiembre que sigue en Firestore.
+
+## Depurar layout
+
+Si algo desborda a lo ancho: copia `scripts/probe-overflow.html` a `public/_probe.html`, abre `/_probe.html` y lista los elementos que se salen con su padre. Medir es más rápido que adivinar. Sácalo de `public/` antes de compilar.
+
+## Las cinco superficies
+
+La app tiene cinco destinos y nada más:
+
+- **Mapa** — dónde queda cada cosa. Pestañas por día, con hoy elegido por
+  defecto durante el viaje, y una lista debajo que sigue sirviendo si el mapa
+  no carga. Las coordenadas están **precalculadas** en `src/data/coordenadas.js`
+  (`node scripts/geocodificar.mjs`): la app no llama a Geocoding en caliente.
+- **Ahora** — antes del viaje, cuenta atrás y agenda completa. Durante el
+  viaje, se ancla en hoy: tarjeta de «Ahora mismo» y «Lo siguiente» con hora,
+  sitio y *Cómo llegar*; los días que ya pasaron se pliegan detrás de un botón;
+  la cabecera deja de contar hacia la salida y pasa a «día 2 de 14».
+- **Decisiones** — lo que está abierto, con estado y trazabilidad.
+- **Cuentas** — quién ha puesto qué y quién le debe a quién. Quinta pestaña
+  (por eso «Decidir» y no «Decisiones»: con cinco columnas en un móvil de
+  390 px cada una mide 78 px y la palabra larga no cabe).
+- **Copiloto** — la conversación, con la IA dentro como participante que ejecuta.
+
+No hay pestañas por categoría de dato. Hospedaje, comida y actividades son *tipos de decisión*.
+
+## El mapa
+
+Google Maps JS, cargado **bajo demanda** al entrar en la pantalla: quien no abre
+Mapa no lo descarga ni genera carga facturable. Tope de **300 cargas al día**
+(`BillableDefaultPerDayPerProject`), que por 31 días queda bajo las 10.000
+gratuitas al mes.
+
+Dos decisiones que parecen errores y no lo son:
+
+- **Sin `mapId`.** El estilo oscuro en código (`styles`) solo se aplica a mapas
+  sin Map ID. Crear un Map ID hay que hacerlo a mano en la consola de Google.
+- **Marcadores clásicos** (`google.maps.Marker`) en vez de `AdvancedMarkerElement`,
+  que exige Map ID. Los pines son SVG generados en `src/services/estilo-mapa.js`.
+
+Si algún día se crea un Map ID en la consola, se pueden revertir las dos.
+
+**Los planes que agrega el copiloto también salen en el mapa.** La Cloud
+Function resuelve el sitio contra Places (`resolverSitio` en `functions/lib/maps.js`)
+y guarda `coords` en el propio evento; `puntos.js` prefiere esas coordenadas
+sobre la tabla precalculada, para que una corrección mande sobre la tabla.
+
+Las coordenadas las resuelve **el servidor, no el modelo**: pedirle a Gemini
+que repita quince dígitos es pedirle que se equivoque, y un pin mal puesto es
+peor que ningún pin. Cuesta una llamada más a Places por plan añadido.
+
+```bash
+GOOGLE_MAPS_API_KEY=... npm run probar:sitio "Rosi La Loca, Madrid"
+```
+
+**No dibujamos rutas.** El copiloto sigue diciendo «metro 35 min, coche 29» en
+texto (`computeRoute` ya resuelve TRANSIT, WALK y DRIVE) y el mapa ofrece un
+botón que abre Google Maps con la navegación de verdad. Una polilínea nuestra
+sería una foto bonita sin horarios de metro en vivo: enseñar una línea y dejar
+a alguien esperando un metro que ya no pasa es peor que no dibujar nada.
+
+`VITE_GOOGLE_MAPS_KEY` es una clave de **navegador**: viaja en el JS y cualquiera
+puede sacarla. La restricción por dominio ayuda, pero **lo que acota el gasto es
+el tope diario**. Sin esa variable la pantalla enseña la lista y avisa; nada se
+rompe.
+
+## La pasada visual (27 de agosto)
+
+El diagnóstico fue de Camilo y es el mejor que ha dado nadie: **«se pierde
+espacio, cero visual, mucho texto»**. No era falta de diseño — hay tokens y
+consistencia — era que **todo pesaba lo mismo** y todo era prosa.
+
+Lo que cambió:
+
+- **Un color por tipo de cosa**, declarado una sola vez (`--ev-color`). El
+  punto del hilo, el lomo de la tarjeta y el `+` de abrir salen todos de ahí:
+  un vuelo se distingue de una cama sin leer una palabra.
+- **Un color por persona** (`color` en `travelers.js`). Nueve iniciales grises
+  eran nueve manchas iguales; ahora la pregunta que más se repite en un viaje
+  de nueve — *¿quién va a esto?* — se responde de un vistazo.
+- **Tarjetas compactas que se abren al tocarlas.** La del apartamento de Madrid
+  ocupaba una pantalla entera de móvil. **Lo que nunca se pliega es el aviso**:
+  esconderlo detrás de un toque sería como no ponerlo.
+- **El botón de abrir dice lo que hay dentro** («3 por hacer · detalle»), no un
+  «ver más» a ciegas.
+- **Los dos héroes gigantes pasan a una línea.** Un «14» de dos centímetros
+  ocupaba un sexto de la pantalla y no cambiaba ninguna decisión.
+- **La urgencia se ve, no se lee**: un punto de color en vez de la palabra
+  URGENTE cuatro veces seguidas.
+- **«Afecta a…» pasa de párrafo monoespaciado a fichas** con el color del tipo.
+
+Resultado medido en la misma captura: donde antes cabía **un día y medio**
+ahora caben **tres días completos**.
+
+### Dos trampas de CSS que costaron una iteración
+
+- **El valor por defecto de una variable va PRIMERO.** `.ev` y `.ev-kind-flight`
+  tienen la misma especificidad, así que gana la última declarada: ponerlo
+  después dejaba todo gris y el color por tipo no aparecía en ningún sitio.
+- **`border:` en forma abreviada borra un `border-left:` anterior.** El lomo de
+  color tiene que declararse *después* del borde general.
+- Y una tercera, en `<i class="dec-punto">`: un `<i>` es *inline*, y el ancho y
+  el alto no le aplican sin `display`. El punto existía en el DOM y no se veía.
+
+### El Copiloto
+
+Lo que más cambia una respuesta es **la foto**. Antes iba en una miniatura de
+84 px al lado del texto y no decidía nada; ahora manda: 16/9 a ancho completo,
+y **carrusel** cuando hay varios sitios — apilar tres fotos grandes deja la
+respuesta a tres pantallas de scroll.
+
+- **Las rutas son fichas con su modo**: antes eran tres filas iguales con el
+  mismo icono genérico y no se distinguía el metro del coche sin leer.
+- **Lo que el copiloto HIZO no puede parecer una viñeta más.** «En la agenda»
+  va en verde y «En Decisiones» en morado: es lo único del hilo que cambia el
+  viaje de verdad.
+- **Una firma morada** en cada respuesta suya. Fiarlo todo a la alineación
+  funciona con dos mensajes y falla con veinte.
+
+Para trabajarlo sin hablar con él en cada iteración:
+
+```bash
+GOOGLE_MAPS_API_KEY=... node scripts/demo-copiloto.mjs   # datos reales
+# y luego, en modo local:  /copiloto?demo
+```
+
+La conversación de ejemplo se genera con **Places y Routes de verdad**: una
+foto real tiene proporciones y colores que un rectángulo gris no tiene, y el
+diseño se cae justo ahí. Se carga con `import()` diferido, así que no viaja en
+el paquete de producción.
+
+⚠️ La vista previa destapó un dato en crudo en pantalla: `2026-09-10 13:00`,
+que es como lo guarda Firestore y no como lo lee una persona. Hay una prueba
+que falla si vuelve a pintarse sin pasar por `formatDay`.
+
+### Hacer y deshacer desde la tarjeta
+
+`agregarPlan` y `quitarPlan` son dos funciones **deterministas, sin modelo**.
+Agregar Rosi La Loca al jueves a la una no necesita que Gemini interprete
+nada: gastarle una llamada sería pagar por adivinar algo que ya sabemos. Las
+coordenadas y la dirección ya vienen en la tarjeta — no se vuelve a preguntar
+a Places por lo mismo.
+
+**Deshacer va pegado a hacer.** Sin poder quitar, nadie se atreve a dejar que
+la app le escriba en la agenda del viaje. `quitarPlan` lleva tres candados y
+ninguno sobra:
+
+- **Lo puso una persona** (`createdBy`): los momentos de la siembra — vuelos,
+  hoteles, el AV027 — no se borran desde ahí ni por accidente.
+- **Sigue propuesto**: si alguien ya lo confirmó, deja de ser tuyo.
+- **Es tuyo, o eres owner.**
+
+```bash
+npm run probar:planes    # 10 comprobaciones contra las funciones desplegadas
+```
+
+⚠️ **Una función recién creada puede responder 401** hasta que Cloud Run le
+asigna el permiso de invocación pública. Si pasa:
+`gcloud run services add-iam-policy-binding <nombre-en-minusculas> --region=europe-west1 --member=allUsers --role=roles/run.invoker`.
+
+⚠️ **`export { x } from './otro.js'` en `index.js` rompe el despliegue** con
+«Detected cycle while resolving name». La lógica vive en `planes.js` y el
+`onCall` que la envuelve en `index.js`: separar transporte de lógica lo evita
+y de paso deja las funciones probables sin levantar nada.
+
+### El marco de captura mentía
+
+La pantalla del Copiloto parecía rota — sin campo de escribir — y no lo estaba:
+`marco-movil.html` medía **2400 px de alto**, así que una barra anclada abajo
+salía fuera de la foto. Ahora acepta `&h=932` para ver lo que cabe en un móvil
+de verdad. **Casi «arreglo» algo que funcionaba**; la herramienta de verificar
+también hay que verificarla.
+
+## Que la agenda se pueda tocar (28 de agosto)
+
+> «El plan del Camp Nou del 15 sept está ahí pero no se puede hacer nada.»
+
+Era verdad, y el plan existía: lo dejó el copiloto en Firestore
+(`status: 'propuesto'`, `createdBy`), no en `src/data/`. La tentación era poner
+**votar / aprobar / descartar** en todas las tarjetas. Habría sido un error: la
+agenda de este viaje son sobre todo reservas pagadas, y un botón *Descartar*
+encima del Vueling de 431,91 € no es una función, es una trampa.
+
+Lo que se puede hacer con un momento lo decide `src/domain/acciones.js`, que es
+puro y está probado:
+
+| Estado del momento | Qué ofrece la tarjeta |
+| --- | --- |
+| `propuesto` **con** `createdBy` | votar · confirmar (owner) · quitar (autor u owner) · cómo llegar |
+| `propuesto` **sin** `createdBy` | votar · cómo llegar — **nunca quitar**: no lo puso nadie desde la app |
+| `confirmado` | cómo llegar, y las decisiones abiertas que lo bloqueen |
+
+### El enlace que ya existía y no se veía
+
+`conflicto-bernabeu` declaraba `blocks: ['bernabeu']` desde el primer día. El
+dato estaba, la interfaz no lo usaba: por eso el tour del Bernabéu parecía
+muerto en la agenda pese a tener una decisión abierta encima. Ahora cada
+tarjeta enseña sus decisiones abiertas y salta a ellas (`/decisiones#dec-<id>`,
+que además fuerza el filtro «Todas» — enlazar a algo que el filtro esconde es
+peor que no enlazar).
+
+Hay un test que recorre `OPEN_DECISIONS` y falla si un `blocks` apunta a un
+momento que ya no existe. Sin él, renombrar un evento haría desaparecer el
+chip en silencio.
+
+### Decisiones con varias opciones
+
+Hasta hoy una decisión era una pregunta de sí o no. «Dónde comemos el domingo»
+con tres restaurantes delante no se resuelve votando «sí»: se resuelve
+señalando uno. Una decisión puede traer `options: [{ id, title, detail,
+address, priceEur }]`, y entonces el voto **es el id de la opción**. El resto
+del modelo no cambia: un documento de voto por persona, mismo electorado, los
+niños siguen sin contar, y **el empate no cierra**.
+
+El copiloto tiene la herramienta `proponerOpciones`. Antes buscaba tres sitios
+estupendos y ahí se acababa: la familia tenía que salirse de la app para
+escoger. Las direcciones se resuelven en el servidor con Places, como en
+`agregarAlPlan` y por lo mismo — el modelo puede inventarse una calle, y una
+dirección falsa dentro de una opción votada es peor que no poner ninguna.
+
+### Y de paso, un agujero que llevaba semanas abierto
+
+`match /timeline/{eventId}` decía `allow create, update: if isAdult(tripId)`.
+Es decir: cualquier adulto del viaje podía reescribir el localizador del
+Vueling desde la consola del navegador. Ahora un adulto solo toca lo que tiene
+autor —lo que salió de la app—; los vuelos y los hoteles los escribe
+`scripts/seed.mjs` con el SDK de administrador, que no pasa por las reglas.
+`node scripts/probar-reglas.mjs` lo comprueba: **13 casos contra el motor real
+de Google**, no el emulador.
+
+El valor de un voto pasa de `in ['si','no','igual']` a «cadena de 2 a 60». No
+se valida contra las opciones reales: haría falta un `get()` de la decisión en
+cada voto, y a cambio solo evitaría que alguien se guarde a sí mismo un voto a
+una opción inventada, que el recuento ya ignora en silencio.
+
+## Cuentas (28 de agosto)
+
+Un Tricount para nueve personas y **tres bolsillos**. La regla, en palabras de
+Camilo: repartir entre los **siete adultos**, saldar entre las **tres
+subfamilias**. Si él paga una comida de todos, su hogar cubre 2/7; los papás
+deben 2/7 y la familia de la hermana, 3/7.
+
+Los dos niños **no están en ningún hogar**, y no es un olvido: «entre todos
+podemos asumir los gastos de ellos». Comen, ocupan cama y pagan entrada, pero
+su parte la ponen los siete adultos. Meterlos en el hogar de su madre haría
+que esa familia pasara de deber 3/7 a deber 5/9 de cada cuenta. Hay una prueba
+que lo vigila (`test/cuentas.test.js`).
+
+Un gasto se divide entre **los adultos que participan en él**, no siempre
+entre siete: el vuelo Bilbao–Madrid lo cogen dos y se parte en dos; un plan de
+F1 se parte en tres; uno «sin F1» se parte en cuatro aunque vayan seis
+personas, porque dos son niños.
+
+### Todo en céntimos enteros
+
+`0.1 + 0.2` da `0.30000000000000004`, y 100 € entre 7 sumados en coma flotante
+no vuelven a dar 100 €. Ese céntimo aparece como un saldo fantasma que nadie
+sabe de dónde sale, y la gente deja de fiarse del número. Aquí:
+
+- Los importes se guardan en céntimos y las **reglas de Firestore exigen un
+  `int`**: un `12.5` en euros se rechaza en el servidor.
+- `repartir()` da lo que sobra de uno en uno **por orden alfabético de id**, y
+  siempre suma exactamente lo que se pagó. Probado con 1, 2, 7, 99, 12.345 y
+  999.999 céntimos entre 1, 2, 3, 4 y 7 personas.
+- El comentario decía «por orden alfabético» y el código no ordenaba: los
+  mismos tres adultos en distinto orden daban repartos distintos. Lo cazó la
+  prueba de estabilidad, no la lectura.
+
+### De dónde salen los 6.710,44 € ya pagados
+
+`src/data/gastos-iniciales.js`, verificado **contra los correos**, no contra la
+memoria de nadie. Lo que se verificó de verdad:
+
+| Gasto | Importe | Pagó | Fuente |
+| --- | --- | --- | --- |
+| Vueling VY8002 BCN→ORY, billetes | 431,91 € | el padre | MLD57T, Mastercard ...7527, 18/05 |
+| Las nueve maletas de cabina, BCN→ORY | 405,00 € | **Camilo** | MLD57T, pago 2 del 28/08, PayPal |
+| Vueling VY1463 ORY→BIO, billetes | 456,44 € | el padre | SNF23N, pago 1 del 18/05 |
+| Las nueve maletas de cabina, ORY→BIO | 225,00 € | **Camilo** | SNF23N, pago 2 del 15/08, Visa |
+| Barcelona: impuesto y seguro | 160,30 € | **Camilo** | Recibo Sweett #1301973 |
+
+Los correos de Vueling confirman que **las dos reservas se pagaron en dos
+veces**, exactamente como lo contó Camilo: los billetes en mayo con la tarjeta
+del padre, las maletas después con las suyas. El resto de reservas van a
+nombre del padre por lo que él dijo, sin correo que lo pruebe.
+
+**Las maletas de Barcelona costaron 405 €, no 225.** La decisión abierta
+estimaba «del orden de 225 €» por analogía con el vuelo de Bilbao, y se
+equivocó en 180 €. Una estimación por parecido no es un precio; el número solo
+apareció al pagarlo. Aun así se ahorraron hasta 270 €: en puerta habrían sido
+hasta 675 €.
+
+**Un aviso que deja de ser cierto es peor que no tenerlo.** Ese vuelo gritaba
+«NO ESTÁ PAGADA LA MALETA DE CABINA» y el alojamiento de Barcelona decía que
+el impuesto municipal de 146,30 € se paga allí. Las dos cosas ya están
+pagadas. Un aviso que pide pagar algo ya pagado se acaba ignorando, y con él
+se ignoran los que sí importan: los dos se quitaron y hay pruebas que impiden
+que vuelvan.
+
+**Lo que NO entra, a propósito:**
+
+- **La F1.** «ya están los tiquetes comprados y pagados, no lo sumes.»
+- **Los vuelos de Bogotá.** Son de los papás y de la familia de la hermana;
+  Camilo no va en ellos. Sus confirmaciones no están en su correo, así que no
+  se sabe el importe: **inventarlo sería peor que no ponerlo.**
+- El Bernabéu, Guardo y el coche: aún no hay importe cerrado.
+- El depósito de 300 € de Barcelona **no es un gasto**: es una retención con
+  tarjeta de crédito que devuelven a los 14 días.
+
+### La pantalla la miran nueve personas, no una
+
+Los hogares se llamaban **«Nosotros», «Papás» y «Hermana»**. Escrito desde la
+silla de Camilo, en una app a la que cada uno entra con su propio código.
+Fernando abría Cuentas y leía «Papás» para sus suegros, «Hermana» para su
+propia casa y «Nosotros» para la de su cuñado: **las tres mal**.
+
+El número grande de arriba («Debéis 1.088,39 €») sí era correcto para cada
+uno, porque sale de `hogarDe(yo.id)`. Los nombres no: eran cadenas fijas. Es
+el error más fácil de cometer y el más difícil de ver, porque quien escribe la
+app siempre la mira desde su propia cuenta.
+
+Ahora los nombres son de personas —«Camilo y Juliana», «Julián y Cielo»,
+«Juliana y Fernando»— y lo único que se personaliza es el tuyo, que pasa a ser
+**«Vosotros»**. Encaja con el resto de la pantalla, que ya te habla de tú.
+`etiquetaHogar(hogarId, miHogarId)` es puro, y hay pruebas que recorren **los
+siete adultos** y comprueban que nadie lee «Vosotros» sobre la casa de otro, y
+que ningún nombre de hogar contiene palabras que solo son ciertas desde una
+silla (`papás`, `hermana`, `mamá`, `suegros`).
+
+### Probar solo con el ancho cómodo es no probar
+
+Los nombres nuevos son más largos y a 430 px cabían de sobra. A **375 px** (un
+iPhone SE) la fila de transferencia se partía y el botón «Ya está» caía solo a
+la línea de abajo, huérfano. Ahora el importe y el botón son un bloque: o caben
+los dos arriba, o bajan los dos juntos.
+
+`scripts/capturar.sh` acepta `ANCHO=375`. Úsalo antes de dar por buena
+cualquier fila con importes.
+
+### Dos trampas que costaron una vuelta cada una
+
+- `allow delete: if resource.data.origen != 'seed'` **denegaba siempre**. Un
+  gasto normal no tiene ese campo, y en las reglas leer un campo inexistente
+  hace fallar la expresión entera. Nadie habría podido borrar un gasto suyo, y
+  no se habría notado hasta el viaje. Se arregla con
+  `resource.data.get('origen', '')`. Lo cazó `scripts/probar-reglas.mjs`, que
+  ya lleva **22 casos contra el motor real de Google**.
+- El servidor de `scripts/capturar.sh` seguía sirviendo un `/tmp/local-dist`
+  **ya borrado**: `pgrep` decía que vivía y las capturas salían de la
+  compilación de media hora antes. Ahora el script lo mata siempre al empezar.
+- Y la copia de `marco-movil.html` estaba **dentro del `if` de compilar**, así
+  que una mejora del propio marco (el parámetro `ANCHO`) no llegaba nunca si no
+  tocaba recompilar: la captura salía con el ancho de antes y parecía un fallo
+  de la app. Tres veces en un día la herramienta de verificar mintió; **la
+  herramienta de verificar también hay que verificarla.**
+
+## Pesos a euros, y el copiloto en las cuentas (29 de agosto)
+
+### La tasa se guarda con el gasto
+
+Se pide a dos fuentes, en este orden y por una razón: la de jsDelivr da la
+tasa con ocho decimales y `open.er-api.com` con seis. Para el peso eso es
+demasiado poco — 0,000275 y 0,00027199 se parecen, pero el primero dice 3.636
+COP por euro y el segundo 3.677, un **1,1 % de diferencia**: once euros en mil.
+La segunda vale como respaldo, no como primera opción.
+
+**La tasa se escribe en el documento del gasto.** Si se recalculara al vuelo,
+la cena del día 12 valdría distinto cada vez que alguien abriera la app y los
+saldos bailarían solos. Y se dice en pantalla que es una referencia de
+mercado: el banco añade su diferencial. Sirve para repartir una cuenta entre
+hermanos, no para cuadrar un extracto al céntimo.
+
+Sin red no se inventa una tasa aproximada: el botón COP se desactiva y se
+teclean los euros. Comprobado que las dos fuentes envían
+`access-control-allow-origin: *`.
+
+### Cambiar de moneda CONVIERTE
+
+La primera versión solo cambiaba la etiqueta: escribías 1.000 €, pulsabas COP
+y seguías viendo 1.000, ahora leídos como mil pesos. El número dejaba de
+significar lo mismo y nada lo avisaba. Ahora 1.000 € pasan a 3.676.590 y al
+revés, y el equivalente está siempre a la vista en las dos direcciones: no
+hace falta cambiar de moneda para saber cuánto es.
+
+Detrás había un segundo fallo que el primero tapaba: **`aCentimos('3.676.590')`
+devolvía `null`**. El punto es ambiguo en español y hay que desambiguarlo con
+la forma, no con una suposición:
+
+| Se escribe | Se lee como | Por qué |
+| --- | --- | --- |
+| `1.234,56` | 1234,56 | hay coma → la coma decide, los puntos son de miles |
+| `3.676.590` | 3676590 | grupos de tres → todos los puntos son de miles |
+| `1.000` | 1000 | un grupo de tres → miles. Nadie escribe «1.000» por un euro |
+| `12.50` | 12,50 | dos decimales, no tres → punto decimal, a la inglesa |
+
+Sin ese caso, al pasar 1.000 € a pesos el campo quedaba con un número que la
+propia app no sabía leer. Hay una prueba de ida y vuelta: lo que la app pinta
+al cambiar de moneda tiene que poder reintroducirse en el mismo campo.
+
+### El selector de moneda se leía como una etiqueta
+
+Iba en vertical a la izquierda del número. Escribiendo `250000` pensando en
+pesos, con «€» activo, al pulsar COP salían **919 millones**: la conversión
+era correcta, lo que fallaba era no ver en qué moneda estabas escribiendo.
+Ahora es un interruptor segmentado del ancho del campo —«Euros | Pesos
+colombianos», con las palabras enteras— y la unidad va pegada al número.
+
+Lo encontró una prueba automática de interacción, no una captura: escribir,
+pulsar, leer lo que quedó. **Es el bucle que faltaba en este proyecto**: hasta
+ahora todo se verificaba mirando una imagen, y una imagen no teclea.
+
+### La mitad invisible de una función es una función que no está
+
+Los gastos se podían anotar y no se podían corregir ni quitar. El borrado
+existía desde el primer día: `borrarGasto()` en el servicio, `allow delete` en
+las reglas, seis casos verdes contra el motor de Google, `quitarGasto` en el
+copiloto. **Todo menos un botón que lo llamara.** La lista era papel pintado:
+un cero de más y no había forma de arreglarlo desde la app.
+
+Ahora la fila entera abre el gasto —en un móvil, apuntar a un icono de 20 px
+con el pulgar falla; apuntar a una fila de 340 px, no— y desde ahí se edita o
+se quita, con confirmación: cada línea de esa lista es dinero de alguien.
+
+Las cerraduras de la interfaz **espejan las de Firestore** a propósito. Si la
+app enseña un botón que el servidor va a rechazar, la persona se queda mirando
+un error que no entiende:
+
+| Gasto | Se puede |
+| --- | --- |
+| Lo anotaste tú | editar y quitar |
+| Lo anotó otro, y organizas | editar y quitar |
+| Lo anotó otro, y no organizas | solo mirar |
+| Reserva sembrada | **solo mirar, ni siendo owner** |
+
+Lo sembrado no se edita ni con permisos de owner, y la razón no es de
+permisos: **la siembra es un espejo con `set()` sin merge**. El siguiente
+`npm run publicar` devolvería el valor de `src/data/` y la corrección
+desaparecería sin que nadie se enterara. Esos importes se corrigen en el
+código, donde al lado queda escrito de qué correo salieron. La app lo explica
+en vez de fallar en silencio, y los campos se ven bloqueados: **un campo que
+se deja escribir y luego no se puede guardar es una promesa rota.**
+
+### Otra vez el servidor sin el botón
+
+Las transferencias «Ya está» quedaban grabadas **para siempre**: `allow delete`
+en las reglas desde el primer día y ningún sitio donde pulsarlo. Un toque sin
+querer y el saldo quedaba mal sin rastro de por qué. Es el mismo error que la
+lista de gastos, cometido dos veces en dos días — por eso ahora hay una prueba
+que lee `Saldado.jsx` y falla si el botón desaparece.
+
+Ahora lo ya saldado se lista bajo el saldo y cada línea se abre: se corrige el
+importe —un Bizum de 200 que en realidad fueron 180— o se deshace. **Lo que no
+se puede cambiar es la dirección**: quién le paga a quién lo decide el saldo,
+no una persona. Si la dirección está mal, lo que está mal son los gastos.
+
+### Un gasto puede ir dirigido a personas sueltas
+
+El motor repartía entre una lista de viajeros desde el primer día —el vuelo de
+Bilbao son solo Camilo y Juliana— pero la pantalla solo sabía ofrecer «Los
+nueve», «Grupo F1» y «Sin F1». No se podía decir «esta cena fue de mi papá,
+Fernando y yo».
+
+El selector ofrece **solo a los siete adultos**: son los que reparten. Los
+niños que vayan a esa comida siguen comiendo; su parte la ponen los adultos
+presentes, igual que en todo lo demás.
+
+Y lleva el punto de color de cada uno **siempre**, elegido o no. En esa lista
+hay una «Juliana Bueno» y una «Juliana» —la hermana— una al lado de la otra, y
+un «Julián» y un «Julián David». En gris son cuatro nombres que se parecen;
+con su color son cuatro personas. Para eso están los colores en
+`travelers.js`.
+
+### La invariante que casi se rompe
+
+Poder elegir personas abre un caso que antes no existía: **un gasto sin ningún
+adulto** entre los participantes. Alguien ha puesto el dinero y nadie lo debe,
+así que los saldos dejarían de sumar cero y aparecería un crédito de la nada.
+No lo habría cazado ninguna prueba: la de «los saldos suman cero» solo miraba
+los gastos sembrados.
+
+Tres cierres, porque un documento puede llegar de otra versión de la app:
+
+1. La pantalla no deja guardar (`tienePagadores`).
+2. El copiloto rechaza una lista sin adultos.
+3. `saldos()` tiene su propia red: si llega igualmente, **lo asume quien lo
+   pagó**. Es lo único que no inventa deuda.
+
+Y una prueba nueva que lanza gastos deliberadamente rotos —participantes solo
+niños, lista vacía— y exige que los tres hogares sigan sumando cero.
+
+### El modo local también tiene que decir la verdad
+
+Al probar esto, el aviso de «reserva verificada» no salía. No era un fallo del
+aviso: en modo local los gastos de siembra **no llevaban la marca
+`origen: 'seed'`** que sí llevan en Firestore, así que parecían editables. El
+modo local enseñaba una app distinta de la real — exactamente la trampa que ya
+me costó una tarde en agosto. La marca se pone también en el respaldo local.
+
+### Cuatro verbos para el copiloto
+
+`anotarGasto`, `listarGastos` (con orden por fecha, importe, concepto, pagador
+o categoría), `quitarGasto` y `sugerirGastos`. Los tres candados de siempre
+para borrar, y uno nuevo: **lo sembrado no se toca desde el copiloto**, porque
+cada uno de esos importes está verificado contra su correo.
+
+`sugerirGastos` **no escribe nada**. Cruza la agenda con las cuentas y dice qué
+falta: una reserva con precio que nadie ha apuntado es dinero pagado que no
+está en el reparto — y eso, no los cafés, es lo que descuadra un Tricount. Hay
+una prueba que lee el cuerpo de esa función y falla si algún día contiene un
+`.add(`, `.set(`, `.update(` o `.delete(`.
+
+### Una medida vale más que dos capturas
+
+La hoja de «Anotar un gasto» se salía de la pantalla en móvil y en escritorio.
+Dos capturas seguidas dijeron QUE estaba mal; ninguna dijo por qué. Medida con
+`npm run medir`, la respuesta salió en un segundo:
+
+```
+DESBORDA 390 px
+    div.ng-head    534 px dentro de un padre de 460 · de -156 a 378
+```
+
+Los hijos medían **534 px dentro de una hoja de 460**. Causa: una pista `auto`
+de CSS Grid se dimensiona al **max-content** del hijo más ancho —la fila de
+cinco categorías— y desborda el contenedor aunque este tenga ancho fijo. Se
+arregla con `grid-template-columns: minmax(0, 1fr)`: el `minmax(0, …)` es lo
+que permite que los hijos encojan.
+
+Antes había otro, del mismo día: `flex: 1` en los chips es `flex-basis: 0`, y
+con base 0 el navegador cree que caben todos en una línea, reparte, y luego el
+`min-width` del contenido los empuja fuera **en vez de envolverlos**.
+`flex: 0 1 auto` calcula el ajuste con el ancho real y sí envuelve.
+
+**`npm run medir` es ahora parte del trabajo**, no un último recurso. Una
+captura dice que algo está mal; una medida dice cuánto y dónde.
+
+## El abuelo cubre a Julián David (30 de agosto)
+
+Julián David pasó del hogar de su madre al de sus abuelos. **Quién va en cada
+casa no es quién vive con quién, sino de qué bolsillo sale el dinero**: su
+parte de cada cuenta se la cargan ahora los abuelos, y la casa de la hermana
+pasó de tres adultos a dos.
+
+Sobre lo ya reservado, eso movió **939,34 €** de una casa a la otra:
+
+| Subfamilia | Le tocaba | Le toca | Saldo |
+| --- | ---: | ---: | ---: |
+| Julián, Cielo y Julián David | 1.878,70 € | 2.818,04 € | **+2.967,04 €** |
+| Juliana y Fernando | 2.817,99 € | 1.878,65 € | −1.878,65 € |
+| Camilo y Juliana | 2.013,75 € | 2.013,75 € | −1.088,39 € |
+
+La casa de Camilo no se movió un céntimo, que es la comprobación de que el
+cambio hace lo que dice: reparte distinto entre dos casas y no toca al resto.
+
+Se eligió mover el hogar en vez de añadir un campo «cubierto por». La
+diferencia solo aparece si Julián David paga algo de su bolsillo: ese dinero
+contaría como puesto por los abuelos. Se aceptó a sabiendas, para no meter un
+concepto más en el modelo.
+
+### Tres pruebas se cayeron, y hicieron bien
+
+Llevaban escrito **«3/7»** en vez de la regla. Ahora dicen «cada casa debe lo
+que tiene de adultos», leyendo `HOGARES`: si alguien vuelve a cambiar de casa,
+siguen siendo ciertas. **Un número mágico en una prueba caduca; la regla, no.**
+
+Una cuarta comparaba contra `Math.round(8100 * n / 7)` y fallaba por **un
+céntimo**: 8.100 entre 7 no es exacto y el que sobra se lo lleva alguien.
+Replicar ahí el reparto del resto sería copiar el algoritmo dentro de su
+propia prueba —ya está probado aparte, con importes feos—, así que ahora
+comprueba que es proporcional con un céntimo de margen.
+
+Y hay una prueba nueva que fija el acuerdo: si alguien devuelve a Julián David
+a la casa de su madre sin querer, salta.
+
+## El copiloto mentía sin saberlo (30 de agosto)
+
+Una conversación real destapó seis fallos. Los dos peores no se veían en
+pantalla: las respuestas parecían perfectas y eran falsas.
+
+### 1. Calculaba rutas desde el sitio equivocado
+
+Las búsquedas de Places no tenían **ningún sesgo geográfico**. Medido:
+
+| Le pides | Google devolvía | Ahora, con la ciudad del día |
+| --- | --- | --- |
+| `Sol` | Bar el Sol, Velilla del Río Carrión — **282 km** | Sol, Centro, Madrid |
+| `circuito` | Karting El Pinar, León — 286 km | Circuito del Jarama |
+| `el hotel` | Hotel El Tremazal, **Guardo** — 279 km | un hotel de Madrid |
+
+Los tres caían cerca de Guardo: sin sesgo, Places resuelve hacia donde parece
+venir la petición. El copiloto trazaba rutas desde un pueblo de Palencia y las
+daba por buenas. De ahí salió el «15 horas y 7 minutos» para ir de Sol a
+IFEMA — no se pudo reproducir exactamente, pero es la única explicación que
+encaja.
+
+Y `regionCode` estaba fijo en `'ES'` para las cuatro ciudades, tres días de
+las cuales son en **París**.
+
+### 2. Calculaba para AHORA, no para el día del viaje
+
+La Routes API, sin `departureTime`, responde para este instante. En transporte
+público eso no es un matiz. Medido, Sol → IFEMA:
+
+- **1 h 15 min** a medianoche de hoy
+- **39 minutos** el domingo de carrera a las 09:55
+
+La app daba un número **31 minutos peor** justo en lo único que sirve para
+planificar un día que aún no ha llegado. Ahora el modelo rellena `cuando` con
+el día de la agenda y el servidor deduce la hora del primer plan de ese día.
+En coche hace falta además `TRAFFIC_AWARE`: con `departureTime` sobre el modo
+por defecto, la API responde *«Timestamp cannot be set for TRAFFIC_UNAWARE
+routing mode»*.
+
+### 3. La tarjeta perdía el modo
+
+El servidor devolvía `mode` (inglés) y la interfaz leía `modo`. Por eso las
+tres rutas salían con el mismo icono de tren y la palabra «RUTA»: en coche, en
+bici y en metro, idénticas.
+
+### 4. Un modo desconocido caía en silencio a transporte público
+
+Era `MODOS[modo] || 'TRANSIT'`. Si el modelo mandaba «carro» o «DRIVE», la
+función devolvía un tiempo de metro y él lo contaba como si fuera en coche.
+**Una caída silenciosa que da un número plausible es peor que un error**:
+nadie la ve. Ahora es un error explícito.
+
+### 5. El markdown se pintaba en crudo
+
+`*   **En transporte público:**` con los asteriscos a la vista. Un modelo
+escribe listas y negritas se le pida o no; es más barato pintarlas que
+pelearse con él. Cincuenta líneas propias en vez de 40 kB de librería, y el
+análisis está en `src/domain/marcado.js` para poder probarlo **con el texto
+exacto que salió mal**, no con una captura.
+
+### 6. El guardia anti-mentiras tenía un falso positivo
+
+`proponerOpciones` devuelve `eleccion`, no `propuesta`, así que cuando el
+copiloto dejaba la elección en Decisiones **de verdad**, la app le desmentía
+debajo. Y cuando mentía de verdad, se le desmentía y ahí acababa. Ahora se le
+devuelve el aviso y se le da **una** oportunidad de llamar a la herramienta;
+si insiste, entonces sí se desmiente.
+
+### Lo que sabe ahora sin preguntar
+
+El contexto incluye **las cuentas**: cuánto se lleva gastado y qué debe cada
+subfamilia. Eso obliga a duplicar los hogares en `functions/lib/hogares.js`,
+porque `firebase deploy` solo sube esa carpeta. Duplicar datos es aceptable
+solo si algo vigila la copia: hay una prueba que compara los dos archivos
+**y** exige que los dos cálculos den el mismo saldo. De paso murió una lista
+de adultos que ya estaba duplicada en `gastos.js` sin nadie mirándola.
+
+### El hilo ya no se pierde al recargar
+
+`trips/{id}/hilos/{travelerId}/mensajes`, uno por persona. **Ni siquiera un
+owner puede leer el de otro**: mandar en el viaje no es mandar en las
+conversaciones ajenas. Se guarda solo el texto; las fotos y las rutas se
+vuelven a pedir si hacen falta.
+
+### Y el detector de referencias colgando tenía un punto ciego
+
+Solo reconocía un parámetro desestructurado si era **el último**: `f({a,b})`
+sí y `f({a,b}, c)` no. Añadir un segundo parámetro a `comoLlegar` hizo saltar
+la prueba con tres falsos positivos. **La herramienta de verificar también hay
+que verificarla** — van cuatro veces en este proyecto.
+
+## Rutas de turismo, la nota que manda y el mapa (30 de agosto)
+
+Camilo pidió tres cosas: que el copiloto sepa armar rutas de turismo conociendo
+el itinerario y la gente, que la puntuación pese de verdad al sugerir sitios, y
+que todo eso se vea en el mapa. Estaban en tres estados muy distintos.
+
+### El mapa ya hacía la mitad, y la otra mitad no la hacía nadie
+
+`agregarAlPlan` resolvía el sitio contra Places y guardaba `coords`;
+`puntos.js` las lee **antes** que la tabla precalculada. Un plan del copiloto
+con `lugar` ya salía en el mapa. Lo que no salía: los sitios que solo se
+sugieren, las opciones de una votación, y un plan al que el modelo no le puso
+`lugar`.
+
+Y había una fuga que llevaba ahí desde el arreglo del 30 por la mañana:
+**`resolverSitio` llamaba a `searchPlaces` SIN ciudad**. Se arregló el sesgo
+geográfico de la búsqueda del copiloto y se dejó sin sesgo justo la llamada que
+*escribe el pin en la agenda*. La puerta por la que seguía entrando Guardo.
+
+Ahora hay dos cosas nuevas en el mapa:
+
+- **El recorrido, dibujado.** Las paradas que comparten `rutaId` se unen en
+  orden con una línea punteada por debajo de los pines (`recorridos()` en
+  `puntos.js`, `Polyline` en `Mapa.jsx`). Seis pines sueltos no dicen en qué
+  orden se visitan.
+- **Las sugerencias, antes de agregarlas** (`MiniMapa.jsx`). Escoger mirando
+  dónde caen era medio criterio y se estaba perdiendo entero. Se monta **solo
+  en el último mensaje con sitios**: cada mapa cuenta contra el tope diario de
+  Maps JS (300 cargas) y un hilo de planificación con un mapa por respuesta se
+  lo come en una tarde.
+
+### La puntuación no ordenaba nada, y ordenar por nota es peor que no ordenar
+
+Places devolvía `rating` y `userRatingCount` y los dos llegaban al modelo y a
+la tarjeta, pero no había ni filtro, ni orden, ni una línea en el prompt que
+dijera que la nota importa. La lista salía en el orden de relevancia de Google.
+
+La trampa de «ordenar por nota» es que **un 4,9 con 7 reseñas gana a un 4,5 con
+3.000**. Así que se pondera hacia la media del propio lote… y eso tampoco basta,
+cosa que descubrió una prueba y no una lectura: con esos dos sitios la media
+sale 4,5, el 4,9 encoge hasta 4,53 y **sigue ganando por dos centésimas**.
+Encoger acerca a la media pero nunca cruza por debajo de ella.
+
+Se ordena por el **extremo inferior** del intervalo, no por la media: no
+«cuánto vale, más o menos», sino «cuánto vale como poco».
+
+```
+posterior = (v/(v+m))·nota + (m/(v+m))·media      m = 100 reseñas
+nota      = posterior − z·√(varianza/(v+m))       z = 1, varianza = 1
+```
+
+`varianza = 1` y `z = 1` son supuestos declarados, no medidas. La media sí es
+un dato: la de las notas que Google acaba de devolver para esa consulta.
+
+Medido contra la API real el 30 de agosto, «restaurantes para cenar en familia
+cerca de Sol»:
+
+| # | Orden de Google (relevancia) | Orden nuevo |
+|---|---|---|
+| 1 | Rosi La Loca 4,7 (26.281) | **Galipán 4,9 (5.911)** |
+| 2 | El Fontán 4,1 (3.120) | Rosi La Loca 4,7 (26.281) |
+| 3 | Barbara Ann 4,6 (1.005) | Barbara Ann 4,6 (1.005) |
+| 4 | **Galipán 4,9 (5.911)** | Venta El Buscón 4,4 (3.797) |
+| 8 | **la loperana 4,7 (11)** | *fuera del top 5* |
+
+«la loperana» es el caso entero en una línea: 4,7 con **once** reseñas. Un
+orden por nota a secas la pone segunda; este la deja fuera.
+
+También se pide ya `regularOpeningHours` en el `fieldMask` (verificado contra
+la API: los tramos vienen con `day` 0 = domingo y `weekdayDescriptions` empieza
+en lunes, en español). Un 4,8 cerrado el domingo es un 0, y la Boqueria cierra
+los domingos.
+
+**`abiertoEl` devuelve tres respuestas, no dos**: sí, no, y **null cuando no se
+sabe**. Mucho sitio no publica horario, y tratar el desconocido como cerrado
+dejaría fuera media ciudad.
+
+### `armarRuta`: el modelo pone los nombres, el servidor pone el reloj
+
+Hasta ahora el copiloto sabía meter UN plan. «Armame una ruta por el Gótico el
+domingo» acababa en un párrafo bonito que no dejaba nada en la agenda, o en
+cinco llamadas con horas inventadas.
+
+El modelo manda nombres y orden. `functions/rutas.js` hace el resto:
+
+1. Resuelve cada parada contra Places **con la ciudad de ese día** y se queda
+   con la mejor por nota ponderada — pide 8 y devuelve 1, porque Places cobra
+   por petición y no por resultado.
+2. **Dos pasadas.** El tiempo de traslado depende de la hora de salida y la
+   hora de salida depende de los traslados anteriores. Se encadena primero sin
+   traslados para tener una hora aproximada, se piden las rutas *para esas
+   horas*, y se vuelve a encadenar. Preguntar «cuánto se tarda ahora» un día
+   que aún no ha llegado fue el fallo de 1 h 15 contra 39 minutos.
+3. Comprueba si cada parada abre a la hora a la que se llega.
+4. Avisa de lo que **pisa algo ya reservado**, y solo de lo que puede afirmar:
+   un evento sin hora no choca con nada y a uno sin final no se le inventa una
+   duración. Estirar los eventos a una duración supuesta llenaría esto de
+   falsos avisos y nadie los leería.
+5. Escribe las paradas como **propuestas**, con un `rutaId` común.
+
+Los avisos viajan **dentro** de `ruta`, no al lado: un modelo que redacta tiende
+a suavizarlos justo cuando más hacen falta, y así la interfaz los pinta él
+quiera o no.
+
+**Un `rutaId` y un botón.** Sin él, deshacer una ruta de seis paradas son seis
+toques, y una función que cuesta seis toques deshacer no la prueba nadie.
+`quitarRuta` respeta los mismos candados uno por uno: solo lo que puso una
+persona, solo mientras siga propuesto, y dice cuántas dejó por confirmadas.
+
+Coste por ruta: hasta 6 peticiones a Places + 5 a Routes. Con el tope de 150
+Places/día son unas 16 rutas diarias. No es gratis y conviene saberlo.
+
+### Editar y quitar desde «Ahora»
+
+Quitar ya estaba; **editar no**. Cambiar la hora de algo que puso el copiloto
+era quitarlo y volver a crearlo, y eso se lleva por delante los votos que ya
+tenía — y quien no es owner ni siquiera podía volver a crearlo, así que en la
+práctica no lo corregía nadie.
+
+`EditarPlan.jsx` cambia título, día, hora, sitio y tipo. El sitio se manda como
+**texto** y lo resuelve el servidor con la ciudad de ese día: si esta pantalla
+pudiera escribir un pin, un dedo torpe podría mover el Camp Nou. Si Places no
+encuentra el sitio nuevo, se queda el texto y **se quita el pin viejo** — dejarlo
+sería enseñar en el mapa la dirección anterior con el nombre nuevo, que es la
+peor de las tres opciones.
+
+Un plan que se mueve de hora arrastra su final; si no, un momento de 10:00 a
+11:30 movido a las 18:00 acabaría antes de empezar.
+
+### Cuatro cosas que solo salieron al medir o al probar
+
+1. **`groups.sin-f1` es `undefined`.** La clave del mapa es `sinF1` y el id es
+   `sin-f1`. `trip.get('groups.sin-f1.travelerIds')` no devuelve nada nunca, así
+   que el aviso de «van los dos niños» se habría apagado justo en el único grupo
+   en el que van. Ahora se busca por `id`, con prueba.
+2. **`4210 reseñas`**, sin separador de miles, encima de `32.871 reseñas`. Es la
+   tercera vez que aparece este fallo en este proyecto: el español no separa los
+   miles hasta cinco cifras. Ahora hay `miles()` en `cuentas.js` al lado de
+   `euros()`, y las dos pantallas la usan.
+3. **`.acc-cierre` no tenía `flex-wrap`.** Medido: los cuatro botones sumaban
+   exactamente el ancho del contenedor, así que «Quitar la ruta entera» no
+   bajaba a su línea — se encogía y quedaba pegado al botón que quita solo esa
+   parada. Dos acciones muy distintas, del mismo tamaño y una al lado de la otra.
+4. **Un banco de pruebas aparte mide otra cosa.** El primer intento de medir
+   `EditarPlan` fue una página suelta con el mismo marcado y la misma hoja de
+   estilos: dio 86 px de ancho donde la app da 343. Sin los padres reales no hay
+   medida. Lo que sí vale es **inyectar el marcado dentro de una tarjeta real**
+   de `/ahora` y medir ahí (`scripts/`, y el detector ignora lo que cuelga de un
+   contenedor con `overflow-x`, o el carrusel de sitios sale como desborde).
+
+### La ventana del viaje, por fin en un solo sitio
+
+`VIAJE_DESDE` y `VIAJE_HASTA` estaban escritas a mano en `planes.js`,
+`gastos.js` e `index.js`. Ahora viven en `functions/lib/ventana.js`, con una
+prueba que falla si vuelve a aparecer una fecha suelta en `functions/*.js`. Era
+la primera de las tres trampas del segundo viaje, y la más barata de quitar.
+
+Y `herramientas.js` se pasaba de 400 líneas con la llegada de `armarRuta`: lo
+que ve el modelo vive ahora en `functions/lib/declaraciones.js`. Son dos cosas
+con dos ritmos distintos — texto dirigido a Gemini y código que se ejecuta.
+
+## ¿Un segundo viaje? (30 de agosto — evaluado, NO implementado)
+
+Camilo preguntó si se puede levantar una página igual para otro viaje con otra
+gente, y si convendría otro host. Se revisó el código y **no se tocó nada**:
+decidió esperar a tener el viaje. Esto queda escrito para que el próximo agente
+no vuelva a derivarlo desde cero.
+
+**Se puede, y media arquitectura ya lo permite.** Todo cuelga de
+`trips/{tripId}`, las reglas son por viaje, los códigos de entrada son por
+viaje y personales, y `src/services/firebase.js` ya lee `VITE_TRIP_ID`
+(`|| 'sept-2026'`). Eso no hay que inventarlo.
+
+**Lo específico del viaje son ~1.000 líneas de `src/data/`**: `trip-madrid-2026.js`
+(330), `travelers.js` (148), `gastos-iniciales.js` (149),
+`decisiones-sept-2026.js` (122), `hogares.js` (85), `coordenadas.js` (29).
+
+**Tres trampas que romperían un segundo viaje en silencio:**
+
+1. **Las fechas del viaje están a mano en tres sitios del servidor**:
+   `functions/planes.js:22`, `functions/gastos.js:21` y `functions/index.js:67`
+   tienen `VIAJE_DESDE = '2026-09-10'` / `VIAJE_HASTA = '2026-09-23'`. Con otras
+   fechas, el copiloto rechazaría *todos* los planes y gastos con «cae fuera del
+   viaje». Es el fallo más caro porque parece un fallo del modelo, no de datos.
+2. **`src/domain/cuentas.js` importa `hogares.js` directamente**, y hay una copia
+   servidor en `functions/lib/hogares.js`. Gente distinta = hogares distintos:
+   ese acoplamiento hay que romperlo, y toca el motor del dinero.
+3. **`scripts/seed.mjs` es un espejo que borra.** Siembra un solo viaje y
+   elimina de Firestore lo que no esté en `src/data/`. Con dos viajes hay que
+   pasarle cuál, o el segundo se lleva por delante al primero.
+
+**Sobre cambiar de host: no.** El hosting no es la restricción. Firebase Hosting
+es gratis a esta escala; el gasto son Places, Routes y Gemini, que no cambian de
+proveedor. Auth, Firestore, las reglas y las Functions **son** el backend: mudarse
+significa reescribirlo entero, coste alto y beneficio cero. Si algún día lo que
+se busca es separar la factura, la respuesta es un segundo proyecto Firebase, no
+otro host.
+
+**Los tres caminos, si se retoma:**
+
+- **B (el recomendado).** Mismo proyecto, segundo `tripId`: quitar las fechas
+  duras, desacoplar hogares, parametrizar la siembra. Sin infraestructura nueva,
+  pero comparte cuota de Places/Routes/Gemini y el mismo aviso de 20 €/mes — con
+  dos viajes activos ese techo se queda corto.
+- **C.** App multiviaje de verdad, con selector y hogares/fechas/grupos desde
+  Firestore. Más trabajo, pero el tercer viaje ya no cuesta nada. Su trabajo
+  base es exactamente el de B, así que hacer B no tira nada.
+- **A.** Segundo proyecto Firebase. Parece la más limpia y envejece peor: dos
+  copias del código que divergen, cada arreglo hecho dos veces, OAuth y claves
+  de Maps nuevas.
+
+**Dato que dejó dicho:** el segundo viaje tendría **algo de gente repetida**. Eso
+obliga a decidir algo que hoy no está decidido: si un viajero es global (una
+persona, varios viajes) o por viaje (una ficha por viaje). Lo segundo duplica
+nombres pero mantiene los hogares limpios; lo primero es más bonito y complica
+las reglas de pertenencia. No hay que resolverlo hasta que haya viaje.
+
+## Reglas innegociables
+
+- Ningún archivo por encima de **400 líneas**.
+- Ningún color, radio o sombra literal fuera de `src/styles/tokens.css`.
+- Ningún secreto en el repositorio: **este repo publica GitHub Pages**.
+- Los niños son viajeros, no usuarios: cuentan para capacidad y presupuesto, y **nunca votan**.
+- IA vía **Google AI Studio**, nunca Vertex AI.
+- Nada que dependa del reloj lo lee por su cuenta: recibe `ahora`. Si no, no se
+  puede probar ni previsualizar.
+- Un botón *Cómo llegar* solo se pinta si el destino es un sitio al que de
+  verdad se puede ir. Trazar ruta a «Madrid» es peor que no poner el botón.
+- **Ningún botón destructivo sobre algo que no puso la app.** Un momento sin
+  `createdBy` salió de la siembra: se mira, no se borra desde el móvil.
+- Lo que se puede hacer con una tarjeta se decide en el dominio (`acciones.js`),
+  nunca en el JSX. El JSX pinta descriptores; así se puede probar sin navegador.
+- **El dinero, en céntimos enteros.** Nunca un euro con decimales, ni en el
+  cliente, ni en Firestore, ni en las reglas.
+- **Ningún importe inventado.** Si no hay correo que lo respalde, el gasto no
+  se siembra: se deja fuera y se dice que falta.
+- Nada de plurales a mano: `plural(n, 'gasto', 'gastos')`. «Ver los 1 días que
+  ya pasaron» se escribió dos veces en dos semanas.
+- **Antes de dar por bueno un diálogo o una tabla, `npm run medir`.** A 1280,
+  430, 390 y 375 px. Mirar una captura no es medir.
+- La tasa de cambio se guarda con el gasto, nunca se recalcula.
+- **Ninguna llamada a Places sin ciudad.** Vale para `buscarLugares`, para
+  `resolverSitio` y para cualquiera que venga: sin sesgo, «Sol» es un bar de
+  Velilla del Río Carrión.
+- **Ninguna ruta sin `departureTime`.** Calcular para «ahora» un día que aún no
+  ha llegado da un número plausible y equivocado, que es el peor.
+- **La nota nunca ordena sola.** Se pondera por número de reseñas y se ordena
+  por el extremo inferior. Un 4,9 con siete opiniones no es el mejor sitio.
+- **Nada que escriba varias cosas a la vez sin poder deshacerlas de una vez.**
+  Una ruta son seis momentos y un solo `rutaId`.
+- **Medir dentro de la app, nunca en una página de pruebas aparte.** Sin los
+  padres reales la medida vale 86 donde la app da 343.

@@ -1,0 +1,95 @@
+/* ============================================================
+   Cuentas. Números alineados o no se pueden comparar:
+   `tabular-nums` en TODO importe, sin excepción.
+   ============================================================ */
+
+.ctas { display: grid; gap: var(--sp-3); padding: var(--sp-3); }
+
+.ctas-total {
+  font-size: .8125rem;
+  color: var(--ink-muted);
+  display: grid;
+  gap: var(--sp-2);
+}
+.ctas-total strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.ctas-cats { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ctas-cat {
+  font-size: .7rem;
+  color: var(--ink-faint);
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-pill);
+}
+.ctas-cat b { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.ctas-nuevo {
+  min-height: var(--touch);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: .875rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+.ctas-nuevo:disabled { opacity: .45; cursor: not-allowed; }
+
+.ctas-list { display: grid; gap: var(--sp-1); list-style: none; margin: 0; padding: 0; }
+
+.ctas-g {
+  display: grid;
+  grid-template-columns: 3px 1fr;
+  align-items: stretch;
+  background: var(--s-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+/* La fila entera es el botón: en un móvil, apuntar a un icono de 20 px con el
+   pulgar falla; apuntar a una fila de 340 px, no. */
+.ctas-g-abrir {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.ctas-g-abrir:hover { background: var(--s-overlay); }
+/* La barra de color dice de qué bolsillo salió sin tener que leer un nombre. */
+.ctas-g-barra { align-self: stretch; background: var(--ink-faint); }
+
+.ctas-g-txt { display: grid; gap: 2px; min-width: 0; }
+.ctas-g-concepto { font-size: .8125rem; color: var(--ink); }
+.ctas-g-meta { font-size: .7rem; color: var(--ink-faint); }
+.ctas-g-cop { font-size: .68rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.ctas-g-nota { font-size: .68rem; color: var(--ink-faint); }
+.ctas-g-aviso { font-size: .68rem; color: var(--warn); }
+
+.ctas-g-importe {
+  font-size: .875rem;
+  font-weight: 550;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ctas-g.es-mio { border-color: var(--line); }
+
+.ctas-mas, .ctas-vacio {
+  font-size: .75rem;
+  color: var(--ink-faint);
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  min-height: var(--touch);
+}

@@ -1,0 +1,69 @@
+/* Ajustes. Poca pantalla, mucha claridad: se entra dos veces en todo el viaje
+   y siempre con una duda concreta. */
+.aj { display: grid; gap: var(--sp-5); padding: var(--sp-4) var(--sp-4) var(--sp-7); }
+
+.aj-hero {
+  margin: 0; font: var(--t-small); color: var(--ink-muted);
+}
+.aj-hero strong { color: var(--ink); font-weight: 600; }
+
+.aj-bloque { display: grid; gap: var(--sp-3); }
+
+.aj-titulo {
+  font: var(--t-label); letter-spacing: var(--track-label);
+  text-transform: uppercase; color: var(--ink-faint);
+}
+
+.aj-nota { font: var(--t-small); font-size: .8125rem; color: var(--ink-muted); margin: 0; }
+.aj-nota strong { color: var(--ink-soft); }
+.aj-fallo { font: var(--t-small); color: var(--danger); margin: 0; }
+
+.aj-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+
+.aj-fila {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-height: var(--touch); padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md); border: 1px solid var(--line);
+  background: var(--s-raised);
+}
+/* Quien ya entro se ve entero; quien no, apagado. La lista se lee de un
+   vistazo sin tener que comparar textos. */
+.aj-fila:not(.es-dentro) { opacity: .62; }
+
+.aj-punto {
+  flex: 0 0 auto; width: 10px; height: 10px; border-radius: var(--r-pill);
+  background: var(--ink-faint);
+}
+
+.aj-quien { display: grid; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.aj-quien strong { font: var(--t-small); font-weight: 600; color: var(--ink); }
+.aj-quien em { font-style: normal; font-size: .6875rem; color: var(--ink-faint); }
+
+.aj-codigo {
+  flex: 0 0 auto; cursor: pointer; min-height: 30px;
+  font-family: var(--font-mono); font-size: .75rem; letter-spacing: .08em;
+  color: var(--ink-soft);
+  padding: 3px var(--sp-2);
+  border-radius: var(--r-sm); background: var(--s-sunken);
+  border: 1px solid var(--line-subtle);
+}
+
+.aj-codigo:hover { border-color: var(--accent); color: var(--ink); }
+.aj-codigo.es-copiado { color: var(--ok); border-color: var(--ok); }
+
+.aj-soltar {
+  flex: 0 0 auto; min-height: 32px; padding: 0 var(--sp-2);
+  border: 0; background: none; color: var(--ink-faint);
+  font: var(--t-small); font-size: .75rem; cursor: pointer;
+}
+.aj-soltar:hover { color: var(--danger); }
+.aj-soltar:disabled { opacity: .5; cursor: not-allowed; }
+
+.aj-salir {
+  min-height: var(--touch);
+  border-radius: var(--r-md); border: 1px solid var(--line);
+  background: transparent; color: var(--ink-muted);
+  font: var(--t-small); font-weight: 600; cursor: pointer;
+}
+.aj-salir:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.aj-salir:disabled { opacity: .5; cursor: not-allowed; }

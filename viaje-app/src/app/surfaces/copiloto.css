@@ -1,0 +1,272 @@
+/* El copiloto ocupa el alto disponible y ancla la barra abajo: es un chat,
+   no un documento. El hilo scrollea; la barra no se mueve. */
+.cop {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.cop-hilo {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-4);
+  display: grid;
+  gap: var(--sp-4);
+  align-content: start;
+}
+
+/* ---------- inicio ---------- */
+
+.cop-inicio { display: grid; gap: var(--sp-2); padding: var(--sp-4) 0 var(--sp-2); }
+
+.cop-eyebrow {
+  font: var(--t-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cop-titulo { font-size: 1.35rem; font-weight: 600; letter-spacing: -.03em; }
+.cop-lede { font: var(--t-small); color: var(--ink-muted); max-width: 46ch; }
+
+/* Fichas que fluyen, no cinco botones de ancho completo apilados. Ocupan la
+   mitad de alto y se leen como sugerencias, que es lo que son. */
+.cop-atajos { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
+
+.cop-atajo {
+  flex: 0 1 auto;
+  border-radius: var(--r-pill);
+  text-align: left;
+  min-height: var(--touch);
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line);
+  background: var(--s-raised);
+  color: var(--ink-soft);
+  font-size: .875rem;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.cop-atajo:hover { border-color: var(--accent); color: var(--ink); }
+
+/* ---------- mensajes ---------- */
+
+.cop-msg { display: grid; gap: var(--sp-2); animation: msgIn var(--dur-base) var(--ease) both; }
+
+.cop-de-mi { justify-items: end; }
+
+.cop-de-mi .cop-texto {
+  background: var(--accent-wash);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--ink);
+  border-radius: var(--r-md) var(--r-md) var(--r-sm) var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  max-width: 85%;
+}
+
+.cop-de-copiloto .cop-texto {
+  color: var(--ink-soft);
+  max-width: 62ch;
+  white-space: pre-wrap;
+}
+
+.cop-texto { font: var(--t-body); font-size: .9375rem; overflow-wrap: anywhere; }
+.cop-fallo { color: var(--danger); }
+
+.cop-pensando { display: inline-flex; align-items: center; gap: 5px; font: var(--t-small); color: var(--ink-faint); }
+.cop-pensando i {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  animation: latido 1.1s infinite ease-in-out;
+}
+.cop-pensando i:nth-child(2) { animation-delay: .15s }
+.cop-pensando i:nth-child(3) { animation-delay: .3s }
+
+/* ---------- rutas ---------- */
+
+/* Las rutas, como fichas. Antes eran tres filas iguales con el mismo icono
+   generico: no se distinguia el metro del coche sin leer. */
+.cop-rutas { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.cop-ruta {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--s-raised);
+  color: var(--modo-color, var(--ink-muted));
+}
+.cop-modo-metro, .cop-modo-transporte { --modo-color: var(--info); }
+.cop-modo-coche   { --modo-color: #7dd3fc; }
+.cop-modo-andando { --modo-color: var(--ok); }
+
+.cop-ruta-modo {
+  font: var(--t-label); letter-spacing: var(--track-label);
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.cop-ruta-dur { font-size: .9375rem; font-weight: 600; color: var(--ink); }
+.cop-ruta-km  { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
+
+/* Con un solo resultado, tarjeta a ancho completo. Con varios, carrusel:
+   apilar tres fotos grandes deja la respuesta a tres pantallas de scroll. */
+.cop-lugares { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+
+.cop-lugares.es-carrusel {
+  display: flex; gap: var(--sp-3);
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  margin: 0 calc(-1 * var(--sp-4)); padding: 0 var(--sp-4);
+  scrollbar-width: none;
+}
+.cop-lugares.es-carrusel::-webkit-scrollbar { display: none; }
+.cop-lugares.es-carrusel .cop-lugar { flex: 0 0 78%; scroll-snap-align: start; }
+
+.cop-lugar {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--s-raised);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.cop-lugar a { display: block; color: inherit; text-decoration: none; }
+
+.cop-foto {
+  display: block; width: 100%; aspect-ratio: 16 / 9;
+  object-fit: cover; background: var(--s-overlay);
+}
+.cop-sinfoto {
+  background: linear-gradient(135deg, var(--s-overlay), var(--s-sunken));
+}
+
+.cop-lugar-txt { display: grid; gap: 3px; padding: var(--sp-3); min-width: 0; }
+.cop-lugar-txt h3 { font-size: .9375rem; font-weight: 600; line-height: 1.3; }
+
+.cop-meta { display: flex; align-items: center; gap: var(--sp-2); }
+
+.cop-nota { font-size: .8125rem; font-weight: 600; color: var(--warn); }
+.cop-resenas { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
+.cop-dir { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
+
+.cop-enlace {
+  font-size: .75rem;
+  color: var(--accent);
+  text-decoration: none;
+  justify-self: start;
+  margin-top: 2px;
+}
+.cop-enlace:hover { text-decoration: underline; }
+
+.cop-propuesta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--accent);
+  background: var(--accent-wash);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+/* ---------- barra ---------- */
+
+.cop-barra {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--line);
+  background: var(--s-raised);
+}
+
+.cop-campo {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--s-base);
+  color: var(--ink);
+  padding: 0 var(--sp-4);
+  font-size: .9375rem;
+}
+.cop-campo::placeholder { color: var(--ink-faint); }
+.cop-campo:disabled { opacity: .6; }
+
+.cop-enviar {
+  min-height: var(--touch);
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cop-enviar:disabled { opacity: .4; cursor: not-allowed; }
+
+@keyframes latido { 0%, 60%, 100% { opacity: .25 } 30% { opacity: 1 } }
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+
+/* Lo que el copiloto ha ESCRITO de verdad, separado de lo que dice.
+   Si esta lista esta vacia es que no hizo nada, diga lo que diga el texto. */
+.cop-hechos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+
+.cop-hechos li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: start;
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--accent);
+  background: var(--accent-wash);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+}
+.cop-hechos svg { margin-top: 2px; }
+.cop-hechos em { display: block; font-style: normal; font-size: .6875rem; color: var(--ink-faint); }
+
+/* Lo que el copiloto hizo: un recibo, no una viñeta.
+   Verde para lo que ya esta en la agenda, morado para lo que espera un voto. */
+.cop-hecho {
+  display: flex; align-items: flex-start; gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--hecho-color);
+  background: var(--hecho-fondo);
+  color: var(--hecho-color);
+  font: var(--t-small);
+}
+.cop-hecho-plan { --hecho-color: var(--ok); --hecho-fondo: var(--ok-wash); }
+.cop-hecho-voto { --hecho-color: var(--accent); --hecho-fondo: var(--accent-wash); }
+.cop-hecho svg { flex: 0 0 auto; margin-top: 2px; }
+.cop-hecho span { display: grid; gap: 2px; }
+.cop-hecho strong { color: var(--ink); font-weight: 600; }
+.cop-hecho em { font-style: normal; font-size: .75rem; color: var(--ink-faint); }
+.cop-cuando { color: var(--ink-muted); font-size: .8125rem; }
+
+/* La firma del copiloto. */
+.cop-firma {
+  display: block; width: 7px; height: 7px; border-radius: var(--r-pill);
+  background: var(--accent); margin-bottom: 2px;
+}
+
+/* La papelera del recibo. Discreta pero siempre presente: si hay que buscarla,
+   deja de cumplir su funcion, que es quitar el miedo a pulsar «Agregar». */
+.cop-quitar {
+  margin-left: auto; align-self: center;
+  min-height: 32px; padding: 0 var(--sp-2);
+  border: 0; background: none;
+  color: var(--ink-faint); font: var(--t-small); font-size: .75rem;
+  cursor: pointer;
+}
+.cop-quitar:hover { color: var(--danger); }
+.cop-quitar:disabled { opacity: .5; cursor: not-allowed; }
+
+/* El sitio que se esta mirando, resaltado a la vez en la tarjeta y en el pin
+   del mini mapa. Es lo que conecta las dos mitades: sin esto, un mapa con
+   cinco pines naranjas no dice cual es cual. */
+.cop-lugar.es-elegido {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}

@@ -1,0 +1,46 @@
+.voto {
+  border-top: 1px solid var(--line-subtle);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-2);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+/* Una marca por elector. Se ve de un vistazo cuántos faltan, que es la
+   pregunta real: no "cuánto apoyo hay" sino "a quién estoy esperando". */
+.voto-barra { display: flex; gap: 3px; }
+
+.voto-marca { height: 5px; flex: 1; border-radius: var(--r-pill); background: var(--s-overlay); }
+.voto-si    { background: var(--ok); }
+.voto-no    { background: var(--danger); }
+.voto-igual { background: var(--ink-faint); }
+.voto-falta { background: var(--s-overlay); box-shadow: inset 0 0 0 1px var(--line); }
+
+.voto-estado { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
+.voto-faltan { color: var(--warn); }
+.voto-listo { color: var(--ok); }
+.voto-trabado { color: var(--warn); }
+
+.voto-botones { display: flex; gap: var(--sp-2); }
+
+.voto-btn {
+  flex: 1;
+  min-height: var(--touch);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: .8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+.voto-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
+.voto-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.voto-btn-si.is-on    { background: var(--ok-wash); border-color: var(--ok); color: var(--ok); }
+.voto-btn-no.is-on    { background: var(--danger-wash); border-color: var(--danger); color: var(--danger); }
+.voto-btn-igual.is-on { background: var(--s-overlay); border-color: var(--line-strong); color: var(--ink-soft); }
+
+.voto-nota { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }

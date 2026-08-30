@@ -1,0 +1,111 @@
+.prox {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  background:
+    radial-gradient(110% 80% at 0% 0%, var(--accent-wash) 0%, transparent 65%);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.prox-eyebrow {
+  font: var(--t-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.prox-bloque {
+  background: var(--s-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-4);
+  display: grid;
+  gap: var(--sp-3);
+}
+
+/* Lo que esta pasando ahora lleva el acento; lo siguiente, no. Si todo
+   destacara, no destacaria nada. */
+.prox-curso { border-color: var(--accent); }
+.prox-curso .prox-eyebrow { color: var(--accent); }
+.prox-siguiente .prox-eyebrow { color: var(--ink-faint); }
+
+.prox-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+
+.prox-apunte {
+  font-family: var(--font-mono);
+  font-size: .8125rem;
+  font-weight: 500;
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
+}
+
+.prox-cuerpo {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+.prox-icono {
+  width: 40px; height: 40px;
+  border-radius: var(--r-md);
+  display: grid;
+  place-items: center;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.prox-siguiente .prox-icono { background: var(--s-overlay); color: var(--ink-muted); }
+
+.prox-txt { display: grid; gap: 2px; min-width: 0; }
+
+.prox-titulo { font-size: 1.25rem; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+
+.prox-meta { display: flex; flex-wrap: wrap; gap: 0 var(--sp-3); font: var(--t-small); color: var(--ink-muted); }
+.prox-hora { font-family: var(--font-mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.prox-donde { min-width: 0; overflow-wrap: anywhere; }
+
+.prox-dato { font: var(--t-small); font-size: .8125rem; color: var(--ink-faint); }
+.prox-dato strong { font-family: var(--font-mono); color: var(--ink-soft); }
+
+.prox-aviso {
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--warn);
+  background: var(--warn-wash);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+/* Boton grande a proposito: se pulsa andando, con maletas y con prisa. */
+.prox-ir {
+  min-height: var(--touch);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: .9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.prox-ir:hover { background: var(--accent-strong); }
+.prox-siguiente .prox-ir { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
+.prox-siguiente .prox-ir:hover { border-color: var(--accent); color: var(--accent); }
+
+/* La base (donde duermen) no es un plan: se dice, no se destaca. */
+.prox-base {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2);
+  align-items: start;
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--ink-muted);
+  padding: 0 var(--sp-1);
+}
+.prox-base svg { margin-top: 3px; color: var(--ok); }
+.prox-base em { display: block; font-style: normal; font-size: .75rem; color: var(--ink-faint); }
+
+.prox-libre { padding-block: var(--sp-6); }
+.prox-nada { font-size: 1.125rem; color: var(--ink-muted); margin-top: var(--sp-2); }

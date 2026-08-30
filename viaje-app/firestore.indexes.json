@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "decisions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "urgency", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

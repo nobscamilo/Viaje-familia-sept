@@ -1,0 +1,180 @@
+.dec { padding: 0 0 var(--sp-7); }
+
+/* El heroe, una linea. Ver el comentario en Decisiones.jsx. */
+.dec-hero {
+  margin: 0; padding: var(--sp-3) var(--sp-4);
+  font: var(--t-small); color: var(--ink-muted);
+  border-bottom: 1px solid var(--line-subtle);
+}
+.dec-hero strong { color: var(--ink); font-weight: 600; }
+.dec-hero em { font-style: normal; color: var(--danger); }
+
+.dec-filters {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in srgb, var(--s-base) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line-subtle);
+}
+.dec-filters::-webkit-scrollbar { display: none; }
+
+.dec-filter {
+  flex: none;
+  min-height: 34px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: .8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+.dec-filter:hover { color: var(--ink-soft); border-color: var(--line-strong); }
+.dec-filter.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* ---------- tarjetas ---------- */
+
+.dec-list { list-style: none; margin: 0; padding: var(--sp-4); display: grid; gap: var(--sp-3); }
+
+.dec-card {
+  background: var(--s-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-card);
+  display: grid;
+  gap: var(--sp-2);
+  /* La franja izquierda codifica la urgencia: se lee antes que el texto. */
+  border-left: 3px solid var(--line-strong);
+  animation: decIn var(--dur-base) var(--ease) both;
+}
+.dec-alta  { border-left-color: var(--danger); }
+.dec-media { border-left-color: var(--warn); }
+.dec-baja  { border-left-color: var(--line-strong); }
+
+.dec-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+
+.dec-alta .dec-urg  { color: var(--danger); }
+.dec-media .dec-urg-VIEJO { color: var(--warn); }
+
+.dec-title { font-size: 1rem; font-weight: 600; line-height: 1.35; }
+
+.dec-why { font: var(--t-small); color: var(--ink-muted); }
+/* Tres lineas y punto. El porque completo esta a un toque, en la
+   conversacion: cuatro parrafos seguidos en movil no los lee nadie. */
+.dec-why.es-corto {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* «Afecta a» como fichas, no como un parrafo monoespaciado gris.
+   Antes decia «Afecta a Avianca AV182 · Bogota → Madrid · Triplex Lujo 5 Dorm
+   · Sol» en dos lineas de texto que nadie leia. */
+.dec-blocks { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-1); }
+
+.dec-chip {
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-subtle);
+  border-left: 2px solid var(--chip-color, var(--line-strong));
+  background: var(--s-sunken);
+  font: var(--t-small); font-size: .75rem; color: var(--ink-muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dec-chip-flight    { --chip-color: var(--info); }
+.dec-chip-lodging   { --chip-color: var(--ok); }
+.dec-chip-f1        { --chip-color: var(--accent); }
+.dec-chip-transport { --chip-color: #7dd3fc; }
+.dec-chip-activity  { --chip-color: #f0a05a; }
+
+.dec-empty, .dec-note {
+  font: var(--t-small);
+  color: var(--ink-faint);
+  padding: 0 var(--sp-4);
+}
+.dec-note { border-top: 1px solid var(--line-subtle); padding-top: var(--sp-4); margin-top: var(--sp-3); }
+
+@keyframes decIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Barra de filtros + acción principal. La acción va a la derecha y siempre
+   visible: proponer es lo que convierte la pantalla en algo vivo. */
+.dec-barra {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in srgb, var(--s-base) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.dec-barra .dec-filters {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.dec-barra .dec-proponer { flex: 0 0 auto; }
+
+.dec-proponer {
+  flex: none;
+  min-height: 34px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: .8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dec-proponer:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.dec-proponer:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Lo cerrado se apaga, pero no desaparece: sirve de historial. */
+.dec-cerrada { opacity: .62; }
+.dec-cerrada:hover { opacity: 1; }
+
+.dec-mas {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--ink-faint);
+  font-size: .8125rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.dec-mas:hover { color: var(--accent); }
+
+/* Llegada desde la agenda: /decisiones#dec-<id>. Un halo que se apaga solo;
+   si se quedara fijo seria una decision "marcada" que nadie marco. */
+.dec-card.es-destacada {
+  border-color: var(--accent);
+  animation: dec-halo 2.4s var(--ease) 1;
+}
+@keyframes dec-halo {
+  0%, 60% { box-shadow: var(--shadow-card), 0 0 0 2px var(--accent-wash); }
+  100%    { box-shadow: var(--shadow-card); }
+}
