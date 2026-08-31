@@ -105,3 +105,50 @@ test('los codigos personales no se guardan donde los pueda leer un miembro', asy
   assert.match(reglas, /match \/codes\/\{travelerId\}[\s\S]{0,120}allow read, write: if false/,
     '/codes no se lee ni se escribe desde el cliente')
 })
+
+/**
+ * Toda dependencia externa que usen los scripts y las pruebas tiene que estar
+ * declarada en `package.json`.
+ *
+ * Del 31 de agosto: `npm run seed:write` reventó con «Cannot find package
+ * 'firebase-admin'». Seis scripts lo importaban y no estaba declarado en
+ * ninguna parte — funcionaba solo mientras alguien lo tuviera instalado a
+ * mano. Un `npm ci` en limpio, o un ordenador nuevo, y la siembra del viaje
+ * deja de funcionar el día que hace falta.
+ */
+test('los scripts no usan paquetes sin declarar', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs')
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  const declarados = new Set([
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.devDependencies ?? {}),
+  ])
+
+  // Playwright es la única excepción, y está documentada en `medir.mjs`:
+  // instalarlo se trae ~150 MB de navegadores en cada `npm install`. A cambio,
+  // ese script tiene que avisar de cómo instalarlo en vez de reventar.
+  const OPCIONALES = new Set(['playwright'])
+  const medir = readFileSync(new URL('../scripts/medir.mjs', import.meta.url), 'utf8')
+  assert.match(medir, /npx playwright install/, 'la dependencia opcional tiene que decir cómo instalarse')
+
+  const faltan = new Set()
+  for (const [carpeta, filtro] of [['../scripts/', (f) => f.endsWith('.mjs')], ['../test/', (f) => f.endsWith('.js')]]) {
+    const dir = new URL(carpeta, import.meta.url)
+    for (const archivo of readdirSync(dir).filter(filtro)) {
+      const src = readFileSync(new URL(archivo, dir), 'utf8')
+      for (const m of src.matchAll(/(?:from|import\()\s*'([^']+)'/g)) {
+        const spec = m[1]
+        if (spec.startsWith('.') || spec.startsWith('node:')) continue
+        // `check-dangling.mjs` lleva `import(` dentro de una expresión regular
+        // que analiza código: si no se filtra, se cuela como paquete «,».
+        if (!/^(@[\w.-]+\/)?[\w.-]+(\/[\w.-]+)*$/.test(spec)) continue
+        // `@ambito/paquete` cuenta como un paquete; `paquete/sub`, también.
+        const nombre = spec.startsWith('@')
+          ? spec.split('/').slice(0, 2).join('/')
+          : spec.split('/')[0]
+        if (!declarados.has(nombre) && !OPCIONALES.has(nombre)) faltan.add(`${archivo} → ${nombre}`)
+      }
+    }
+  }
+  assert.deepEqual([...faltan], [], 'paquetes usados y no declarados en package.json')
+})

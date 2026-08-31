@@ -144,6 +144,11 @@ no usuarios. Nunca votan y nunca entran en el denominador.
   el mismo marcado y la misma hoja de estilos dio 86 px donde la app da 343: sin
   los padres reales no hay medida. Si algo no se puede alcanzar navegando, se
   inyecta el marcado en una tarjeta real y se mide ahí.
+- **Ningún paquete sin declarar en `package.json`.** Si un script o una prueba
+  importa algo externo, va declarado aunque «ya esté instalado» en la máquina de
+  turno. `firebase-admin` lo usaban seis scripts y no estaba: la siembra del
+  viaje reventó el 31 de agosto. Hay una prueba que lo vigila, con `playwright`
+  como única excepción documentada.
 - **Separador de miles siempre**, con `miles()` de `cuentas.js`. El español no
   separa hasta cinco cifras, así que «4210 reseñas» debajo de «32.871 reseñas»
   parece un error. Escrito a mano tres veces ya.

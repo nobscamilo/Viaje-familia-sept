@@ -1083,6 +1083,32 @@ repositorio es público. Tampoco están todavía en Firestore — hay que meterl
 mano, como se hizo con los del Tríplex, y por eso queda como `todo` en la ficha
 en vez de darlo por hecho.
 
+## La siembra no arrancaba: una dependencia que nadie declaró (31 de agosto)
+
+`npm run seed:write` reventó con «Cannot find package 'firebase-admin'». No era
+un fallo de la siembra: **seis scripts** —`seed`, `codigos`, `mover-codigos`,
+`reparar-enlace`, `probar-entrada`, `probar-planes`— importan `firebase-admin`
+y no estaba en `package.json` de `viaje-app`. Solo vivía en
+`functions/node_modules`, para las Cloud Functions.
+
+Funcionaba mientras alguien lo tuviera instalado a mano. Un `npm ci` en limpio,
+un ordenador nuevo o un `npm install` que podara el árbol, y la siembra del
+viaje deja de funcionar **el día que hace falta usarla**. Es el mismo tipo de
+fallo que el `./lib/admin.js` mal importado: no rompe al escribirlo, rompe al
+ejecutarlo, y para entonces ya nadie se acuerda.
+
+Ahora está declarado como `devDependency` (`^13.9.0`, la misma línea que usan
+las funciones) y hay una prueba que recorre `scripts/` y `test/`, saca todos
+los paquetes externos que importan y exige que estén en `package.json`.
+Comprobada quitando `firebase-admin`: falla y nombra los seis archivos.
+
+**La única excepción es `playwright`**, que usa `scripts/medir.mjs`. Declararlo
+se trae ~150 MB de navegadores en cada `npm install` para una herramienta que
+se usa unas pocas veces al mes. Está en una lista de opcionales dentro de la
+propia prueba, y a cambio `medir.mjs` tiene que decir en voz alta cómo
+instalarse en lugar de reventar con un stack — eso también lo comprueba la
+prueba.
+
 ## ¿Un segundo viaje? (30 de agosto — evaluado, NO implementado)
 
 Camilo preguntó si se puede levantar una página igual para otro viaje con otra

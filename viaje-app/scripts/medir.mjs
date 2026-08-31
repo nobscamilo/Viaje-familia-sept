@@ -41,7 +41,17 @@ const srv = http.createServer((req, res) => {
 })
 await new Promise((r) => srv.listen(4400, r))
 
-const { chromium } = await import('playwright')
+/**
+ * Playwright NO esta en `package.json` a proposito: instalarlo se trae ~150 MB
+ * de navegadores en cada `npm install`, y esta herramienta se usa unas pocas
+ * veces al mes. Es la unica dependencia opcional del proyecto, y por eso tiene
+ * que decir en voz alta como instalarse en vez de reventar con un stack.
+ */
+const { chromium } = await import('playwright').catch(() => {
+  console.error('Falta Playwright. Instalalo solo para medir:\n' +
+    '  npm i --no-save playwright && npx playwright install chromium')
+  process.exit(1)
+})
 const nav = await chromium.launch()
 let fallos = 0
 
