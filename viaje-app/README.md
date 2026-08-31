@@ -1049,6 +1049,40 @@ Y `herramientas.js` se pasaba de 400 líneas con la llegada de `armarRuta`: lo
 que ve el modelo vive ahora en `functions/lib/declaraciones.js`. Son dos cosas
 con dos ritmos distintos — texto dirigido a Gemini y código que se ejecuta.
 
+## La noche del 22, reservada (30 de agosto)
+
+Camilo reservó *Aparment Almudena* (Calle de San Emilio 62, Ciudad Lineal). El
+momento `aloj-madrid-22` deja de ser un hueco con aviso y pasa a `confirmado`,
+con sus 261,50 €, su ventana de entrada y sus coordenadas reales — el pin
+estaba puesto en Sol como marcador provisional y ahora cae donde de verdad se
+duerme.
+
+**No entra en `gastos-iniciales.js`.** El correo dice «Total pagado: 0 €»:
+Booking carga la tarjeta automáticamente y no se sabe cuál. Es exactamente la
+distinción que ya costó una vez —quién reservó no es quién pagó— y un pagador
+equivocado mueve dinero real entre hermanos. Lleva `pagado: false` y un `todo`
+para acordarse.
+
+Los dos números de la ficha están **medidos, no estimados**:
+
+| Trayecto | Medido el 30 de agosto |
+|---|---|
+| Guardo → Ciudad Lineal, saliendo a las 15:00 del 22 | 373 km, **3 h 56 min** con tráfico |
+| Ciudad Lineal → T4, a las 06:30 del 23, en coche | 17,9 km, **20 min** |
+| Ciudad Lineal → T4, a las 06:30 del 23, en transporte público | **1 h 2 min** |
+
+De ahí salen las dos advertencias que lleva la tarjeta. La primera: no dejan
+entrar después de medianoche y desde las 22:00 hay recargo, así que salir de
+Guardo a las 15:00 y no a las 18:00. La segunda, que no era obvia: el
+apartamento resuelve la salida del AV027 **solo si hay coche**. En metro y
+autobús son 1 h 2 min, y para estar en T4 a las 07:40 habría que salir a las
+06:30 con siete personas y las maletas de catorce días.
+
+El PIN de la reserva y el teléfono del anfitrión no están aquí: este
+repositorio es público. Tampoco están todavía en Firestore — hay que meterlos a
+mano, como se hizo con los del Tríplex, y por eso queda como `todo` en la ficha
+en vez de darlo por hecho.
+
 ## ¿Un segundo viaje? (30 de agosto — evaluado, NO implementado)
 
 Camilo preguntó si se puede levantar una página igual para otro viaje con otra

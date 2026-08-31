@@ -56,8 +56,21 @@ una persona y siga sin confirmar; una ruta se quita entera de un toque.
   28 de agosto: **405 €** por PayPal. En puerta habrían sido hasta 675 €.
   **Hay que rehacer el check-in**, porque modificar la reserva invalida las
   tarjetas de embarque.
-- 🔴 **Reservar la noche del 22 en Madrid.** El AV027 sale a las 09:40 de T4 y
-  desde Guardo son 3 h 35 min: saldrían a las 03:30 con dos niños.
+- ✅ **La noche del 22 en Madrid está reservada** (30 de agosto): *Aparment
+  Almudena*, Calle de San Emilio 62, Ciudad Lineal. Una noche, 3 dormitorios
+  para los nueve, **261,50 €** — de los que 100 € son limpieza. Entrada de
+  15:00 a 22:00, salida de 05:00 a 11:30. **Aún no está cobrado**: Booking
+  carga la tarjeta automáticamente, así que no está en Cuentas hasta que se
+  sepa de qué tarjeta sale.
+  - **No dejan entrar después de medianoche** y desde las 22:00 hay recargo
+    (30 € hasta las 23:00, 50 € después). Desde Guardo son **3 h 56 min**
+    medidos con tráfico: salir a las 15:00.
+  - De Ciudad Lineal a T4 son **20 min en coche** pero **1 h 2 min en
+    transporte público**. Hay que saber si el coche de alquiler sigue
+    disponible la mañana del 23, o el margen para estar a las 07:40 se come
+    la diferencia.
+  - Cancelación gratis solo hasta el **19 de septiembre**; desde el 20 cuesta
+    161,50 €.
 - 🔴 **El coche de alquiler tiene que ser de siete plazas.** Nueve personas y
   nueve maletas de cabina no caben en dos turismos. Ojo al recargo por
   recogerlo en Bilbao y devolverlo en Madrid.

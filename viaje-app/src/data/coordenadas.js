@@ -24,6 +24,6 @@ export const COORDENADAS = {
   'aloj-santander': { lat: 43.452482, lng: -3.828308, etiqueta: 'ibis Styles Santander' },
   'aloj-guardo': { lat: 42.789026, lng: -4.847439, etiqueta: 'Guardo' },
   'traslado-guardo-madrid': { lat: 42.789026, lng: -4.847439, etiqueta: 'Salida desde Guardo' },
-  'aloj-madrid-22': { lat: 40.416728, lng: -3.703291, etiqueta: 'Madrid (sin reservar)' },
+  'aloj-madrid-22': { lat: 40.426478, lng: -3.655381, etiqueta: 'Aparment Almudena, Ciudad Lineal' },
   'vuelo-av027': { lat: 40.49555, lng: -3.594429, etiqueta: 'Barajas T4' },
 }
