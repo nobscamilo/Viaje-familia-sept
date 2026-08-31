@@ -3,8 +3,8 @@
 App de viaje familiar, reconstruida desde cero en agosto de 2026.
 
 **Antes de tocar nada**, lee en este orden:
-1. `../firebase-family-app/docs/reinvencion.md` — qué se está construyendo y por qué.
-2. `../firebase-family-app/docs/datos-viaje.md` — los datos reales del viaje.
+1. `docs/reinvencion.md` — qué se está construyendo y por qué.
+2. `docs/datos-viaje.md` — los datos reales del viaje.
 3. `docs/rescate.md` — qué se trajo del proyecto anterior y qué se descartó.
 4. `docs/configuracion.md` — **credenciales de Firebase: cuál es secreta y cuál no.**
 

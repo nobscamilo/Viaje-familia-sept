@@ -9,9 +9,13 @@ semana de F1 en IFEMA), Barcelona, París y el norte de España.
 <https://viaje-familia-sept-2026.web.app>. Todo lo que haya que hacer se hace
 ahí; empieza por `viaje-app/README.md`.
 
-`firebase-family-app/` — **congelado**. El proyecto anterior. Se conserva por
-sus datos (`docs/datos-viaje.md`) y por la historia del rescate. No se toca y
-no se despliega.
+**En esta carpeta ya no hay nada más.** El proyecto anterior
+(`firebase-family-app/`) se movió el 31 de agosto de 2026 a la carpeta hermana
+**`Viaje sept - archivo/`**, con todo lo que arrastraba: el workflow de GitHub
+Pages —que llevaba días roto, porque ejecutaba archivos borrados—, el script de
+Leaflet, `.nojekyll` y el `.docx` de alojamiento. Los dos documentos que seguían
+sirviendo, `reinvencion.md` y `datos-viaje.md`, están ahora en
+`viaje-app/docs/`.
 
 *Este archivo describía hasta el 28 de agosto de 2026 un generador estático
 (`generar_alojamiento.js`) y una página en GitHub Pages que ya no existen.*

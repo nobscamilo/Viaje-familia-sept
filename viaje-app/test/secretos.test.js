@@ -76,7 +76,7 @@ test('el numero de reserva de Paris no esta en el repositorio', async () => {
   assert.ok(paris, 'el alojamiento de Paris sigue existiendo')
   assert.equal(paris.confirmation, undefined, 'sin numero de reserva en el codigo')
 
-  const archivos = ['viaje-app/src/data/trip-madrid-2026.js', 'firebase-family-app/docs/datos-viaje.md']
+  const archivos = ['viaje-app/src/data/trip-madrid-2026.js', 'viaje-app/docs/datos-viaje.md']
   for (const rel of archivos) {
     const texto = readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8')
     assert.ok(!texto.includes('6443669211'), `${rel} no puede llevar ese numero`)

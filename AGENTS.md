@@ -1,7 +1,7 @@
 > ## 🧭 DIRECCIÓN VIGENTE (2026-08-25)
 > El proyecto activo pasa a ser **`viaje-app/`** (nuevo, desde cero). Lee `viaje-app/README.md` y `viaje-app/docs/rescate.md`.
-> `firebase-family-app/` queda **congelado**: solo se consulta como archivo histórico y como origen del rescate.
-> El plan vive en `firebase-family-app/docs/reinvencion.md`; los datos del viaje, en `firebase-family-app/docs/datos-viaje.md`.
+> El proyecto anterior **ya no está en este repositorio**: se movió el 31 de agosto de 2026 a la carpeta hermana `Viaje sept - archivo/`. Aquí solo vive la app que funciona.
+> El plan vive en `viaje-app/docs/reinvencion.md`; los datos del viaje, en `viaje-app/docs/datos-viaje.md`.
 > 🔒 Este repositorio publica GitHub Pages: **ningún PIN, teléfono ni enlace de check-in en el código.**
 
 # Memoria y Reglas del Proyecto (Viaje Familia)
@@ -22,12 +22,16 @@ Este documento es la **fuente de verdad de configuración e instrucciones** para
 - **La aplicación única y activa** es `viaje-app/` (React 19 + Vite + Firebase).
   Lee `viaje-app/README.md` antes de tocar nada: ahí está el porqué de cada
   decisión, incluidos los errores que costaron horas.
-- `firebase-family-app/` está **congelado**. Se consulta como archivo histórico
-  (`docs/datos-viaje.md`, `docs/reinvencion.md`) y no se despliega.
-  *Esta sección decía lo contrario hasta el 28 de agosto de 2026: apuntaba a
-  `firebase-family-app` como «la app única y activa», en contradicción con el
-  banner de arriba. Un agente que leyera solo esta sección habría trabajado
-  durante horas en el proyecto equivocado.*
+- **En este repositorio ya no hay otra app.** El proyecto anterior
+  (`firebase-family-app/`) se movió el 31 de agosto de 2026 a la carpeta
+  hermana `Viaje sept - archivo/`, junto con el workflow de GitHub Pages que
+  lo publicaba y que llevaba días roto. Los dos documentos que seguían
+  sirviendo —`reinvencion.md` y `datos-viaje.md`— se copiaron a
+  `viaje-app/docs/`, así que la app activa es autocontenida.
+  *Hasta el 28 de agosto esta sección decía que la app activa era la vieja, en
+  contradicción con el banner de arriba: un agente que leyera solo esto habría
+  trabajado horas en el proyecto equivocado. Moverla de sitio es lo que hace
+  que esa confusión no pueda repetirse.*
 - **Todo cambio de lógica, Firestore, funciones o diseño va en `viaje-app/`.**
 - Se despliega con `npm run publicar` desde `viaje-app/`. La web lee **Firestore**,
   no `src/data/`: editar un archivo y desplegar no cambia lo que ve la familia
