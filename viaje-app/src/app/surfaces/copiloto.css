@@ -2,7 +2,9 @@
    no un documento. El hilo scrollea; la barra no se mueve. */
 .cop {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* Tres filas: la barra de sesion (colapsa a 0 si no hay conversacion), el
+     hilo que scrollea, y la barra de escribir. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
   min-height: 0;
 }
@@ -122,68 +124,6 @@
 .cop-ruta-dur { font-size: .9375rem; font-weight: 600; color: var(--ink); }
 .cop-ruta-km  { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
 
-/* Con un solo resultado, tarjeta a ancho completo. Con varios, carrusel:
-   apilar tres fotos grandes deja la respuesta a tres pantallas de scroll. */
-.cop-lugares { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
-
-.cop-lugares.es-carrusel {
-  display: flex; gap: var(--sp-3);
-  overflow-x: auto; scroll-snap-type: x mandatory;
-  margin: 0 calc(-1 * var(--sp-4)); padding: 0 var(--sp-4);
-  scrollbar-width: none;
-}
-.cop-lugares.es-carrusel::-webkit-scrollbar { display: none; }
-.cop-lugares.es-carrusel .cop-lugar { flex: 0 0 78%; scroll-snap-align: start; }
-
-.cop-lugar {
-  border-radius: var(--r-lg);
-  border: 1px solid var(--glass-border);
-  background: var(--glass-mid);
-  backdrop-filter: var(--blur-glass);
-  -webkit-backdrop-filter: var(--blur-glass);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-.cop-lugar a { display: block; color: inherit; text-decoration: none; }
-
-.cop-foto {
-  display: block; width: 100%; aspect-ratio: 16 / 9;
-  object-fit: cover; background: var(--s-overlay);
-}
-.cop-sinfoto {
-  background: linear-gradient(135deg, var(--s-overlay), var(--s-sunken));
-}
-
-.cop-lugar-txt { display: grid; gap: 3px; padding: var(--sp-3); min-width: 0; }
-.cop-lugar-txt h3 { font-size: .9375rem; font-weight: 600; line-height: 1.3; }
-
-.cop-meta { display: flex; align-items: center; gap: var(--sp-2); }
-
-.cop-nota { font-size: .8125rem; font-weight: 600; color: var(--warn); }
-.cop-resenas { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
-.cop-dir { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
-
-.cop-enlace {
-  font-size: .75rem;
-  color: var(--accent);
-  text-decoration: none;
-  justify-self: start;
-  margin-top: 2px;
-}
-.cop-enlace:hover { text-decoration: underline; }
-
-.cop-propuesta {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font: var(--t-small);
-  font-size: .8125rem;
-  color: var(--accent);
-  background: var(--accent-wash);
-  border-radius: var(--r-sm);
-  padding: var(--sp-2) var(--sp-3);
-}
-
 /* ---------- barra ---------- */
 
 .cop-barra {
@@ -283,10 +223,39 @@
 .cop-quitar:hover { color: var(--danger); }
 .cop-quitar:disabled { opacity: .5; cursor: not-allowed; }
 
-/* El sitio que se esta mirando, resaltado a la vez en la tarjeta y en el pin
-   del mini mapa. Es lo que conecta las dos mitades: sin esto, un mapa con
-   cinco pines naranjas no dice cual es cual. */
-.cop-lugar.es-elegido {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+
+/* --- Empezar de cero -------------------------------------------
+   La conversación caduca sola (domain/hilo.js), pero a veces hay que
+   cortarla ahora. Pegajosa arriba para que se alcance con el hilo largo, y
+   lo más lejos posible del botón de enviar: lo único que se pierde es
+   contexto, pero perderlo por un dedo torpe molesta igual. */
+.cop-sesion {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--divider-soft);
 }
+
+.cop-sesion-txt {
+  flex: 1;
+  font: var(--t-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.cop-limpiar {
+  flex: 0 1 auto;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: var(--r-pill);
+  background: var(--glass-faint);
+  color: var(--ink-muted);
+  font: var(--t-small);
+  font-size: .75rem;
+  cursor: pointer;
+}
+.cop-limpiar:hover { color: var(--ink); border-color: var(--line-strong); }
+.cop-limpiar:disabled { opacity: .45; cursor: not-allowed; }

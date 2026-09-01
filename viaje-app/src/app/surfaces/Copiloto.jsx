@@ -2,15 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useTrip } from '../../hooks/useTrip.js'
 import { useHilo } from '../../hooks/useHilo.js'
 import { formatDay } from '../../domain/dates.js'
-import AgregarPlan from '../../ui/AgregarPlan.jsx'
 import MiniMapa from '../../ui/MiniMapa.jsx'
+import Lugar from '../../ui/LugarTarjeta.jsx'
 import ReciboRuta from '../../ui/ReciboRuta.jsx'
 import BorradorRuta from '../../ui/BorradorRuta.jsx'
 import BorradorPlan from '../../ui/BorradorPlan.jsx'
 import { motivoPlan, quitarPlan } from '../../services/planes.js'
 import { preguntarCopiloto } from '../../services/copiloto.js'
 import Icon from '../../ui/Icon.jsx'
-import { plural } from '../../domain/cuentas.js'
 import Marcado from '../../ui/Marcado.jsx'
 import './copiloto.css'
 
@@ -37,6 +36,7 @@ export default function Copiloto() {
   const [mensajes, setMensajes] = useState([])
   const [texto, setTexto] = useState('')
   const [pensando, setPensando] = useState(false)
+  const [borrando, setBorrando] = useState(false)
   const finRef = useRef(null)
 
   useEffect(() => {
@@ -50,8 +50,11 @@ export default function Copiloto() {
    * ella el contexto. Preguntabas «¿y en metro?» despues de recargar y el
    * copiloto no sabia de que hablabas.
    *
-   * Solo se vuelca si aun no se ha escrito nada en esta sesion: si alguien ya
-   * esta hablando, una respuesta tardia del servidor no le va a pisar el hilo.
+   * Desde el 1 de septiembre `useHilo` devuelve SOLO la conversacion viva
+   * —corta por silencio largo o cambio de dia—, asi que esto ya no vuelca
+   * anteayer. Solo se vuelca si aun no se ha escrito nada en esta sesion: si
+   * alguien ya esta hablando, una respuesta tardia del servidor no le pisa el
+   * hilo.
    */
   useEffect(() => {
     if (cargando || guardados.length === 0) return
@@ -132,8 +135,46 @@ export default function Copiloto() {
   const ultimoConSitios = mensajes.reduce(
     (ultimo, m, i) => (m.tarjetas?.length > 0 ? i : ultimo), -1)
 
+  /**
+   * Empezar de cero. La conversacion se acaba sola tras unas horas, pero a
+   * veces se quiere cortar AHORA: cambias de tema y no te apetece que la
+   * pregunta anterior siga pesando en la respuesta.
+   *
+   * Va arriba y pegajoso —alcanzable con el hilo largo— y lo mas lejos
+   * posible del boton de enviar. No pide confirmacion a proposito: lo que se
+   * pierde es contexto, no datos. Los planes estan en la agenda, los gastos
+   * en las cuentas y las decisiones en Decisiones; aqui solo queda charla.
+   */
+  const empezarDeCero = async () => {
+    setBorrando(true)
+    setMensajes([])
+    setTexto('')
+    try { await olvidar() } catch { /* si no se borra en el servidor, caduca solo */ }
+    setBorrando(false)
+  }
+
   return (
     <div className="cop">
+      {/* Fila propia, FUERA del hilo. Empezo pegajosa dentro del scroll y la
+          captura lo desmonto: el mensaje de abajo pasaba por debajo y se leia
+          encima de «Empezar de cero», y quedaba una franja de 16 px —el
+          padding del hilo— por la que se colaba el texto. Con el cristal de
+          las tarjetas el truco funciona porque flotan sobre el fondo; sobre
+          texto en movimiento, no. */}
+      {mensajes.length > 0 && (
+        <div className="cop-sesion">
+          <span className="cop-sesion-txt">Conversación de ahora</span>
+          <button
+            type="button"
+            className="cop-limpiar"
+            disabled={borrando || pensando}
+            onClick={empezarDeCero}
+          >
+            {borrando ? 'Borrando…' : 'Empezar de cero'}
+          </button>
+        </div>
+      )}
+
       <div className="cop-hilo">
         {mensajes.length === 0 && <Bienvenida yo={yo} alElegir={preguntar} />}
 
@@ -281,41 +322,6 @@ function Mensaje({ mensaje, tripId, alAgregar, alQuitar, alSoltar, conMapa = fal
         </p>
       ))}
     </div>
-  )
-}
-
-/**
- * La foto manda. Es lo unico verdaderamente visual que tiene esta app, y
- * antes iba en una miniatura de 84 px al lado del texto: no decidia nada.
- * Un sitio para cenar se escoge por la pinta que tiene.
- */
-function Lugar({ lugar, tripId, alAgregar, elegido = false, alElegir }) {
-  const resenas = lugar.userRatingCount
-    ? plural(lugar.userRatingCount, 'reseña', 'reseñas')
-    : null
-
-  return (
-    <li className={`cop-lugar ${elegido ? 'es-elegido' : ''}`}
-      onPointerEnter={() => alElegir?.(lugar.placeId)}>
-      <a href={lugar.googleMapsUri} target="_blank" rel="noreferrer">
-        {lugar.photoUri
-          ? <img className="cop-foto" src={lugar.photoUri} alt="" loading="lazy" />
-          : <span className="cop-foto cop-sinfoto" aria-hidden="true" />}
-
-        <div className="cop-lugar-txt">
-          <h3>{lugar.name}</h3>
-          <p className="cop-meta">
-            {lugar.rating && (
-              <span className="cop-nota">★ {lugar.rating}</span>
-            )}
-            {resenas && <span className="cop-resenas">{resenas}</span>}
-          </p>
-          <p className="cop-dir">{lugar.formattedAddress}</p>
-        </div>
-      </a>
-
-      {tripId && <AgregarPlan tripId={tripId} lugar={lugar} alHecho={alAgregar} />}
-    </li>
   )
 }
 

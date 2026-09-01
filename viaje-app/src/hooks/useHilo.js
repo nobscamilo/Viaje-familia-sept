@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { firebaseListo, getFb } from '../services/firebase.js'
 import { hiloRef } from '../services/paths.js'
+import { sesionActual } from '../domain/hilo.js'
 import { useTrip } from './useTrip.js'
 
 /** Cuántas intervenciones se guardan y se releen. */
@@ -15,6 +16,12 @@ const TOPE = 60
  *
  * Es de cada uno, no del viaje: nadie más lo lee, ni quien organiza. Las
  * reglas de Firestore lo garantizan; esto solo es la parte cómoda.
+ *
+ * Desde el 1 de septiembre **solo vuelve la conversación viva**, no el
+ * historial entero: `sesionActual()` corta por silencio largo o cambio de
+ * día. Lo anterior sigue en Firestore —no se borra a espaldas de nadie— pero
+ * ni se pinta ni viaja al modelo. Abrir el copiloto tenía que ser empezar,
+ * no encontrarse lo de anteayer.
  */
 export function useHilo() {
   const { tripId, yo } = useTrip()
@@ -33,7 +40,14 @@ export function useHilo() {
         if (!vivo) return
         // Se piden los últimos y se les da la vuelta: Firestore no sabe
         // ordenar descendente y devolver el principio.
-        setMensajes(snap.docs.map((d) => ({ id: d.id, ...d.data() })).reverse())
+        const todos = snap.docs.map((d) => {
+          const dato = d.data()
+          // `createdAt` es un Timestamp de Firestore; el dominio quiere
+          // milisegundos y nada más. Recién escrito puede venir null: el
+          // servidor todavía no ha puesto la hora.
+          return { id: d.id, ...dato, en: dato.createdAt?.toMillis?.() ?? null }
+        }).reverse()
+        setMensajes(sesionActual(todos, new Date()))
       } catch {
         // Un hilo que no carga no puede impedir hablar con el copiloto.
       }
@@ -58,6 +72,13 @@ export function useHilo() {
     }
   }, [tripId, yo?.id])
 
+  /**
+   * Empezar de cero: borra el hilo entero, no solo la sesión viva.
+   *
+   * Llevaba semanas escrita y sin un solo botón que la llamara — el mismo
+   * fallo que el borrado de gastos en agosto. Ahora lo tiene, en la cabecera
+   * del hilo y lejos del botón de enviar.
+   */
   const olvidar = useCallback(async () => {
     setMensajes([])
     if (!firebaseListo || !yo?.id) return

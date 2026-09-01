@@ -35,7 +35,13 @@ export const DECLARACIONES = [
             'EN QUE CIUDAD del viaje. Ponla SIEMPRE, mirando la agenda: sin ella, ' +
             '"el hotel" devuelve un hotel de Guardo y "circuito" un karting de Leon.',
         },
-        cuantos: { type: 'integer', description: 'Cuantos resultados, de 1 a 8. Por defecto 5.' },
+        cuantos: {
+          type: 'integer',
+          description:
+            'Cuantos resultados, de 5 a 8. Por defecto 5. Enseña SIEMPRE cinco o mas ' +
+            'aunque en el texto recomiendes uno: la familia son nueve personas con ' +
+            'gustos distintos y el carrusel no cuesta nada. Menos de 5 se ignora.',
+        },
       },
       required: ['consulta'],
     },

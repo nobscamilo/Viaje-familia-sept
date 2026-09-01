@@ -154,6 +154,34 @@ que se pinta en el chat con sus botones; la escritura la dispara una persona.
 
 ---
 
+## 💬 LA CONVERSACIÓN DEL COPILOTO CADUCA (desde 2026-09-01)
+
+- **Un hilo que no termina nunca envenena las respuestas.** Cada pregunta
+  viaja al modelo con las últimas doce intervenciones: si son de anteayer y de
+  otra ciudad, contesta con una seguridad que no le corresponde. Misma familia
+  de error que la ruta calculada «para ahora».
+- `sesionActual()` en `src/domain/hilo.js` corta por **cuatro horas de
+  silencio** o por **cambio de día**. Puro, con `ahora` como parámetro.
+- **Lo viejo no se borra**, solo deja de pintarse y de mandarse. Y un mensaje
+  sin `en` (el `serverTimestamp` aún no ha vuelto) cuenta como de ahora: nunca
+  se corta lo que se acaba de escribir.
+- **«Empezar de cero» existe y tiene botón.** `olvidar()` vivió desde el 30 de
+  agosto sin ninguno — la misma mitad invisible que el borrado de gastos. Si
+  se construye la función, se construye el camino.
+- **El cristal no vale sobre texto en movimiento.** La barra de sesión empezó
+  pegajosa dentro del hilo y el texto de debajo se leía encima. El blur
+  difumina; lo que tapa es la capa. Fuera del scroll, en su propia fila.
+- **El mínimo de nota no puede dejar la lista corta.** `quitarLosFlojos()`
+  filtra y `completarHasta()` rellena con lo mejor de lo descartado: cinco
+  tarjetas siempre, salvo que Google no dé para más. El suelo de cinco está en
+  el CÓDIGO (`Math.max(cuantos || 5, 5)`), no en el prompt — una regla, no una
+  súplica al modelo.
+- ⚠️ **`medir.mjs` en `/copiloto?demo` da falsos negativos**: el hilo de
+  ejemplo entra por `import()` diferido. Si sale 0 desbordes, sube la espera y
+  comprueba que `.cop-lugar` está en el DOM antes de creértelo.
+
+---
+
 ## 🗺️ SITIOS, RUTAS Y MAPAS (desde 2026-08-30)
 
 - **Ninguna llamada a Places sin ciudad.** Ni `buscarLugares`, ni

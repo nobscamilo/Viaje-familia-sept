@@ -1,0 +1,73 @@
+/* La tarjeta de un sitio que propone el copiloto. Vivia en copiloto.css;
+   salio de ahi con el componente cuando Copiloto.jsx llego a 397 de las 400
+   lineas que permite el proyecto. */
+
+/* Con un solo resultado, tarjeta a ancho completo. Con varios, carrusel:
+   apilar tres fotos grandes deja la respuesta a tres pantallas de scroll. */
+.cop-lugares { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+
+.cop-lugares.es-carrusel {
+  display: flex; gap: var(--sp-3);
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  margin: 0 calc(-1 * var(--sp-4)); padding: 0 var(--sp-4);
+  scrollbar-width: none;
+}
+.cop-lugares.es-carrusel::-webkit-scrollbar { display: none; }
+.cop-lugares.es-carrusel .cop-lugar { flex: 0 0 78%; scroll-snap-align: start; }
+
+.cop-lugar {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-mid);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.cop-lugar a { display: block; color: inherit; text-decoration: none; }
+
+.cop-foto {
+  display: block; width: 100%; aspect-ratio: 16 / 9;
+  object-fit: cover; background: var(--s-overlay);
+}
+.cop-sinfoto {
+  background: linear-gradient(135deg, var(--s-overlay), var(--s-sunken));
+}
+
+.cop-lugar-txt { display: grid; gap: 3px; padding: var(--sp-3); min-width: 0; }
+.cop-lugar-txt h3 { font-size: .9375rem; font-weight: 600; line-height: 1.3; }
+
+.cop-meta { display: flex; align-items: center; gap: var(--sp-2); }
+
+.cop-nota { font-size: .8125rem; font-weight: 600; color: var(--warn); }
+.cop-resenas { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
+.cop-dir { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); }
+
+.cop-enlace {
+  font-size: .75rem;
+  color: var(--accent);
+  text-decoration: none;
+  justify-self: start;
+  margin-top: 2px;
+}
+.cop-enlace:hover { text-decoration: underline; }
+
+.cop-propuesta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--accent);
+  background: var(--accent-wash);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+/* El sitio que se esta mirando, resaltado a la vez en la tarjeta y en el pin
+   del mini mapa. Es lo que conecta las dos mitades: sin esto, un mapa con
+   cinco pines naranjas no dice cual es cual. */
+.cop-lugar.es-elegido {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}

@@ -114,6 +114,30 @@ export function quitarLosFlojos(lugares = [], minimo = NOTA_MINIMA) {
   return buenos.length > 0 ? buenos : lugares
 }
 
+/**
+ * Rellena una lista corta con lo mejor de lo descartado, sin desordenarla.
+ *
+ * Nace de una queja de Camilo el 1 de septiembre: «que sugiera al menos 5».
+ * El tope nunca fue el problema —ya eran 5— sino que `quitarLosFlojos` solo
+ * devuelve el lote entero cuando NADIE pasa el 3,8. Si pasan dos, se enseñan
+ * dos: en un barrio flojo o con una busqueda rara, la respuesta se quedaba en
+ * un par de tarjetas sin decir por que.
+ *
+ * El minimo de nota es una PREFERENCIA, no una condicion — es regla escrita
+ * del proyecto desde agosto, y esto es la otra mitad de esa regla. Los buenos
+ * van primero y en su orden; los flojos solo completan, y solo si faltan.
+ *
+ * Compara por identidad, no por id: los dos arrays salen del mismo `map` y
+ * son los mismos objetos. Si algun dia dejaran de serlo, esto devuelve de mas
+ * y no de menos, que es el lado seguro.
+ */
+export function completarHasta(preferidos = [], todos = [], cuantos = 5) {
+  if (preferidos.length >= cuantos) return preferidos
+  const dentro = new Set(preferidos)
+  const resto = todos.filter((l) => !dentro.has(l))
+  return [...preferidos, ...resto.slice(0, cuantos - preferidos.length)]
+}
+
 /** Dia de la semana de una fecha AAAA-MM-DD, 0 = domingo, como Places. */
 export function diaDeLaSemana(dia) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dia ?? '')) return null

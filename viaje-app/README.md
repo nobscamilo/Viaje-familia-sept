@@ -1384,6 +1384,79 @@ Lo que importa de cómo está hecho:
 Medido a 375 px con el panel abierto y cerrado: tres banners y cero botones
 sueltos plegado; al tocar, los tres botones más «Ocultar», sin desbordes.
 
+## La conversación se acaba sola (1 de septiembre, cuarta pasada)
+
+Camilo, probándola: *«mantener las conversaciones en el hilo no es buena»*. El
+síntoma exacto que dio fue **no poder empezar de cero**, y la causa era una
+vieja conocida del proyecto: `olvidar()` estaba escrita en `useHilo.js` desde
+el 30 de agosto, borraba el hilo entero… y **no tenía ni un botón**. La misma
+mitad invisible que el borrado de gastos en agosto, repetida.
+
+Pero el botón solo era la mitad del arreglo. El problema de fondo es que un
+hilo que no termina nunca hace que **cada pregunta viaje al modelo con las
+doce intervenciones anteriores**, que pueden ser de anteayer y de otra ciudad.
+Eso produce respuestas seguras y equivocadas: la misma familia de error que
+calcular una ruta «para ahora» un día que aún no ha llegado.
+
+Así que una conversación ahora se acaba sola. `src/domain/hilo.js`,
+`sesionActual()`, puro y con `ahora` como parámetro. Dos cortes:
+
+- **Un silencio de cuatro horas.** Lo de la mañana y lo de la noche no son la
+  misma conversación. Se mide contra el último mensaje, no contra el primero:
+  una charla larga no caduca por haber empezado temprano.
+- **Un cambio de día.** El 14 se duerme en Barcelona y el 13 en Madrid;
+  arrastrar el contexto de ayer es arrastrar la ciudad de ayer.
+
+Lo anterior **no se borra**: sigue en Firestore, simplemente no se pinta ni se
+manda. Y un mensaje recién escrito, cuyo `serverTimestamp()` todavía no ha
+vuelto, cuenta como de ahora — o la app borraría de la pantalla lo que la
+persona acaba de teclear.
+
+Encima del hilo hay ahora una fila con **«Empezar de cero»**, lejos del botón
+de enviar. No pide confirmación a propósito: lo que se pierde es contexto, no
+datos — los planes están en la agenda, los gastos en las cuentas y las
+decisiones en Decisiones.
+
+### La barra pegajosa que la captura desmontó
+
+Empezó dentro del hilo, `position: sticky`, con el mismo cristal que las
+tarjetas. En la captura se vio el fallo: **el mensaje de debajo pasaba por
+detrás y se leía encima de «Empezar de cero»**, y quedaba una franja de 16 px
+—el `padding` del hilo— por la que se colaba el texto. Con las tarjetas el
+cristal funciona porque flotan sobre el fondo; sobre texto en movimiento, no:
+el blur difumina, pero lo que tapa es la capa.
+
+Se sacó a **fila propia del grid**, fuera del scroll. Sin sticky, sin bleed, y
+colapsa a cero cuando no hay conversación. Medido: `barra.bottom == hilo.top`,
+solapamiento cero.
+
+## Cinco sitios, no dos
+
+La segunda petición era «que sugiera al menos 5 opciones». El tope **ya era 5**
+—lo es desde que existe `buscarLugares`— y ese no era el problema:
+
+- `quitarLosFlojos()` solo devuelve el lote entero cuando **nadie** pasa el 3,8.
+  Si pasaban dos, salían dos tarjetas, sin decir por qué. El mínimo de nota es
+  una *preferencia, no una condición* — regla escrita del proyecto desde
+  agosto — y esto es la otra mitad que faltaba: `completarHasta()` rellena con
+  lo mejor de lo descartado, sin desordenar lo bueno.
+- El suelo pasó a estar **en el código**, no en el prompt:
+  `Math.max(cuantos || 5, 5)`. «Enséñale cinco» en las instrucciones es una
+  intención; un suelo en el servidor es una regla. El proyecto aprendió esa
+  diferencia con las mentiras del copiloto en agosto.
+
+Sale gratis pedir de más: Places cobra por petición, no por resultado.
+
+### Y una medida que mentía
+
+`node scripts/medir.mjs '/copiloto?demo'` dio **0 desbordes** una vez y **4**
+la siguiente sin cambiar nada relevante: el hilo de ejemplo entra por
+`import()` diferido y a veces no había llegado dentro de la espera del script.
+Comprobado a mano: la página **no scrollea a lo ancho** en ninguno de los
+cuatro anchos, y los 20 elementos que asoman viven **todos** dentro de un
+carril con `overflow-x: auto` — los carruseles de sitios y de días haciendo su
+trabajo. Si `medir.mjs` da 0 en `?demo`, desconfía: sube la espera.
+
 ## Reglas innegociables
 
 - Ningún archivo por encima de **400 líneas**.

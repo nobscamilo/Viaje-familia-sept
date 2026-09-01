@@ -162,9 +162,13 @@ test('la tarjeta de un sitio lleva el boton de agregar, con su viaje', () => {
   // Una sustitucion que no encaja no da error: se queda igual y en silencio.
   // Paso aqui: `Lugar` seguia sin recibir `tripId` y el boton no salia, pero
   // el codigo compilaba, las pruebas pasaban y solo lo delato la captura.
+  // El 1 de septiembre `Lugar` se mudo a su propio fichero (Copiloto.jsx
+  // llego a 397 de las 400 lineas permitidas). Esta prueba lo cazo: se mira
+  // el paso del viaje donde se monta, y el boton donde ahora se pinta.
   const jsx = readFileSync(new URL('../src/app/surfaces/Copiloto.jsx', import.meta.url), 'utf8')
   assert.match(jsx, /<Lugar[^>]*tripId=\{tripId\}/s, 'Lugar necesita el viaje para poder escribir')
-  assert.match(jsx, /<AgregarPlan/, 'y la tarjeta tiene que pintar el boton')
+  const tarjeta = readFileSync(new URL('../src/ui/LugarTarjeta.jsx', import.meta.url), 'utf8')
+  assert.match(tarjeta, /<AgregarPlan/, 'y la tarjeta tiene que pintar el boton')
 })
 
 // ------------------------------------------ el dia a dia del rediseño

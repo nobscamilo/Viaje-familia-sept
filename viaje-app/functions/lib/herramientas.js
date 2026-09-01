@@ -13,7 +13,7 @@ import {
   aLatLng, computeRoute, ifemaCoords, momentoDeSalida, normalizePlace, searchPlaces, withPlacePhotos,
 } from './maps.js'
 import { cleanText } from './text.js'
-import { ordenarPorNota, quitarLosFlojos } from './ranking.js'
+import { completarHasta, ordenarPorNota, quitarLosFlojos } from './ranking.js'
 
 // Las declaraciones que ve Gemini viven aparte; se reexportan para que quien
 // las usa siga importando de un solo sitio.
@@ -75,9 +75,22 @@ async function buscarLugares({ consulta, cuantos, ciudad }, contexto) {
    * valorados cuesta lo mismo —Places cobra por peticion, no por resultado—
    * y cambia por completo lo que sale para «donde cenamos».
    */
-  const cuantosEnsenar = Math.min(Math.max(cuantos || 5, 1), 8)
+  /**
+   * CINCO como suelo, no como valor por defecto (peticion de Camilo, 1 sept).
+   *
+   * Antes era `Math.max(cuantos || 5, 1)`: si el modelo pedia dos, salian
+   * dos. Ahora el suelo esta en el codigo y no en una suplica al modelo, que
+   * es la diferencia entre una regla y una intencion. El tope sigue en 8:
+   * mas tarjetas en un carrusel no se miran, se pasan.
+   *
+   * Sale gratis pedir de mas: Places cobra por peticion, no por resultado.
+   */
+  const cuantosEnsenar = Math.min(Math.max(cuantos || 5, 5), 8)
   const crudos = await searchPlaces(texto, Math.max(cuantosEnsenar * 2, 12), donde)
-  const mejores = ordenarPorNota(quitarLosFlojos(crudos.map(normalizePlace))).slice(0, cuantosEnsenar)
+  const todos = ordenarPorNota(crudos.map(normalizePlace))
+  // El minimo de nota es una preferencia, no una condicion: si deja la lista
+  // corta, se completa con lo mejor de lo descartado en vez de enseñar dos.
+  const mejores = completarHasta(quitarLosFlojos(todos), todos, cuantosEnsenar).slice(0, cuantosEnsenar)
   const lugares = await Promise.all(mejores.map((p) => withPlacePhotos(p)))
 
   return {
