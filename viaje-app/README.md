@@ -1024,8 +1024,9 @@ Un plan que se mueve de hora arrastra su final; si no, un momento de 10:00 a
 
 > ⚠️ **Superado el 1 de septiembre de 2026.** Los tres candados que se
 > describen aquí —tener autor, seguir propuesto, ser tuyo— ya no existen.
-> Cualquier adulto edita o quita cualquier momento. Lee «Se acabaron los
-> candados de la agenda» más abajo.
+> Cualquier adulto edita o quita cualquier momento, y esos botones viven
+> plegados detrás de un banner. Lee «Se acabaron los candados de la agenda» y
+> «La gestión, detrás de un banner» más abajo.
 
 ### Cuatro cosas que solo salieron al medir o al probar
 
@@ -1352,6 +1353,37 @@ Verificado: `npm run medir` en las cinco rutas a 1280/430/390/375 px — cero
 desbordes — y capturas revisadas una a una (agenda antes y durante el viaje,
 copiloto con borradores, decidir, cuentas, escritorio).
 
+## La gestión, detrás de un banner (1 de septiembre, tercera pasada)
+
+Quitar los candados tuvo un efecto que solo se ve mirando la pantalla, no el
+código: **cada tarjeta de la agenda acabó con «Volver a proponer · Editar ·
+Quitar» siempre puestos**. Diecisiete momentos × tres botones = una agenda que
+parecía un panel de administración, justo lo contrario de lo que la superficie
+«Ahora» tiene que ser — algo que se lee de un vistazo con el teléfono en la
+mano y una maleta en la otra.
+
+Camilo lo pidió directo: que aparezcan solo al tocar algo. Ahora hay una fila
+discreta, **«Editar o quitar ›»**, y los tres botones salen debajo con un
+«Ocultar» al lado.
+
+Lo que importa de cómo está hecho:
+
+- **La marca vive en el dominio.** `accionesDe` etiqueta cada acción con
+  `discreta: true`; `Cierre.jsx` filtra por esa marca y no por una lista propia
+  de ids. Si se decidiera en el JSX, la próxima sustitución de texto rompería
+  el pliegue en silencio — y hay una prueba que lo vigila.
+- **`Confirmar` NO es discreta.** Es la acción que un plan propuesto está
+  esperando: esconderla detrás de un toque convertiría el flujo normal en el
+  camino largo. La regla es «gestionar se pliega, decidir no».
+- **Cerrar el banner suelta también la pregunta de seguridad.** Un «¿Seguro
+  que quieres quitar el Vueling?» colgando de un panel que ya no se ve es
+  exactamente la clase de trampa que el segundo toque existía para evitar.
+- El banner es vidrio neutro con chevron: pariente visual de los enlaces a
+  decisiones, pero sin su color de urgencia. **Gestionar no es un aviso.**
+
+Medido a 375 px con el panel abierto y cerrado: tres banners y cero botones
+sueltos plegado; al tocar, los tres botones más «Ocultar», sin desbordes.
+
 ## Reglas innegociables
 
 - Ningún archivo por encima de **400 líneas**.
@@ -1371,6 +1403,9 @@ copiloto con borradores, decidir, cuentas, escritorio).
 - **Fricción donde está el daño, no en todas partes.** Quitar una reserva pide
   un segundo toque; quitar una cena propuesta hace un minuto, no. Quién es
   «reserva» lo decide `esReserva()` en el dominio, nunca el JSX.
+- **Gestionar se pliega; decidir, no.** Editar, quitar y devolver a propuesto
+  viven detrás del banner «Editar o quitar»; `Confirmar` se queda a la vista.
+  La marca es `discreta` en `accionesDe`, nunca una lista de ids en el JSX.
 - **El copiloto propone, no escribe.** `agregarAlPlan` y `armarRuta` devuelven
   un borrador; la escritura la dispara una persona con un botón.
 - Lo que se puede hacer con una tarjeta se decide en el dominio (`acciones.js`),

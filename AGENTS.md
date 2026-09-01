@@ -98,6 +98,13 @@ Eso solo es honesto por lo que se hizo al mismo tiempo:
 - **Fricción donde está el daño.** Quitar una reserva pide un segundo toque;
   quitar una cena propuesta hace un minuto, no. Quién es «reserva» lo dice
   `esReserva()` en `src/domain/acciones.js` — nunca el JSX.
+- **Gestionar se pliega; decidir, no.** «Volver a proponer», «Editar» y
+  «Quitar» viven detrás del banner *Editar o quitar*; `Confirmar` se queda a
+  la vista, porque es lo que el plan está esperando. Con los tres puestos
+  siempre, la agenda parecía un panel de administración. La marca es
+  `discreta: true` en `accionesDe`; `Cierre.jsx` filtra por ella y **nunca por
+  una lista de ids**, o la próxima sustitución de texto rompe el pliegue en
+  silencio. Cerrar el banner cancela también la pregunta de seguridad.
 - **Mover el estado es del owner.** Confirmar y «volver a proponer». Devolver a
   propuesto conserva los votos, que es justo lo que se perdía cuando la única
   salida era borrar y recrear.

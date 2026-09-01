@@ -80,6 +80,30 @@ test('un plan confirmado se puede devolver a propuesto sin perder los votos', ()
   assert.equal(a.find((x) => x.id === 'desconfirmar').a, 'propuesto')
 })
 
+test('la gestion es discreta; confirmar no', () => {
+  // Los botones marcados `discreta` viven plegados detras del banner
+  // «Editar o quitar» (Camilo, 1 sept): a la vista convertian cada tarjeta
+  // en un panel de administracion. Confirmar es lo que el plan espera y se
+  // queda fuera del pliegue. La marca vive en el dominio: si se decidiera
+  // en el JSX, esta prueba no existiria y la proxima sustitucion de texto
+  // la rompia en silencio.
+  const abierto = accionesDe(campNou, { esOwner: true, uid: 'uid-camilo' })
+  assert.equal(abierto.find((a) => a.id === 'confirmar').discreta, undefined)
+  assert.equal(abierto.find((a) => a.id === 'editar').discreta, true)
+  assert.equal(abierto.find((a) => a.id === 'quitar').discreta, true)
+
+  const confirmado = accionesDe({ ...campNou, status: 'confirmado', rutaId: 'r1' },
+    { esOwner: true, uid: 'uid-camilo' })
+  assert.equal(confirmado.find((a) => a.id === 'desconfirmar').discreta, true)
+  assert.equal(confirmado.find((a) => a.id === 'quitar-ruta').discreta, true)
+
+  // Y la interfaz de verdad las separa: el banner existe y filtra por la
+  // marca del dominio, no por una lista propia de ids.
+  const src = readFileSync(new URL('../src/ui/Cierre.jsx', import.meta.url), 'utf8')
+  assert.match(src, /acc-gestion/)
+  assert.match(src, /a\.discreta/)
+})
+
 test('mover el estado es del owner; editar y quitar, de cualquier adulto', () => {
   // No es un candado de vuelta: es que «esto va a pasar» lo dice quien
   // organiza, y corregir una hora lo hace quien la ve mal.

@@ -20,9 +20,19 @@ export default function Cierre({ evento, acciones, tripId, uid, editando, alEdit
   const [trabajando, setTrabajando] = useState(null)
   const [pidiendo, setPidiendo] = useState(null)
   const [fallo, setFallo] = useState(null)
+  // Los botones de gestion viven PLEGADOS detras de un banner (peticion de
+  // Camilo, 1 sept): con «Volver a proponer · Editar · Quitar» siempre a la
+  // vista, cada tarjeta parecia un panel de administracion. Cerrar el banner
+  // suelta tambien la pregunta de seguridad: un «¿Seguro?» colgando de un
+  // panel que ya no se ve es una trampa.
+  const [gestionando, setGestionando] = useState(false)
 
   const botones = acciones.filter((a) => ['estado', 'editar', 'quitar', 'quitar-ruta'].includes(a.tipo))
   if (botones.length === 0) return null
+
+  // Quien decide que es discreto es el dominio, no este componente.
+  const visibles = botones.filter((a) => !a.discreta)
+  const discretas = botones.filter((a) => a.discreta)
 
   const hacer = async (a) => {
     if (a.tipo === 'editar') return alEditar?.(true)
@@ -46,6 +56,11 @@ export default function Cierre({ evento, acciones, tripId, uid, editando, alEdit
 
   const pulsar = (a) => (a.peligroso ? setPidiendo(a) : hacer(a))
 
+  const plegar = () => {
+    setGestionando(false)
+    setPidiendo(null)
+  }
+
   if (editando) return null
 
   if (pidiendo) {
@@ -66,21 +81,46 @@ export default function Cierre({ evento, acciones, tripId, uid, editando, alEdit
     )
   }
 
+  const boton = (a) => (
+    <button
+      key={a.id}
+      type="button"
+      className={CLASE[a.id] ?? 'acc-editar'}
+      disabled={Boolean(trabajando)}
+      onClick={() => pulsar(a)}
+    >
+      {trabajando === a.id ? 'Un momento…' : a.etiqueta}
+    </button>
+  )
+
   return (
     <>
-      <div className="acc-cierre">
-        {botones.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className={CLASE[a.id] ?? 'acc-editar'}
-            disabled={Boolean(trabajando)}
-            onClick={() => pulsar(a)}
-          >
-            {trabajando === a.id ? 'Un momento…' : a.etiqueta}
+      {(visibles.length > 0 || discretas.length > 0) && (
+        <div className="acc-cierre">
+          {visibles.map(boton)}
+          {discretas.length > 0 && !gestionando && (
+            <button
+              type="button"
+              className="acc-gestion"
+              aria-expanded={false}
+              onClick={() => setGestionando(true)}
+            >
+              <span>Editar o quitar</span>
+              <span className="acc-gestion-ir" aria-hidden="true">›</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {gestionando && discretas.length > 0 && (
+        <div className="acc-cierre acc-desplegado">
+          {discretas.map(boton)}
+          <button type="button" className="acc-plegar" onClick={plegar}>
+            Ocultar
           </button>
-        ))}
-      </div>
+        </div>
+      )}
+
       {fallo && <p className="acc-fallo">{fallo}</p>}
     </>
   )

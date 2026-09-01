@@ -159,11 +159,17 @@ export function accionesDe(
           a: 'propuesto',
           etiqueta: 'Volver a proponer',
           peligroso: reserva,
+          // `discreta`: no se pinta a la vista, vive detras del banner
+          // «Editar o quitar». Lo pidio Camilo el 1 de septiembre: con los
+          // tres botones siempre puestos, cada tarjeta parecia un panel de
+          // administracion y la agenda dejaba de leerse. Confirmar NO es
+          // discreta: es la accion que el plan esta esperando.
+          discreta: true,
         })
       }
     }
 
-    acciones.push({ id: 'editar', tipo: 'editar', etiqueta: 'Editar' })
+    acciones.push({ id: 'editar', tipo: 'editar', etiqueta: 'Editar', discreta: true })
     acciones.push({
       id: 'quitar',
       tipo: 'quitar',
@@ -171,6 +177,7 @@ export function accionesDe(
       // El segundo toque va aqui, en el dato, no en el JSX: asi se puede
       // probar que el vuelo lo pide y la cena propuesta no.
       peligroso: reserva,
+      discreta: true,
       aviso: reserva
         ? 'Esto no lo puso nadie desde la app: es una reserva. Se quita de verdad.'
         : null,
@@ -183,6 +190,7 @@ export function accionesDe(
         rutaId: evento.rutaId,
         etiqueta: `Quitar la ruta «${evento.rutaNombre ?? 'sin nombre'}»`,
         peligroso: true,
+        discreta: true,
       })
     }
   }

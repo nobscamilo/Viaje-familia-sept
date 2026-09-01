@@ -176,3 +176,50 @@
 .acc-si { flex: 0 1 auto; border: 1px solid var(--danger); background: var(--danger); color: #1a0d0d; }
 .acc-no { flex: 0 1 auto; border: 1px solid var(--line); background: transparent; color: var(--ink-muted); }
 .acc-no:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* --- El banner que guarda la gestion --------------------------
+   «Volver a proponer», «Editar» y «Quitar» viven plegados aqui detras
+   (peticion de Camilo, 1 sept): siempre a la vista convertian cada tarjeta
+   en un panel de administracion. Es una fila de vidrio neutra con chevron,
+   pariente de los enlaces a decisiones pero sin su urgencia: gestionar no
+   es un aviso. */
+.acc-gestion {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1 1 100%;
+  min-height: 40px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: var(--r-md);
+  background: var(--glass-faint);
+  color: var(--ink-muted);
+  font: var(--t-small);
+  font-size: .78rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.acc-gestion:hover { color: var(--ink); border-color: var(--line-strong); }
+.acc-gestion span:first-child { flex: 1; }
+.acc-gestion-ir { color: var(--ink-faint); font-size: 1rem; line-height: 1; }
+
+/* El panel desplegado entra suave, no de golpe. */
+.acc-desplegado { animation: accDespliegue var(--dur-base) var(--ease) both; }
+@keyframes accDespliegue {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.acc-plegar {
+  flex: 0 1 auto;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  font: var(--t-small);
+  font-size: .75rem;
+  cursor: pointer;
+}
+.acc-plegar:hover { color: var(--ink-soft); }
