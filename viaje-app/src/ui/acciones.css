@@ -143,3 +143,31 @@
   font: var(--t-small); cursor: pointer;
 }
 .acc-quitar-ruta:hover { color: var(--danger, #f87171); border-color: currentColor; }
+
+/* --- El segundo toque -----------------------------------------
+   Cualquier adulto puede quitar el Vueling de 431,91 €. Lo que separa eso de
+   un accidente no es un permiso, es esta pregunta. Ocupa el sitio de los
+   botones en vez de flotar encima: un dialogo modal en un movil tapa
+   justamente la tarjeta que hay que mirar antes de decidir. */
+.acc-seguro {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-md);
+  background: var(--danger-wash);
+}
+.acc-seguro-txt { font-size: .75rem; line-height: 1.4; color: var(--ink); margin: 0; }
+.acc-seguro-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.acc-si, .acc-no {
+  min-height: 44px;              /* se toca con el dedo y decide una reserva */
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-sm);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.acc-si { flex: 0 1 auto; border: 1px solid var(--danger); background: var(--danger); color: #1a0d0d; }
+.acc-no { flex: 0 1 auto; border: 1px solid var(--line); background: transparent; color: var(--ink-muted); }
+.acc-no:hover { color: var(--ink); border-color: var(--ink-faint); }

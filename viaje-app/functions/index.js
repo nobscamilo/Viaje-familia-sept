@@ -16,11 +16,11 @@ import { cleanText } from './lib/text.js'
 import { anotar, listar, quitar, sugerir } from './gastos.js'
 import { construirContexto } from './lib/contexto.js'
 
-import { borrarPlan, cambiarPlan, crearPlan } from './planes.js'
+import { borrarPlan, cambiarPlan, crearPlan, moverEstado } from './planes.js'
 import { desvincular as soltar, verGente } from './ajustes.js'
 import { resolverSitio } from './lib/maps.js'
 import { dentroDelViaje, motivoFueraDelViaje } from './lib/ventana.js'
-import { armarRuta, borrarRuta } from './rutas.js'
+import { armarRuta, borrarRuta, guardar, recalcular } from './rutas.js'
 
 const opciones = {
   region: 'europe-west1',
@@ -67,11 +67,22 @@ export const copiloto = onCall(opciones, async (peticion) => {
 
   const herramientas = {
     /**
-     * Agrega un plan a la agenda, SIEMPRE como `propuesto`.
+     * PROPONE un plan. Ya no lo escribe.
      *
-     * Es la diferencia entre un copiloto util y uno peligroso: puede escribir
-     * en la linea de tiempo, pero lo que escribe se ve como sin cerrar hasta
-     * que una persona lo confirma. Nada aparece como hecho por arte de magia.
+     * Hasta el 1 de septiembre de 2026 esto metia el plan en la agenda en el
+     * acto, como `propuesto`. Sonaba seguro y no lo era del todo: la primera
+     * vez que la familia veia el plan era encontrandoselo ya en «Ahora», y
+     * cambiarle la hora significaba quitarlo y volver a pedirselo al copiloto
+     * con otras palabras.
+     *
+     * Ahora devuelve un borrador que se pinta en el chat, con el dia y la
+     * hora editables y dos botones. La escritura la hace `agregarPlan` — la
+     * misma Cloud Function que usa el boton «Agregar al plan» de una tarjeta
+     * de sitio— cuando una persona la pulsa.
+     *
+     * Las coordenadas se resuelven AQUI y no las pone el modelo: ya vio la
+     * latitud en `buscarLugares`, pero pedirle que la repita es pedirle que
+     * copie quince digitos, y un pin mal puesto es peor que ningun pin.
      */
     async agregarAlPlan({ titulo, fecha, hora, duracionMinutos, tipo, lugar, grupo, nota }) {
       const limpio = cleanText(titulo).slice(0, 140)
@@ -81,48 +92,29 @@ export const copiloto = onCall(opciones, async (peticion) => {
       if (!dentroDelViaje(dia)) return { error: motivoFueraDelViaje(dia) }
 
       const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/.test(cleanText(hora)) ? cleanText(hora) : null
-      // Horas en la zona del viaje, no en la de quien pregunta.
-      const inicio = hhmm ? `${dia}T${hhmm}:00+02:00` : dia
 
-      let fin = null
-      if (hhmm && Number.isFinite(duracionMinutos) && duracionMinutos > 0) {
-        const t = new Date(`${dia}T${hhmm}:00+02:00`)
-        t.setMinutes(t.getMinutes() + Math.min(duracionMinutos, 24 * 60))
-        fin = t.toISOString()
-      }
-
-      // Coordenadas del sitio, resueltas AQUI y no por el modelo.
-      // El modelo ya vio la latitud y la longitud en `buscarLugares`, pero
-      // pedirle que las repita es pedirle que copie quince digitos: se
-      // equivoca, y un pin mal puesto es peor que ningun pin. Una llamada
-      // mas a Places por plan agregado es un precio barato por no mentir.
       // La ciudad del dia, o la del dia que se este mirando. Sin ella,
       // «el hotel» resolvia a un hotel de Guardo y el pin caia a 279 km.
       const ciudad = contexto.porDia?.[dia]?.ciudad ?? contexto.ciudadPorDefecto
       const sitio = lugar ? await resolverSitio(cleanText(lugar), ciudad) : null
 
-      const ref = await db.collection(`trips/${tripId}/timeline`).add({
-        title: limpio,
-        kind: ['activity', 'food', 'transport', 'lodging'].includes(tipo) ? tipo : 'activity',
-        status: 'propuesto',
-        start: inicio,
-        ...(fin ? { end: fin } : {}),
-        ...(lugar ? { address: sitio?.address ?? cleanText(lugar).slice(0, 200) } : {}),
-        ...(sitio?.coords ? { coords: sitio.coords } : {}),
-        ...(nota ? { notes: cleanText(nota).slice(0, 600) } : {}),
-        groupId: ['todos', 'f1', 'sin-f1'].includes(grupo) ? grupo : 'todos',
-        travelerIds: 'pendiente',
-        createdBy: uid,
-        createdByCopiloto: true,
-        sugeridoPor: travelerId,
-        createdAt: FieldValue.serverTimestamp(),
-      })
-
       return {
         ok: true,
-        aviso: 'Queda como PROPUESTO en la agenda hasta que alguien lo confirme.',
+        aviso: 'PROPUESTO EN EL CHAT: todavia NO esta en la agenda. Lo agrega la persona con un boton. No digas que ya lo agregaste.',
         enElMapa: Boolean(sitio?.coords),
-        plan: { id: ref.id, title: limpio, fecha: dia, hora: hhmm },
+        borradorPlan: {
+          titulo: limpio,
+          fecha: dia,
+          hora: hhmm,
+          duracionMinutos: Number.isFinite(duracionMinutos) && duracionMinutos > 0
+            ? Math.min(duracionMinutos, 24 * 60) : null,
+          tipo: ['activity', 'food', 'transport', 'lodging'].includes(tipo) ? tipo : 'activity',
+          grupo: ['todos', 'f1', 'sin-f1'].includes(grupo) ? grupo : 'todos',
+          lugar: sitio?.address ?? (lugar ? cleanText(lugar).slice(0, 200) : null),
+          coords: sitio?.coords ?? null,
+          placeId: sitio?.placeId ?? null,
+          nota: nota ? cleanText(nota).slice(0, 600) : null,
+        },
       }
     },
 
@@ -338,9 +330,24 @@ export const quitarPlan = onCall(opcionesPlan, borrarPlan)
 // Editar necesita Places: cambiar «Rosi La Loca» por «Casa Julio» sin volver
 // a resolver la direccion dejaria el pin viejo con el nombre nuevo.
 export const cambiarUnPlan = onCall({ ...opcionesPlan, secrets: [mapsApiKey] }, cambiarPlan)
+// Confirmar y desconfirmar. Se subio al servidor cuando la app empezo a
+// dejar tocar tambien los momentos sembrados: esos no tienen `createdBy` y
+// las reglas de Firestore no dejan que un adulto los escriba desde el
+// navegador. Aqui ademas queda la huella que respeta la siembra.
+export const moverEstadoDeUnPlan = onCall(opcionesPlan, moverEstado)
 // Una ruta son hasta seis momentos en la agenda. Sin esto, deshacerla son
 // seis toques, y una funcion que cuesta seis toques deshacer no se prueba.
 export const quitarRuta = onCall(opcionesPlan, borrarRuta)
+/**
+ * El borrador de ruta: rehacer las horas y, al final, guardarlo.
+ *
+ * Las dos necesitan Places y Routes (`mapsApiKey`) porque vuelven a calcular
+ * los traslados: si el navegador mandara las horas, una ruta a la que se le
+ * quita la parada del medio llegaria a la agenda con los horarios de la
+ * version anterior.
+ */
+export const recalcularRuta = onCall({ ...opcionesPlan, secrets: [mapsApiKey], timeoutSeconds: 120 }, recalcular)
+export const guardarRuta = onCall({ ...opcionesPlan, secrets: [mapsApiKey], timeoutSeconds: 120 }, guardar)
 
 /**
  * Ajustes. Solo responde a un owner, y por eso vive en el servidor: los

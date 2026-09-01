@@ -12,6 +12,7 @@ export async function preguntarCopiloto(tripId, mensajes) {
     return {
       texto: 'Modo local: no hay copiloto. Configura Firebase para hablar conmigo.',
       tarjetas: [], rutas: [], propuestas: [], planes: [],
+      borradores: [], borradoresPlan: [],
     }
   }
   const funciones = fb.fs.__funciones ?? (await import('firebase/functions'))
@@ -24,5 +25,10 @@ export async function preguntarCopiloto(tripId, mensajes) {
     rutas: data?.rutas ?? [],
     propuestas: data?.propuestas ?? [],
     planes: data?.planes ?? [],
+    // Lo que el copiloto PROPONE y todavia no ha escrito. Van aparte de
+    // `planes` a proposito: `planes` son recibos de algo que ya esta en la
+    // agenda, y esto es lo contrario.
+    borradores: data?.borradores ?? [],
+    borradoresPlan: data?.borradoresPlan ?? [],
   }
 }

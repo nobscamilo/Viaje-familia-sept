@@ -1,0 +1,57 @@
+/* Un plan suelto propuesto. Hermano de `borrador-ruta.css` y con el mismo
+   borde de acento: lo que significa el color es «esto espera una decision». */
+.bp {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2);
+  margin-top: var(--sp-2); padding: var(--sp-3);
+  border: 1px solid var(--accent); border-radius: var(--r-md);
+  background: var(--s-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.bp-cab { display: flex; gap: var(--sp-2); align-items: flex-start; font: var(--t-small); }
+.bp-cab > span { display: grid; gap: 2px; min-width: 0; }
+.bp-donde { font: var(--t-small); font-size: .75rem; color: var(--ink-muted); overflow-wrap: anywhere; }
+.bp-cab em {
+  font: var(--t-small); font-size: .75rem; font-style: normal;
+  color: var(--accent); font-weight: 600;
+}
+
+/* Los catorce dias, en un carril que se desliza. Es el MISMO patron que
+   `agregar-plan.css` y `editar-plan.css`, a proposito: tres formas distintas
+   de elegir un dia del viaje en tres pantallas seria una app distinta cada
+   vez. Envolverlos en cuadricula haria la tarjeta el doble de alta en un
+   movil, justo encima del boton que hay que pulsar. */
+.bp-dias {
+  display: flex; gap: var(--sp-2); overflow-x: auto;
+  margin: 0 calc(-1 * var(--sp-3)); padding: 0 var(--sp-3);
+  scrollbar-width: none;
+}
+.bp-dias::-webkit-scrollbar { display: none; }
+.bp-dia {
+  flex: 0 0 auto; min-height: 34px; padding: 0 var(--sp-3);
+  border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--s-raised); color: var(--ink-muted);
+  font: var(--t-small); font-size: .8125rem; white-space: nowrap; cursor: pointer;
+}
+.bp-dia.es-activo { background: var(--accent-wash); border-color: var(--accent); color: var(--ink); }
+
+.bp-botones { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.bp-hora {
+  flex: 0 1 auto;
+  min-height: var(--touch); padding: 0 var(--sp-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--s-sunken); color: var(--ink);
+  font: var(--t-small); font-variant-numeric: tabular-nums;
+}
+.bp-agregar, .bp-descartar {
+  flex: 0 1 auto;
+  min-height: var(--touch); padding: 0 var(--sp-4);
+  border-radius: var(--r-md); font: var(--t-small); font-weight: 600;
+  cursor: pointer;
+}
+.bp-agregar { border: 1px solid var(--accent-strong); background: var(--accent-strong); color: var(--on-accent); }
+.bp-descartar { border: 1px solid var(--line); background: transparent; color: var(--ink-muted); }
+.bp-descartar:hover { color: var(--ink); border-color: var(--ink-faint); }
+.bp-agregar:disabled { opacity: .45; cursor: not-allowed; }
+
+.bp-fallo { font: var(--t-small); font-size: .75rem; color: var(--danger); }

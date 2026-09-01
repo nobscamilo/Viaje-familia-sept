@@ -89,9 +89,24 @@ const resumen = { creados: 0, actualizados: 0, borrados: 0, respetados: 0 }
 lote.set(db.doc(base), tripDoc, { merge: true })
 for (const t of TRAVELERS) lote.set(db.doc(`${base}/travelers/${t.id}`), t, { merge: true })
 
-// --- Linea de tiempo: espejo exacto de la fuente ---
+// --- Linea de tiempo: espejo exacto de la fuente, con DOS excepciones ---
+//
+// Desde el 1 de septiembre de 2026 la app deja quitar y corregir cualquier
+// momento, incluidos los vuelos y los hoteles. Este espejo hacia `set()` sin
+// merge sobre todos ellos, asi que sin lo que viene abajo cada publicacion
+// revertiria la correccion en silencio y resucitaria lo borrado. Un boton que
+// deshace su propio efecto en el siguiente despliegue es peor que no tenerlo.
+//
+//   · `tocadoAMano`  -> alguien lo edito desde la app. No se pisa.
+//   · lapida en `borrados/{id}` -> alguien lo quito. No se vuelve a crear.
+//
+// Las dos se avisan en consola y a proposito con un rotulo distinto: quiere
+// decir que `src/data/` y lo que ve la familia YA NO DICEN LO MISMO, y eso hay
+// que arreglarlo en el archivo, no dejarlo vivir en Firestore.
 const timelineActual = await db.collection(`${base}/timeline`).get()
 const idsFuente = new Set(TIMELINE.map((e) => e.id))
+const lapidas = new Set((await db.collection(`${base}/borrados`).get()).docs.map((d) => d.id))
+const tocados = new Set(timelineActual.docs.filter((d) => d.get('tocadoAMano')).map((d) => d.id))
 
 for (const doc of timelineActual.docs) {
   if (idsFuente.has(doc.id)) continue
@@ -100,12 +115,32 @@ for (const doc of timelineActual.docs) {
     console.log(`  RESPETADO  timeline/${doc.id} - lo creo alguien, no la siembra`)
     continue
   }
+  if (doc.get('tocadoAMano')) {
+    resumen.respetados++
+    console.log(`  RESPETADO  timeline/${doc.id} - editado desde la app`)
+    continue
+  }
   lote.delete(doc.ref)
   resumen.borrados++
   console.log(`  BORRADO    timeline/${doc.id} - ya no esta en src/data/`)
 }
 
 for (const e of TIMELINE) {
+  if (lapidas.has(e.id)) {
+    resumen.respetados++
+    console.log(`  QUITADO    timeline/${e.id} - ${e.title}`)
+    console.log(`             lo quito alguien desde la app y NO se vuelve a crear.`)
+    console.log(`             Si tiene que volver: borra trips/${TRIP_ID}/borrados/${e.id} y quita`)
+    console.log(`             el momento de src/data/ si de verdad ya no va.`)
+    continue
+  }
+  if (tocados.has(e.id)) {
+    resumen.respetados++
+    console.log(`  TOCADO     timeline/${e.id} - ${e.title}`)
+    console.log(`             editado desde la app: src/data/ ya no manda aqui. Pasa el cambio`)
+    console.log(`             al archivo y quita el campo tocadoAMano para volver al espejo.`)
+    continue
+  }
   const existia = timelineActual.docs.some((d) => d.id === e.id)
   // set() sin merge: si en la fuente se quito un `warning`, tiene que desaparecer.
   lote.set(db.doc(`${base}/timeline/${e.id}`), { ...e, origen: 'seed' })

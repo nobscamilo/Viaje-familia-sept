@@ -997,6 +997,11 @@ toques, y una función que cuesta seis toques deshacer no la prueba nadie.
 `quitarRuta` respeta los mismos candados uno por uno: solo lo que puso una
 persona, solo mientras siga propuesto, y dice cuántas dejó por confirmadas.
 
+> ⚠️ **Superado el 1 de septiembre de 2026.** `armarRuta` ya NO escribe: ahora
+> devuelve un borrador que se enseña en el chat y se guarda con un botón. Los
+> cinco pasos de arriba siguen siendo exactos; lo que cambió es el paso 5.
+> Lee «El copiloto propone y espera» más abajo.
+
 Coste por ruta: hasta 6 peticiones a Places + 5 a Routes. Con el tope de 150
 Places/día son unas 16 rutas diarias. No es gratis y conviene saberlo.
 
@@ -1016,6 +1021,11 @@ peor de las tres opciones.
 
 Un plan que se mueve de hora arrastra su final; si no, un momento de 10:00 a
 11:30 movido a las 18:00 acabaría antes de empezar.
+
+> ⚠️ **Superado el 1 de septiembre de 2026.** Los tres candados que se
+> describen aquí —tener autor, seguir propuesto, ser tuyo— ya no existen.
+> Cualquier adulto edita o quita cualquier momento. Lee «Se acabaron los
+> candados de la agenda» más abajo.
 
 ### Cuatro cosas que solo salieron al medir o al probar
 
@@ -1165,6 +1175,139 @@ persona, varios viajes) o por viaje (una ficha por viaje). Lo segundo duplica
 nombres pero mantiene los hogares limpios; lo primero es más bonito y complica
 las reglas de pertenencia. No hay que resolverlo hasta que haya viaje.
 
+## Se acabaron los candados de la agenda (1 de septiembre)
+
+Camilo lo pidió en dos frases: poder quitar o modificar planes ya autorizados,
+y que el copiloto enseñe la ruta antes de meterla. Las dos tocan la misma
+costura —quién decide qué acaba en «Ahora»— y las dos estaban mal por el mismo
+motivo: la app confundía *proteger* con *bloquear*.
+
+### Confirmar un plan lo congelaba para siempre
+
+Un momento `propuesto` con autor se votaba, se editaba y se quitaba. En cuanto
+alguien pulsaba **Confirmar**, desaparecían todos los botones. Dos causas, y
+había que arreglar las dos:
+
+- En el servidor, `planes.js` tenía tres candados —tener `createdBy`, seguir
+  `propuesto`, ser tuyo o ser owner— y el segundo cerraba la puerta por dentro.
+- En la interfaz, los botones de cierre vivían **dentro** de `VotoDelPlan`. Al
+  confirmar desaparece la votación, y con ella se llevaba los botones. Ahora
+  `Cierre.jsx` es un componente aparte que no sabe nada de votos.
+
+Lo que queda en su lugar no es otro permiso, es una **pregunta**. Las acciones
+marcadas `peligroso` piden un segundo toque, y quién es peligroso lo decide
+`esReserva()` en `acciones.js`, que es puro y está probado: quitar el Vueling
+de 431,91 € pregunta; quitar una cena que propuso el copiloto hace un minuto,
+no. `Cierre.jsx` no razona sobre reservas, solo lee el descriptor.
+
+Mover el **estado** —confirmar, devolver a propuesto— sigue siendo del owner.
+No es un candado de vuelta: decir «esto va a pasar» es de quien organiza, y
+corregir una hora, de quien la ve mal. Y **devolver a propuesto** es la pieza
+que faltaba: hasta ahora, corregir algo confirmado era borrarlo y recrearlo, y
+eso se lleva por delante los votos.
+
+### La mitad silenciosa: la siembra lo revertía todo
+
+Aquí estaba el fallo de verdad, y no se ve leyendo la interfaz. `scripts/seed.mjs`
+hace `lote.set(doc, { ...e, origen: 'seed' })` sobre **todos** los momentos de
+`src/data/`, sin merge y sin condición. Con los candados quitados y la siembra
+intacta, editar el hotel desde el móvil habría durado hasta el siguiente
+`npm run publicar`, y un vuelo borrado habría vuelto solo al día siguiente. Sin
+un solo mensaje. Un botón que deshace su propio efecto en el siguiente
+despliegue es peor que no tener botón.
+
+Dos huellas lo arreglan, y las pone el servidor, no el cliente:
+
+- Editar algo sembrado le pone **`tocadoAMano: true`**. La siembra lo salta.
+- Quitar algo sembrado deja **lápida en `trips/{id}/borrados/{id}`**, con quién
+  y cuándo. La siembra no lo vuelve a crear. La lápida se escribe **antes** del
+  borrado: al revés, si falla, el momento resucita.
+
+Las dos se avisan en consola con su propio rótulo (`TOCADO`, `QUITADO`) porque
+significan que `src/data/` y lo que ve la familia **ya no dicen lo mismo**, y
+eso se arregla en el archivo, no dejándolo vivir en Firestore.
+
+Y el cambio de estado subió al servidor (`moverEstadoDeUnPlan`): un momento
+sembrado no tiene `createdBy` y las reglas de Firestore no dejan que un adulto
+lo escriba desde el navegador. Un botón que las reglas van a rechazar deja a la
+persona mirando un error que no entiende.
+
+### El copiloto propone y espera
+
+`armarRuta` calculaba las paradas y las escribía en la agenda en el mismo
+gesto. Quedaban propuestas y se podían quitar de una vez, sí — pero la primera
+vez que la familia veía el recorrido era encontrándoselo ya metido, y cambiarle
+algo era quitarlo entero y volver a pedírselo con otras palabras.
+
+Ahora son tres pasos y **solo el último escribe**:
+
+| | escribe | qué hace |
+|---|---|---|
+| `armarRuta` (herramienta) | no | resuelve las paradas contra Places, encadena las horas y devuelve un borrador |
+| `recalcularRuta` (callable) | no | rehace traslados y avisos cuando alguien quita una parada o mueve el arranque |
+| `guardarRuta` (callable) | **sí** | vuelve a calcular y escribe las paradas, propuestas, con su `rutaId` |
+
+`recalcular` y `guardar` **vuelven a pasar por `calcularTramos`**, y eso no es
+desconfianza del navegador por gusto: si el cliente mandara las horas, una ruta
+a la que se le quita la parada del medio llegaría a la agenda con los horarios
+de la versión anterior. Plausibles y falsos, que es la peor clase de error y el
+que nadie ve hasta estar allí. `limpiarParadas()` tira al suelo cualquier
+`llegada`, `salida` o `trasladoMin` que llegue de fuera; hay una prueba que lo
+vigila. Lo que sí se acepta del cliente son las **coordenadas**, porque ya se
+resolvieron contra Places al proponer y porque un adulto ya podía escribirlas
+creando un plan a mano: aceptarlas ahí no abre nada nuevo.
+
+En la tarjeta se puede quitar una parada, decir cuánto se quiere estar en cada
+sitio y mover la hora de arranque. Se recalcula al **soltar** el campo y no en
+cada tecla: cada recálculo es una llamada a Routes por tramo y teclear «11:30»
+dispararía cuatro.
+
+`agregarAlPlan` hace lo mismo en pequeño: devuelve un borrador con el día y la
+hora a mano, y la escritura la hace `agregarPlan` —la misma función que usa el
+botón «Agregar al plan» de una tarjeta de sitio— cuando alguien la pulsa.
+
+**Y hubo que cambiar las instrucciones del modelo, no solo la herramienta.**
+Dejarlas diciendo «entra como PROPUESTO en la agenda» habría producido un
+copiloto que promete algo que todavía no ha pasado — exactamente la mentira que
+el guardia intenta cazar. Ahora se le dice que no escribe y que hable de
+proponer. Al guardia, en cambio, hubo que decirle lo contrario: un borrador
+**cuenta** como haber llamado a la herramienta, porque «te dejo propuesto el
+plan» ya casa con el patrón de «lo agendé» y el aviso saltaría en cada ruta
+bien hecha.
+
+### Lo que salió al probar contra el servicio real, no al leer
+
+`scripts/probar-planes.mjs` afirmaba «un momento de la siembra NO se puede
+quitar» sobre `vuelo-av182` — una reserva de verdad. Cambiar el `esperado` a
+`OK` habría **borrado el billete** para comprobar que el botón funciona. Se
+prueba sobre un doble: un documento con `origen: 'seed'` y sin `createdBy`,
+creado y limpiado por la propia prueba. Son 26 comprobaciones contra las
+funciones desplegadas, y cubren el borrador entero: que `recalcularRuta` no
+escriba nada, que las horas las ponga Google y no el reloj, y que `guardarRuta`
+deje dos paradas propuestas que `quitarRuta` se lleva de una vez.
+
+Medido a 1280, 430, 390 y 375 px con el hilo de `?demo`, al que se le añadieron
+un borrador de ruta y uno de plan: las dos tarjetas caben (343 px dentro de 375)
+sin desbordar la página. Dos arreglos salieron de ahí: el campo de minutos
+medía 32 px y subió a 44, y las pastillas de día se alinearon al mismo carril
+deslizante que ya usan `AgregarPlan` y `EditarPlan` — tres formas distintas de
+elegir un día en tres pantallas sería una app distinta cada vez.
+
+### Lo que NO se tocó, y por qué
+
+- **Las reglas de Firestore siguen igual de estrechas.** Editar y quitar pasan
+  por Cloud Functions, que usan el SDK de administrador: relajar las reglas
+  habría abierto el navegador sin necesidad. Lo único nuevo es
+  `borrados/{id}`, de lectura para los miembros y sin escritura desde el cliente.
+- **Votar sigue siendo solo de lo propuesto.** Votar algo ya pagado no cambia
+  nada, y ponerle marcas de voto al Vueling sería fingir que la familia decide
+  sobre un billete emitido.
+- **Un `viewer` sigue sin tocar nada.** Es el único límite que queda, y es
+  sobre *quién* toca, no sobre *qué*.
+- **`npm run lint` sigue roto** y ya lo estaba: no hay `eslint.config.js` en el
+  repositorio y ESLint 10 no lee `.eslintrc`. No se arregló aquí para no
+  mezclarlo con este cambio, pero conviene arreglarlo o quitar el script.
+
 ## Reglas innegociables
 
 - Ningún archivo por encima de **400 líneas**.
@@ -1176,8 +1319,16 @@ las reglas de pertenencia. No hay que resolverlo hasta que haya viaje.
   puede probar ni previsualizar.
 - Un botón *Cómo llegar* solo se pinta si el destino es un sitio al que de
   verdad se puede ir. Trazar ruta a «Madrid» es peor que no poner el botón.
-- **Ningún botón destructivo sobre algo que no puso la app.** Un momento sin
-  `createdBy` salió de la siembra: se mira, no se borra desde el móvil.
+- **Nada que la app deje tocar puede deshacerlo la siembra en silencio.**
+  Cualquier adulto edita o quita cualquier momento, vuelos y hoteles incluidos
+  (1 de septiembre). Eso solo es honesto porque `seed.mjs` respeta la marca
+  `tocadoAMano` y las lápidas de `borrados/`. Si se toca uno de los dos lados,
+  se tocan los dos.
+- **Fricción donde está el daño, no en todas partes.** Quitar una reserva pide
+  un segundo toque; quitar una cena propuesta hace un minuto, no. Quién es
+  «reserva» lo decide `esReserva()` en el dominio, nunca el JSX.
+- **El copiloto propone, no escribe.** `agregarAlPlan` y `armarRuta` devuelven
+  un borrador; la escritura la dispara una persona con un botón.
 - Lo que se puede hacer con una tarjeta se decide en el dominio (`acciones.js`),
   nunca en el JSX. El JSX pinta descriptores; así se puede probar sin navegador.
 - **El dinero, en céntimos enteros.** Nunca un euro con decimales, ni en el

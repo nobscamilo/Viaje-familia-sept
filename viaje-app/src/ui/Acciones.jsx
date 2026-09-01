@@ -5,8 +5,7 @@ import { useTrip } from '../hooks/useTrip.js'
 import { useVotos } from '../hooks/useVotos.js'
 import { accionesDe } from '../domain/acciones.js'
 import { puedeVotar, recuento, sePuedeCerrar } from '../domain/decisions.js'
-import { cambiarEstadoPlan } from '../services/tripRepo.js'
-import { motivoPlan, quitarPlan, quitarRuta } from '../services/planes.js'
+import Cierre from './Cierre.jsx'
 import EditarPlan from './EditarPlan.jsx'
 import Icon from './Icon.jsx'
 import './acciones.css'
@@ -21,22 +20,26 @@ const VOTO = [
  * Lo que se puede hacer con un momento, dentro de su propia tarjeta.
  *
  * Antes la agenda era un cartel: el plan del Camp Nou que el copiloto dejo el
- * 15 estaba ahi, en gris, marcado «propuesto», y no habia nada que tocar. Ni
- * decir que si, ni quitarlo, ni saber quien mas lo queria.
+ * 15 estaba ahi, en gris, marcado «propuesto», y no habia nada que tocar.
  *
- * Lo que NO hace, a proposito: no pone botones de voto en las reservas. El
- * Vueling a Orly esta pagado; «descartar» encima de 431,91 € seria una trampa,
- * no una funcion. Quien decide que hay en cada tarjeta es `accionesDe`, que es
- * puro y esta probado.
+ * Y despues fue un cartel a medias: se podia tocar mientras estuviera
+ * propuesto, pero confirmarlo lo congelaba. Los botones de cierre vivian
+ * DENTRO del bloque de votacion, asi que desaparecian con ella. Ahora `Cierre`
+ * es un componente aparte y se pinta haya voto o no.
+ *
+ * Quien decide que botones salen sigue siendo `accionesDe`, que es puro y
+ * esta probado. Aqui no se razona sobre estados ni sobre reservas.
  */
 export default function Acciones({ evento, hoy = null }) {
   const { tripId, decisions, travelers, yo, user, rol, modoLocal } = useTrip()
   const navegar = useNavigate()
+  const [editando, setEditando] = useState(false)
 
   const acciones = accionesDe(evento, {
     decisiones: decisions,
     uid: user?.uid,
     esOwner: rol === 'owner',
+    esAdulto: rol === 'owner' || rol === 'adult',
     hoy,
   })
   if (acciones.length === 0) return null
@@ -65,14 +68,23 @@ export default function Acciones({ evento, hoy = null }) {
       )}
 
       {hayVoto && (
-        <VotoDelPlan
+        <VotoDelPlan evento={evento} travelers={travelers} yo={yo} modoLocal={modoLocal} />
+      )}
+
+      {editando && (
+        <EditarPlan evento={evento} tripId={tripId} alCerrar={() => setEditando(false)} />
+      )}
+
+      {/* En modo local no hay servidor al que pedirle nada: ensenar botones
+          que van a fallar es peor que no ensenarlos. */}
+      {!modoLocal && (
+        <Cierre
           evento={evento}
-          travelers={travelers}
-          yo={yo}
-          modoLocal={modoLocal}
           acciones={acciones}
           tripId={tripId}
           uid={user?.uid}
+          editando={editando}
+          alEditar={setEditando}
         />
       )}
 
@@ -92,10 +104,8 @@ export default function Acciones({ evento, hoy = null }) {
  * fuera, mismo «falta Cielo». Lo unico distinto es de que rama de Firestore
  * cuelgan los votos, y eso lo resuelve `useVotos(id, 'timeline')`.
  */
-function VotoDelPlan({ evento, travelers, yo, modoLocal, acciones, tripId, uid }) {
+function VotoDelPlan({ evento, travelers, yo, modoLocal }) {
   const { votos, votar, miVoto } = useVotos(evento.id, 'timeline')
-  const [trabajando, setTrabajando] = useState(null)
-  const [fallo, setFallo] = useState(null)
 
   // Un plan del grupo de F1 lo deciden los tres del circuito, no los nueve.
   const grupo = Object.values(GROUPS).find((g) => g.id === evento.groupId)
@@ -104,32 +114,6 @@ function VotoDelPlan({ evento, travelers, yo, modoLocal, acciones, tripId, uid }
   const r = recuento(comoDecision, travelers, votos)
   const cierre = sePuedeCerrar(comoDecision, travelers, votos)
   const puedo = puedeVotar(yo) && !modoLocal
-
-  const confirmar = acciones.find((a) => a.id === 'confirmar')
-  const quitar = acciones.find((a) => a.id === 'quitar')
-  const editar = acciones.find((a) => a.id === 'editar')
-  const laRuta = acciones.find((a) => a.id === 'quitar-ruta')
-  const [editando, setEditando] = useState(false)
-
-  const hacer = async (que) => {
-    setTrabajando(que)
-    setFallo(null)
-    try {
-      if (que === 'confirmar') await cambiarEstadoPlan(tripId, evento.id, { status: 'confirmado', uid })
-      if (que === 'quitar') await quitarPlan(tripId, evento.id)
-      if (que === 'ruta') {
-        const r = await quitarRuta(tripId, laRuta.rutaId)
-        // Lo que ya se confirmo no se borra, y hay que decirlo: si no,
-        // desaparecen cuatro paradas de seis y parece que fallo a medias.
-        if (r?.intocables > 0) {
-          setFallo(`Quité ${r.borradas}; ${r.intocables} ya estaban confirmadas y las dejo.`)
-        }
-      }
-    } catch (e) {
-      setFallo(motivoPlan(e))
-    }
-    setTrabajando(null)
-  }
 
   return (
     <div className="acc-voto">
@@ -164,43 +148,6 @@ function VotoDelPlan({ evento, travelers, yo, modoLocal, acciones, tripId, uid }
           ))}
         </div>
       )}
-
-      {editando && (
-        <EditarPlan evento={evento} tripId={tripId} alCerrar={() => setEditando(false)} />
-      )}
-
-      {(confirmar || quitar || editar) && !modoLocal && !editando && (
-        <div className="acc-cierre">
-          {confirmar && (
-            <button type="button" className="acc-cerrar" disabled={Boolean(trabajando)}
-              onClick={() => hacer('confirmar')}>
-              {trabajando === 'confirmar' ? 'Un momento…' : 'Confirmar'}
-            </button>
-          )}
-          {editar && (
-            <button type="button" className="acc-editar" onClick={() => setEditando(true)}>
-              Editar
-            </button>
-          )}
-          {quitar && (
-            <button type="button" className="acc-quitar" disabled={Boolean(trabajando)}
-              onClick={() => hacer('quitar')}>
-              {trabajando === 'quitar' ? 'Un momento…' : 'Quitar'}
-            </button>
-          )}
-          {/* Quitar la ruta entera va aparte y en ultimo lugar: se lleva por
-              delante hasta seis momentos y no puede compartir sitio con el
-              boton que quita solo este. */}
-          {laRuta && (
-            <button type="button" className="acc-quitar-ruta" disabled={Boolean(trabajando)}
-              onClick={() => hacer('ruta')}>
-              {trabajando === 'ruta' ? 'Un momento…' : 'Quitar la ruta entera'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {fallo && <p className="acc-fallo">{fallo}</p>}
     </div>
   )
 }

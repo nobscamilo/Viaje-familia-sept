@@ -5,6 +5,8 @@ import { formatDay } from '../../domain/dates.js'
 import AgregarPlan from '../../ui/AgregarPlan.jsx'
 import MiniMapa from '../../ui/MiniMapa.jsx'
 import ReciboRuta from '../../ui/ReciboRuta.jsx'
+import BorradorRuta from '../../ui/BorradorRuta.jsx'
+import BorradorPlan from '../../ui/BorradorPlan.jsx'
 import { motivoPlan, quitarPlan } from '../../services/planes.js'
 import { preguntarCopiloto } from '../../services/copiloto.js'
 import Icon from '../../ui/Icon.jsx'
@@ -74,6 +76,14 @@ export default function Copiloto() {
   const borrarRecibo = (indice, id) => setMensajes((ms) => ms.map((m, i) =>
     i === indice ? { ...m, planes: (m.planes ?? []).filter((p) => p.id !== id) } : m))
 
+  /**
+   * Descartar un borrador lo saca del hilo y ya esta: no habia nada escrito
+   * que deshacer. Es justo lo que hace util el paso previo — decir que no
+   * cuesta un toque y no deja rastro en la agenda de nadie.
+   */
+  const soltarBorrador = (indice, lista, j) => setMensajes((ms) => ms.map((m, i) =>
+    i === indice ? { ...m, [lista]: (m[lista] ?? []).filter((_, k) => k !== j) } : m))
+
   const preguntar = async (pregunta) => {
     const limpio = (pregunta ?? texto).trim()
     if (!limpio || pensando) return
@@ -95,6 +105,8 @@ export default function Copiloto() {
         propuestas: r.propuestas,
         planes: r.planes,
         itinerarios: r.itinerarios,
+        borradores: r.borradores,
+        borradoresPlan: r.borradoresPlan,
       }
       setMensajes([...nuevos, suyo])
       // Solo se guarda el texto: las fotos y las rutas se vuelven a pedir si
@@ -133,6 +145,7 @@ export default function Copiloto() {
             tripId={tripId}
             alAgregar={(plan) => anadirRecibo(i, plan)}
             alQuitar={(id) => borrarRecibo(i, id)}
+            alSoltar={(lista, j) => soltarBorrador(i, lista, j)}
           />
         ))}
 
@@ -185,7 +198,7 @@ function Bienvenida({ yo, alElegir }) {
 
 const MODO = { metro: 'transport', transporte: 'transport', coche: 'transport', andando: 'activity' }
 
-function Mensaje({ mensaje, tripId, alAgregar, alQuitar, conMapa = false }) {
+function Mensaje({ mensaje, tripId, alAgregar, alQuitar, alSoltar, conMapa = false }) {
   const [elegido, setElegido] = useState(null)
   const mio = mensaje.rol === 'yo'
   return (
@@ -224,6 +237,28 @@ function Mensaje({ mensaje, tripId, alAgregar, alQuitar, conMapa = false }) {
           </ul>
         </>
       )}
+
+      {/* Lo que el copiloto PROPONE y todavia no ha escrito. Va antes que
+          los recibos a proposito: lo que espera una decision pesa mas que lo
+          que ya esta hecho. */}
+      {mensaje.borradores?.map((b, j) => (
+        <BorradorRuta
+          key={`br-${j}`}
+          ruta={b}
+          tripId={tripId}
+          alDescartar={() => alSoltar?.('borradores', j)}
+        />
+      ))}
+
+      {mensaje.borradoresPlan?.map((b, j) => (
+        <BorradorPlan
+          key={`bp-${j}`}
+          plan={b}
+          tripId={tripId}
+          alAgregado={(plan) => { alAgregar?.(plan); alSoltar?.('borradoresPlan', j) }}
+          alDescartar={() => alSoltar?.('borradoresPlan', j)}
+        />
+      ))}
 
       {/* Una ruta entera: un recibo, no seis planes sueltos. */}
       {mensaje.itinerarios?.map((r) => (

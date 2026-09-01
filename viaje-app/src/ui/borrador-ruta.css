@@ -1,0 +1,94 @@
+/* La ruta ANTES de la agenda.
+   Se distingue del recibo (`recibo-ruta.css`) por el borde de acento: en un
+   hilo largo hay que saber de un vistazo cual esta ya metida y cual espera
+   una decision. Mismo esqueleto, otro estado. */
+.br {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2);
+  margin-top: var(--sp-2); padding: var(--sp-3);
+  border: 1px solid var(--accent); border-radius: var(--r-md);
+  background: var(--s-raised);
+  box-shadow: var(--shadow-card);
+}
+/* Mientras el servidor rehace las horas, lo que se ve es el horario VIEJO.
+   Bajarle la opacidad dice «esto ya no vale» sin sacarlo de la pantalla. */
+.br.es-ocupado { opacity: .6; }
+
+.br-cab { display: flex; gap: var(--sp-2); align-items: flex-start; font: var(--t-small); }
+.br-cab > span { display: grid; gap: 2px; min-width: 0; }
+.br-cuando { font: var(--t-small); font-size: .75rem; color: var(--ink-muted); }
+.br-cab em {
+  font: var(--t-small); font-size: .75rem; font-style: normal;
+  color: var(--accent); font-weight: 600;
+}
+
+.br-arranque { display: flex; gap: var(--sp-2); align-items: center; font: var(--t-small); font-size: .75rem; color: var(--ink-muted); }
+.br-hora, .br-min {
+  min-height: var(--touch);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--s-sunken); color: var(--ink);
+  font: var(--t-small); font-variant-numeric: tabular-nums;
+}
+/* 44 px tambien aqui: es un campo de formulario, y con 32 se falla con el
+   pulgar. Medido a 375 px. */
+.br-min { width: 4.75rem; min-height: var(--touch); }
+
+.br-paradas { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; }
+
+/* `minmax(0, 1fr)` y no `auto` en la columna del texto: una pista `auto` de
+   CSS Grid se dimensiona al max-content y un nombre largo de restaurante
+   desborda la tarjeta entera. Cazado midiendo, dos veces. */
+.br-parada {
+  display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+  gap: var(--sp-2); align-items: start;
+  padding: var(--sp-2) 0;
+  border-top: 1px solid var(--line-subtle);
+}
+.br-llegada { font: var(--t-small); font-variant-numeric: tabular-nums; color: var(--ink-muted); }
+.br-txt { display: grid; gap: 3px; min-width: 0; }
+.br-txt strong { font: var(--t-small); font-weight: 600; overflow-wrap: anywhere; }
+.br-nota { font: var(--t-small); font-size: .75rem; color: var(--ink-faint); font-style: normal; }
+.br-rato {
+  display: flex; gap: var(--sp-1); align-items: center;
+  font: var(--t-small); font-size: .72rem; color: var(--ink-faint);
+}
+
+/* Area de contacto de 44 px: quita una parada de la ruta y no puede fallarse
+   con el pulgar. La × es pequena; el boton, no. */
+.br-quitar-parada {
+  min-width: var(--touch); min-height: var(--touch);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: transparent; color: var(--ink-faint);
+  font-size: 1.1rem; line-height: 1; cursor: pointer;
+}
+.br-quitar-parada:hover { color: var(--danger); border-color: var(--danger); }
+.br-quitar-parada:disabled { opacity: .4; cursor: not-allowed; }
+
+.br-traslado {
+  grid-column: 2 / -1;
+  font: var(--t-small); font-size: .72rem; color: var(--ink-faint);
+}
+
+.br-avisos { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; }
+.br-avisos li {
+  display: flex; gap: var(--sp-1); align-items: flex-start;
+  font: var(--t-small); font-size: .75rem; color: var(--warn);
+}
+.br-avisos span { min-width: 0; overflow-wrap: anywhere; }
+
+/* `flex-wrap` y `flex: 0 1 auto`: sin envolver, un boton no baja de linea, se
+   encoge y queda pegado al de al lado. Medido el 30 de agosto. */
+.br-botones { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.br-agregar, .br-descartar {
+  flex: 0 1 auto;
+  min-height: var(--touch); padding: 0 var(--sp-4);
+  border-radius: var(--r-md); font: var(--t-small); font-weight: 600;
+  cursor: pointer;
+}
+.br-agregar { border: 1px solid var(--accent-strong); background: var(--accent-strong); color: var(--on-accent); }
+.br-descartar { border: 1px solid var(--line); background: transparent; color: var(--ink-muted); }
+.br-descartar:hover { color: var(--ink); border-color: var(--ink-faint); }
+.br-agregar:disabled, .br-descartar:disabled { opacity: .45; cursor: not-allowed; }
+
+.br-calculando { font: var(--t-small); font-size: .72rem; color: var(--ink-faint); }
+.br-fallo { font: var(--t-small); font-size: .75rem; color: var(--danger); }

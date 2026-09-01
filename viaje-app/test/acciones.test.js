@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { TRAVELERS } from '../src/data/travelers.js'
 import { TIMELINE } from '../src/data/trip-madrid-2026.js'
 import { OPEN_DECISIONS } from '../src/data/decisiones-sept-2026.js'
-import { accionesDe, decisionesDe, enlaceDeMapa } from '../src/domain/acciones.js'
+import { accionesDe, decisionesDe, enlaceDeMapa, esReserva } from '../src/domain/acciones.js'
 import { esDeOpciones, recuentoOpciones, sePuedeCerrarOpciones } from '../src/domain/decisions.js'
 
 const ev = (id) => TIMELINE.find((e) => e.id === id)
@@ -27,22 +27,66 @@ const campNou = {
   createdByCopiloto: true,
 }
 
-// ------------------------------------------------ lo que NO se puede tocar
+// --------------------------------- lo que se puede tocar, y con que friccion
+//
+// Hasta el 1 de septiembre de 2026 aqui habia candados: lo confirmado y lo
+// sembrado no se tocaba. La consecuencia real fue que confirmar un plan lo
+// congelaba para siempre y no habia forma de corregirle una hora. Camilo pidio
+// quitarlos. Lo que queda en su lugar es una PREGUNTA, no un permiso.
 
-test('un vuelo pagado no se vota ni se descarta', () => {
+test('un vuelo pagado no se vota, pero se puede quitar', () => {
   const a = accionesDe(ev('vuelo-bcn-ory'), { decisiones: [], esOwner: true, uid: 'quien-sea' })
-  assert.ok(!ids(a).includes('votar'), 'el Vueling de 431,91 € no se vota')
-  assert.ok(!ids(a).includes('quitar'), 'ni se quita, ni siendo owner')
-  assert.ok(!ids(a).includes('confirmar'))
+  assert.ok(!ids(a).includes('votar'), 'votar algo ya pagado no cambia nada')
+  assert.ok(ids(a).includes('quitar'), 'y si de verdad se cancela, se tiene que poder quitar')
+  assert.ok(ids(a).includes('editar'))
 })
 
-test('un plan propuesto SIN autor no se puede quitar ni siendo owner', () => {
-  // Un momento de la siembra que llegara como propuesto: no lo puso nadie
-  // desde la app, asi que no hay boton que lo borre por accidente.
-  const a = accionesDe({ id: 'x', status: 'propuesto', kind: 'activity' },
-    { decisiones: [], esOwner: true, uid: 'u' })
-  assert.ok(ids(a).includes('votar'))
+test('quitar una reserva pide un segundo toque; quitar una propuesta no', () => {
+  // Esta es la linea que separa esto de una trampa. El dedo gordo sobre el
+  // Vueling de 431,91 € no puede costar una reserva; sobre una cena que
+  // propuso el copiloto hace un minuto, una pregunta sobra.
+  const vuelo = accionesDe(ev('vuelo-bcn-ory'), { esOwner: true, uid: 'u' })
+  assert.equal(vuelo.find((a) => a.id === 'quitar').peligroso, true)
+  assert.ok(vuelo.find((a) => a.id === 'quitar').aviso, 'y se dice por que')
+
+  const cena = accionesDe(campNou, { esOwner: true, uid: 'uid-camilo' })
+  assert.equal(cena.find((a) => a.id === 'quitar').peligroso, false)
+})
+
+test('una reserva es lo que NO puso nadie desde la app', () => {
+  assert.equal(esReserva(ev('vuelo-bcn-ory')), true)
+  assert.equal(esReserva(campNou), false)
+  // Los documentos anteriores a la marca `origen` solo se distinguen por no
+  // tener autor: si esto se rompe, media agenda deja de pedir confirmacion.
+  assert.equal(esReserva({ id: 'viejo', title: 'algo de agosto' }), true)
+  assert.equal(esReserva({ id: 'x', createdBy: 'u', origen: 'seed' }), true)
+})
+
+test('un viewer no toca nada, ni lo que propuso el copiloto', () => {
+  const a = accionesDe(campNou, { esOwner: false, esAdulto: false, uid: 'uid-camilo' })
+  assert.ok(!ids(a).includes('editar'))
   assert.ok(!ids(a).includes('quitar'))
+  // Votar tampoco: quien puede votar lo decide `puedeVotar(yo)` en la
+  // interfaz, pero la marca de que hay votacion sigue estando.
+  assert.deepEqual(ids(a), ['votar'])
+})
+
+test('un plan confirmado se puede devolver a propuesto sin perder los votos', () => {
+  const confirmado = { ...campNou, status: 'confirmado' }
+  const a = accionesDe(confirmado, { esOwner: true, uid: 'uid-camilo' })
+  assert.ok(ids(a).includes('desconfirmar'), 'si no, corregir algo confirmado es borrarlo y recrearlo')
+  assert.ok(!ids(a).includes('votar'), 'lo confirmado no esta en votacion')
+  assert.ok(ids(a).includes('editar'))
+  assert.equal(a.find((x) => x.id === 'desconfirmar').a, 'propuesto')
+})
+
+test('mover el estado es del owner; editar y quitar, de cualquier adulto', () => {
+  // No es un candado de vuelta: es que «esto va a pasar» lo dice quien
+  // organiza, y corregir una hora lo hace quien la ve mal.
+  const adulto = accionesDe(campNou, { esOwner: false, esAdulto: true, uid: 'uid-otro' })
+  assert.ok(!ids(adulto).includes('confirmar'))
+  assert.ok(ids(adulto).includes('editar'))
+  assert.ok(ids(adulto).includes('quitar'))
 })
 
 // ------------------------------------------------------ el caso del usuario
@@ -60,15 +104,11 @@ test('una parada de ruta ofrece quitar la ruta entera', () => {
   assert.ok(!ids(accionesDe(campNou, { esOwner: true, uid: 'uid-camilo' })).includes('quitar-ruta'))
 })
 
-test('quien no puede quitar tampoco puede editar', () => {
-  // Editar el título de un plan ajeno es cambiárselo a otro sin permiso.
+test('el orden de la tarjeta: primero votar, luego cerrar, el mapa al final', () => {
+  // El orden no es decorativo: es lo que se lee de arriba abajo con el
+  // telefono en la mano. Lo que decide va antes que lo que ejecuta.
   const a = accionesDe(campNou, { decisiones: [], esOwner: false, uid: 'uid-otro', hoy: '2026-09-15' })
-  assert.ok(!ids(a).includes('editar'))
-})
-
-test('quien no lo propuso ni organiza solo puede votarlo', () => {
-  const a = accionesDe(campNou, { decisiones: [], esOwner: false, uid: 'uid-otro', hoy: '2026-09-15' })
-  assert.deepEqual(ids(a), ['votar', 'mapa'])
+  assert.deepEqual(ids(a), ['votar', 'editar', 'quitar', 'mapa'])
 })
 
 test('«Cómo llegar» solo sale en lo de HOY, no en las catorce tarjetas', () => {

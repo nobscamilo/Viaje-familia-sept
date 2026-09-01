@@ -1,51 +1,43 @@
 /**
  * Rutas de turismo: varias paradas encadenadas, con horas de verdad.
  *
- * Hasta ahora el copiloto sabia meter UN plan. «Armame una ruta por el gotico
- * el domingo» acababa en un parrafo bonito que no dejaba nada en la agenda, o
- * en cinco llamadas a `agregarAlPlan` con horas inventadas por el modelo.
+ * El modelo pone nombres y un orden. Todo lo demas —donde cae cada sitio, si
+ * abre ese dia, cuanto se tarda de uno a otro y a que hora se llega— lo
+ * calcula `lib/planificar.js` contra Places y Routes. Es la frontera de
+ * siempre: el modelo redacta, el servidor cuenta.
  *
- * Lo que el modelo pone aqui son nombres y un orden. Todo lo demas —donde
- * cae cada sitio, si abre ese dia, cuanto se tarda de uno a otro y a que hora
- * se llega— lo calcula este archivo contra Places y Routes. Es la misma
- * frontera de siempre: el modelo redacta, el servidor cuenta.
+ * ---
+ * LO QUE CAMBIO EL 1 DE SEPTIEMBRE DE 2026
  *
- * DOS PASADAS, y no es un capricho. El tiempo de traslado depende de la hora
- * a la que se sale, y la hora a la que se sale depende de los traslados
- * anteriores. Se encadena primero sin traslados para tener una hora
- * aproximada de cada tramo, se preguntan las rutas PARA ESAS HORAS, y se
- * vuelve a encadenar con los tiempos reales. Preguntar «cuanto se tarda
- * ahora» un dia que aun no ha llegado fue exactamente el fallo que se midio
- * el 30 de agosto: 1 h 15 min en lugar de 39.
+ * `armarRuta` escribia las seis paradas en la agenda en el mismo gesto en que
+ * las calculaba. Quedaban propuestas, se podian quitar de una vez, y aun asi
+ * estaba mal: la unica forma de ver la ruta era encontrandosela ya metida en
+ * «Ahora», y la unica forma de cambiarle algo era quitarla entera y volver a
+ * pedirsela al copiloto con otras palabras.
+ *
+ * Ahora son tres pasos y solo el ultimo escribe:
+ *
+ *   armarRuta   -> calcula y DEVUELVE un borrador. No toca Firestore.
+ *   recalcular  -> alguien quito una parada o movio la hora de arranque:
+ *                  se rehacen los traslados y los avisos. Tampoco escribe.
+ *   guardar     -> ahora si: las paradas entran en la agenda, propuestas.
+ *
+ * `recalcular` y `guardar` vuelven a pasar por `calcularTramos`. No es
+ * desconfianza del navegador por gusto: si el cliente mandara las horas, una
+ * ruta a la que se le quita la parada del medio llegaria a la agenda con los
+ * horarios de la version anterior y nadie lo notaria hasta estar alli.
  */
 import { HttpsError } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
 import { db } from './lib/admin.js'
 import { cleanText } from './lib/text.js'
-import { computeRoute, momentoDeSalida, normalizePlace, searchPlaces } from './lib/maps.js'
-import { abiertoEl, horarioDelDia, ordenarPorNota, quitarLosFlojos } from './lib/ranking.js'
-import { choques, encadenar, MAX_CON_NINOS, MAX_PARADAS } from './lib/itinerario.js'
+import { calcularTramos, choquesCon, limpiarParadas, resolverParadas, TIPOS } from './lib/planificar.js'
+import { MAX_CON_NINOS, MAX_PARADAS } from './lib/itinerario.js'
 import { dentroDelViaje, motivoFueraDelViaje } from './lib/ventana.js'
 
 const MODOS = ['WALK', 'TRANSIT', 'DRIVE']
-const TIPOS = ['activity', 'food', 'transport', 'lodging']
 const GRUPOS = ['todos', 'f1', 'sin-f1']
-
-/**
- * El mejor sitio para un nombre suelto, ya ordenado por nota ponderada.
- *
- * Se piden 8 y se devuelve 1: el primero de Google es el mas parecido al
- * texto, no el mejor. Pedir 8 y quedarse con el mejor valorado cuesta lo
- * mismo que pedir 1 —Places cobra por peticion, no por resultado— y es la
- * diferencia entre la terraza de la esquina y la que va a recordar la
- * familia.
- */
-async function mejorSitio(nombre, ciudad) {
-  const crudos = await searchPlaces(nombre, 8, ciudad)
-  if (crudos.length === 0) return null
-  const [mejor] = ordenarPorNota(quitarLosFlojos(crudos.map(normalizePlace)))
-  return mejor?.location ? mejor : null
-}
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 
 /** Los eventos que ya hay ese dia, con hora, para saber que no pisamos. */
 async function loQueYaHay(tripId, dia) {
@@ -85,8 +77,72 @@ async function llevaNinos(tripId, grupo) {
   return menores.some((id) => ids.includes(id))
 }
 
+/** Miembro del viaje que ademas puede escribir. */
+async function exigirAdulto(tripId, uid) {
+  if (!uid) throw new HttpsError('unauthenticated', 'Entra al viaje primero.')
+  const snap = await db.doc(`trips/${tripId}`).get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Ese viaje no existe.')
+  const rol = snap.get(`roles.${uid}`)
+  if (!rol) throw new HttpsError('permission-denied', 'No eres del viaje.')
+  if (rol !== 'owner' && rol !== 'adult') {
+    throw new HttpsError('permission-denied', 'Con tu rol solo se puede mirar.')
+  }
+  return { rol, travelerId: snap.get(`uidToTraveler.${uid}`) ?? null }
+}
+
+/**
+ * El nucleo compartido: paradas ya situadas -> borrador con horas y avisos.
+ *
+ * Lo llaman los tres caminos. Que sea uno solo es lo que garantiza que la
+ * ruta que se guarda es exactamente la que se enseno.
+ */
+async function componer({ tripId, titulo, dia, ciudad, modo, horaInicio, grupo, paradas, avisos = [] }) {
+  const previos = [...avisos]
+
+  if (await llevaNinos(tripId, grupo) && paradas.length > MAX_CON_NINOS) {
+    previos.push(
+      `En este grupo van los dos niños y la ruta tiene ${paradas.length} paradas. ` +
+      `Con ellos, ${MAX_CON_NINOS} ya es un día largo.`,
+    )
+  }
+
+  const { tramos, avisos: delReloj } = await calcularTramos({ paradas, dia, modo, horaInicio })
+  const choques = choquesCon(tramos, await loQueYaHay(tripId, dia))
+
+  return {
+    titulo,
+    fecha: dia,
+    ciudad,
+    modo,
+    horaInicio,
+    grupo,
+    paradas: tramos.map((t) => ({
+      orden: t.orden,
+      titulo: t.titulo,
+      tipo: t.tipo,
+      minutos: t.minutos,
+      llegada: t.llegada,
+      salida: t.salida,
+      direccion: t.direccion,
+      coords: t.coords,
+      placeId: t.placeId,
+      nota: t.nota,
+      resenas: t.resenas,
+      horario: t.horario,
+      alSiguiente: t.trasladoMin === null ? null : `${t.trasladoMin} min`,
+    })),
+    // Los avisos viajan DENTRO del borrador, no al lado: la interfaz recoge
+    // la ruta y los pintaria vacios si vivieran fuera, y un modelo que
+    // redacta tiende a suavizarlos justo cuando mas hacen falta.
+    avisos: [...previos, ...delReloj, ...choques],
+  }
+}
+
+/**
+ * La herramienta del copiloto. Calcula y PROPONE; no escribe nada.
+ */
 export async function armarRuta(args, ctx) {
-  const { tripId, uid, travelerId, contexto } = ctx
+  const { tripId, contexto } = ctx
 
   const titulo = cleanText(args?.titulo ?? '').slice(0, 140)
   if (!titulo) return { error: 'La ruta necesita un nombre.' }
@@ -96,8 +152,7 @@ export async function armarRuta(args, ctx) {
 
   const grupo = GRUPOS.includes(args?.grupo) ? args.grupo : 'todos'
   const modo = MODOS.includes(args?.modo) ? args.modo : 'WALK'
-  const horaInicio = /^([01]\d|2[0-3]):[0-5]\d$/.test(cleanText(args?.horaInicio ?? ''))
-    ? cleanText(args.horaInicio) : '10:00'
+  const horaInicio = HHMM.test(cleanText(args?.horaInicio ?? '')) ? cleanText(args.horaInicio) : '10:00'
 
   const pedidas = (Array.isArray(args?.paradas) ? args.paradas : []).slice(0, MAX_PARADAS)
   if (pedidas.length < 2) {
@@ -105,92 +160,95 @@ export async function armarRuta(args, ctx) {
   }
 
   const ciudad = contexto?.porDia?.[dia]?.ciudad ?? contexto?.ciudadPorDefecto ?? null
-  const avisos = []
-
-  const conNinos = await llevaNinos(tripId, grupo)
-  if (conNinos && pedidas.length > MAX_CON_NINOS) {
-    avisos.push(
-      `En este grupo van los dos ninos y la ruta tiene ${pedidas.length} paradas. ` +
-      `Con ellos, ${MAX_CON_NINOS} ya es un dia largo.`,
-    )
-  }
-
-  // Los sitios, en paralelo: son independientes entre si.
-  const resueltas = await Promise.all(pedidas.map(async (p) => {
-    const nombre = cleanText(p?.nombre ?? '').slice(0, 140)
-    if (!nombre) return null
-    const sitio = await mejorSitio(nombre, cleanText(p?.ciudad ?? '') || ciudad).catch(() => null)
-    if (!sitio) return { nombre, sinSitio: true, tipo: TIPOS.includes(p?.tipo) ? p.tipo : 'activity' }
-    return {
-      titulo: sitio.name,
-      pedido: nombre,
-      tipo: TIPOS.includes(p?.tipo) ? p.tipo : 'activity',
-      minutos: Number.isFinite(p?.minutos) ? Number(p.minutos) : null,
-      direccion: sitio.formattedAddress,
-      coords: sitio.location,
-      placeId: sitio.placeId,
-      nota: sitio.rating ?? null,
-      resenas: sitio.userRatingCount ?? null,
-      horario: sitio.horario ?? null,
-    }
-  }))
-
-  for (const r of resueltas) {
-    if (r?.sinSitio) avisos.push(`No encontre «${r.nombre}»${ciudad ? ` en ${ciudad}` : ''}: la dejo fuera.`)
-  }
-
-  const paradas = resueltas.filter((r) => r && !r.sinSitio)
+  const { paradas, avisos } = await resolverParadas(pedidas, ciudad)
   if (paradas.length < 2) {
-    return { error: 'Solo pude situar una parada o ninguna. Dame nombres mas concretos.' }
+    return { error: 'Solo pude situar una parada o ninguna. Dame nombres más concretos.' }
   }
 
-  // Pasada 1: sin traslados, solo para saber a que hora se sale de cada sitio.
-  const tanteo = encadenar(paradas, horaInicio, [])
+  const borrador = await componer({ tripId, titulo, dia, ciudad, modo, horaInicio, grupo, paradas, avisos })
 
-  // Pasada 2: los traslados de verdad, cada uno para SU hora.
-  const traslados = []
-  for (let i = 0; i < paradas.length - 1; i += 1) {
-    const cuando = momentoDeSalida(dia, tanteo[i].salida)
-    const r = await computeRoute(paradas[i].coords, modo, {
-      latitude: paradas[i + 1].coords.lat, longitude: paradas[i + 1].coords.lng,
-    }, cuando).catch(() => null)
-    traslados.push(r?.durationSeconds ? Math.round(r.durationSeconds / 60) : null)
-    if (!r) avisos.push(`No pude calcular el trayecto de «${paradas[i].titulo}» a «${paradas[i + 1].titulo}».`)
+  return {
+    ok: true,
+    // Lo que ve el MODELO. El borrador entero (coordenadas, horarios de
+    // Google, placeIds) se lo queda la interfaz: no tiene sentido gastar
+    // tokens en quince digitos de latitud que el no va a leer.
+    aviso: 'La ruta esta PROPUESTA en el chat, todavia NO en la agenda. La familia la revisa, quita lo que no quiera y la agrega con un boton. No digas que ya esta agregada.',
+    resumen: {
+      titulo,
+      fecha: dia,
+      paradas: borrador.paradas.map((p) => ({ titulo: p.titulo, llegada: p.llegada, salida: p.salida })),
+      avisos: borrador.avisos,
+    },
+    borrador,
   }
+}
 
-  const tramos = encadenar(paradas, horaInicio, traslados)
-
-  for (const t of tramos) {
-    const abre = abiertoEl(t.horario, dia, t.llegada)
-    if (abre === false) {
-      avisos.push(`«${t.titulo}» esta cerrado a las ${t.llegada}${horarioDelDia(t.horario, dia) ? ` (${horarioDelDia(t.horario, dia)})` : ''}.`)
-    }
-    if (t.seSalePorArriba) avisos.push(`La ruta se pasa de medianoche en «${t.titulo}».`)
+/** La cabecera de un borrador que vuelve del navegador. */
+function cabecera(datos) {
+  const titulo = cleanText(datos?.titulo ?? '').slice(0, 140) || 'Ruta'
+  const dia = cleanText(datos?.fecha ?? '').slice(0, 10)
+  if (!dentroDelViaje(dia)) throw new HttpsError('invalid-argument', motivoFueraDelViaje(dia))
+  return {
+    titulo,
+    dia,
+    ciudad: cleanText(datos?.ciudad ?? '').slice(0, 80) || null,
+    modo: MODOS.includes(datos?.modo) ? datos.modo : 'WALK',
+    horaInicio: HHMM.test(cleanText(datos?.horaInicio ?? '')) ? cleanText(datos.horaInicio) : '10:00',
+    grupo: GRUPOS.includes(datos?.grupo) ? datos.grupo : 'todos',
   }
+}
 
-  avisos.push(...choques(tramos, await loQueYaHay(tripId, dia)))
+/** Rehacer las horas despues de quitar una parada o mover el arranque. */
+export async function recalcular(peticion) {
+  const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
+  await exigirAdulto(tripId, peticion.auth?.uid)
 
-  // Un solo id para las seis paradas: es lo que hace que se puedan quitar de
-  // una vez. Sin el, deshacer una ruta son seis toques y nadie la prueba.
+  const cab = cabecera(peticion.data?.ruta)
+  const paradas = limpiarParadas(peticion.data?.ruta?.paradas)
+  if (paradas.length < 1) throw new HttpsError('invalid-argument', 'No queda ninguna parada.')
+
+  return { ok: true, borrador: await componer({ tripId, ...cab, paradas }) }
+}
+
+/**
+ * Guardar el borrador: ahora si entra en la agenda, propuesto.
+ *
+ * Se vuelve a calcular todo antes de escribir. El navegador dice QUE paradas
+ * y a que hora se arranca; las horas de llegada las pone este servidor, igual
+ * que la primera vez.
+ */
+export async function guardar(peticion) {
+  const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
+  const uid = peticion.auth?.uid
+  const { travelerId } = await exigirAdulto(tripId, uid)
+
+  const cab = cabecera(peticion.data?.ruta)
+  const paradas = limpiarParadas(peticion.data?.ruta?.paradas)
+  if (paradas.length < 1) throw new HttpsError('invalid-argument', 'No queda ninguna parada.')
+
+  const ruta = await componer({ tripId, ...cab, paradas })
+
+  // Un solo id para las paradas: es lo que hace que se puedan quitar de una
+  // vez. Sin el, deshacer una ruta son seis toques y nadie la prueba.
   const rutaId = db.collection(`trips/${tripId}/timeline`).doc().id
   const lote = db.batch()
 
-  for (const t of tramos) {
+  for (const p of ruta.paradas) {
     const ref = db.collection(`trips/${tripId}/timeline`).doc()
     lote.set(ref, {
-      title: t.titulo,
-      kind: t.tipo,
+      title: p.titulo,
+      kind: TIPOS.includes(p.tipo) ? p.tipo : 'activity',
       status: 'propuesto',
-      start: `${dia}T${t.llegada}:00+02:00`,
-      end: new Date(`${dia}T${t.salida}:00+02:00`).toISOString(),
-      address: t.direccion,
-      coords: t.coords,
-      placeId: t.placeId,
-      groupId: grupo,
+      start: `${ruta.fecha}T${p.llegada}:00+02:00`,
+      end: new Date(`${ruta.fecha}T${p.salida}:00+02:00`).toISOString(),
+      ...(p.direccion ? { address: p.direccion } : {}),
+      ...(p.coords ? { coords: p.coords } : {}),
+      ...(p.placeId ? { placeId: p.placeId } : {}),
+      groupId: ruta.grupo,
       travelerIds: 'pendiente',
       rutaId,
-      rutaOrden: t.orden,
-      rutaNombre: titulo,
+      rutaOrden: p.orden,
+      rutaNombre: ruta.titulo,
       createdBy: uid,
       createdByCopiloto: true,
       sugeridoPor: travelerId ?? null,
@@ -199,52 +257,22 @@ export async function armarRuta(args, ctx) {
   }
   await lote.commit()
 
-  return {
-    ok: true,
-    aviso: 'Las paradas quedan PROPUESTAS en la agenda hasta que alguien las confirme.',
-    ruta: {
-      id: rutaId,
-      titulo,
-      fecha: dia,
-      ciudad,
-      modo,
-      paradas: tramos.map((t) => ({
-        orden: t.orden,
-        titulo: t.titulo,
-        llegada: t.llegada,
-        salida: t.salida,
-        direccion: t.direccion,
-        nota: t.nota,
-        resenas: t.resenas,
-        alSiguiente: t.trasladoMin === null ? null : `${t.trasladoMin} min`,
-      })),
-      // Los avisos viajan DENTRO de la ruta, no al lado: la interfaz recoge
-      // `ruta` y los pintaria vacios si vivieran fuera, y un modelo que
-      // redacta tiende a suavizarlos justo cuando mas hacen falta.
-      avisos,
-    },
-  }
+  return { ok: true, ruta: { ...ruta, id: rutaId } }
 }
 
 /**
  * Quitar la ruta entera.
  *
- * Con los mismos candados que un plan suelto, uno por uno: solo se borra lo
- * que puso una persona, solo mientras siga propuesto, y solo si es tuyo o
- * eres quien organiza. Lo que ya se confirmo se queda, y se dice cuanto.
+ * Cualquier adulto, como cualquier otro momento desde el 1 de septiembre. Lo
+ * que ya se confirmo se queda y se dice cuanto: si desaparecen cuatro de seis
+ * sin explicacion, parece que fallo a medias.
  */
 export async function borrarRuta(peticion) {
-  const uid = peticion.auth?.uid
-  if (!uid) throw new HttpsError('unauthenticated', 'Entra al viaje primero.')
-
   const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
+  await exigirAdulto(tripId, peticion.auth?.uid)
+
   const rutaId = cleanText(peticion.data?.rutaId ?? '').slice(0, 120)
   if (!rutaId) throw new HttpsError('invalid-argument', 'Falta cual.')
-
-  const trip = await db.doc(`trips/${tripId}`).get()
-  if (!trip.exists) throw new HttpsError('not-found', 'Ese viaje no existe.')
-  const rol = trip.get(`roles.${uid}`)
-  if (!rol) throw new HttpsError('permission-denied', 'No eres del viaje.')
 
   const snap = await db.collection(`trips/${tripId}/timeline`).where('rutaId', '==', rutaId).get()
   if (snap.empty) return { ok: true, yaNoEstaba: true, borradas: 0 }
@@ -253,9 +281,7 @@ export async function borrarRuta(peticion) {
   let borradas = 0
   let intocables = 0
   for (const d of snap.docs) {
-    const e = d.data()
-    const suyo = e.createdBy === uid || rol === 'owner'
-    if (e.createdBy && (e.status ?? 'propuesto') === 'propuesto' && suyo) {
+    if ((d.get('status') ?? 'propuesto') === 'propuesto') {
       lote.delete(d.ref)
       borradas += 1
     } else {

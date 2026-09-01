@@ -154,14 +154,19 @@ export async function retirarVoto(tripId, decisionId, uid, rama = 'decisions') {
  * Camp Nou no tiene por qué reenviar la dirección y las coordenadas, y si lo
  * hiciera acabaría pisando lo que otro acabe de corregir.
  */
-export async function cambiarEstadoPlan(tripId, eventId, { status, uid }) {
-  const fb = await fbOFallo()
-  await fb.fs.updateDoc(eventRef(fb, tripId, eventId), {
-    status,
-    statusBy: uid,
-    statusAt: fb.fs.serverTimestamp(),
-  })
-}
+/**
+ * El estado de un momento ya NO se escribe desde el cliente.
+ *
+ * Estaba aqui y funcionaba mientras solo hubiera que confirmar planes que
+ * alguien habia propuesto. Pero devolver a propuesto un momento SEMBRADO —el
+ * tour del Bernabeu que al final no se hace— es una escritura que las reglas
+ * de Firestore no le dejan a un adulto, porque ese documento no tiene
+ * `createdBy`. Y un boton que las reglas van a rechazar deja a la persona
+ * mirando un error que no entiende.
+ *
+ * Vive en `services/planes.js` -> Cloud Function `moverEstadoDeUnPlan`, que
+ * ademas deja la huella que impide que la siembra lo revierta.
+ */
 
 export async function comentar(tripId, decisionId, { uid, travelerId, text }) {
   const limpio = String(text ?? '').trim().slice(0, 2000)

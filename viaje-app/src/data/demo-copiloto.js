@@ -124,5 +124,45 @@ export const DEMO = [
         ]
       }
     ]
+  },
+  {
+    "rol": "yo",
+    "texto": "Y para el sábado, algo tranquilo por Malasaña, que van mis papás"
+  },
+  {
+    "rol": "copiloto",
+    "texto": "Te la propongo aquí abajo, todavía sin meterla. Tres paradas cortas andando. Si alguna sobra, la quitas y te rehago las horas; cuando te cuadre, dale a agregar.",
+    "borradores": [
+      {
+        "titulo": "Malasaña sin prisa",
+        "fecha": "2026-09-12",
+        "ciudad": "Madrid",
+        "modo": "WALK",
+        "horaInicio": "11:00",
+        "grupo": "todos",
+        "paradas": [
+          { "orden": 1, "titulo": "Mercado de San Ildefonso", "tipo": "food", "minutos": 60, "llegada": "11:00", "salida": "12:00", "direccion": "C. de Fuencarral, 57, Centro, 28004 Madrid", "coords": { "lat": 40.4256, "lng": -3.7016 }, "placeId": "demo-si", "nota": 4.2, "resenas": 18420, "horario": null, "alSiguiente": "7 min" },
+          { "orden": 2, "titulo": "Museo de Historia de Madrid", "tipo": "activity", "minutos": 75, "llegada": "12:07", "salida": "13:22", "direccion": "C. de Fuencarral, 78, Centro, 28004 Madrid", "coords": { "lat": 40.4268, "lng": -3.7013 }, "placeId": "demo-mh", "nota": 4.5, "resenas": 5310, "horario": null, "alSiguiente": "5 min" },
+          { "orden": 3, "titulo": "Café Comercial", "tipo": "food", "minutos": 90, "llegada": "13:27", "salida": "14:57", "direccion": "Glorieta de Bilbao, 7, Centro, 28004 Madrid", "coords": { "lat": 40.4287, "lng": -3.7011 }, "placeId": "demo-cc", "nota": 4.1, "resenas": 12903, "horario": null, "alSiguiente": null }
+        ],
+        "avisos": [
+          "«Museo de Historia de Madrid» está cerrado a las 12:07 (sábado: Cerrado)."
+        ]
+      }
+    ],
+    "borradoresPlan": [
+      {
+        "titulo": "Café Comercial",
+        "fecha": "2026-09-12",
+        "hora": "17:30",
+        "duracionMinutos": 90,
+        "tipo": "food",
+        "grupo": "todos",
+        "lugar": "Glorieta de Bilbao, 7, Centro, 28004 Madrid",
+        "coords": { "lat": 40.4287, "lng": -3.7011 },
+        "placeId": "demo-cc",
+        "nota": null
+      }
+    ]
   }
 ]

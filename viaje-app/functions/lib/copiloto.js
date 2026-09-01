@@ -55,15 +55,24 @@ COMO TRABAJAS:
 - Ten en cuenta al grupo real: si van los ninos de 4 y 9, o los padres de 63 y
   65, dilo en la recomendacion. Un plan de cuatro horas de museo con un nino de
   cuatro anos no es un buen plan y hay que decirlo.
-- Tu no decides nada, pero si puedes dejar cosas escritas:
-  · Si te piden "agrega X al plan" o "metelo el viernes", usa agregarAlPlan.
-    Entra como PROPUESTO en la agenda, no como confirmado.
+- Tu no decides nada, y desde el 1 de septiembre TAMPOCO ESCRIBES EN LA
+  AGENDA. agregarAlPlan y armarRuta PROPONEN: dejan una tarjeta en el chat
+  con un boton, y la persona decide si entra o no. Es un cambio importante en
+  como hablas:
+  · NO digas "ya te lo agregue", "lo meti el viernes" ni "queda en la agenda".
+    Di "te lo propongo aqui abajo", "dime si lo agrego", "si te cuadra, dale
+    al boton". Prometer algo que todavia no ha pasado es la unica forma que
+    tienes de mentir.
+  · Si te piden "agrega X al plan" o "metelo el viernes", usa agregarAlPlan
+    igual que antes. Lo que cambia es el final, no la herramienta.
   · Si te piden una RUTA, un recorrido o "que hacemos el domingo", usa
     armarRuta con las paradas en orden. Tu pones nombres y orden; las horas,
     los traslados y si un sitio abre los calcula la herramienta. No inventes
     ni una hora de llegada ni un "andando 10 minutos": vienen en la respuesta.
     Cuenta despues los avisos que te devuelva —sitios cerrados, choques con lo
-    ya reservado— en vez de esconderlos: son lo mas util que te da.
+    ya reservado— en vez de esconderlos: son lo mas util que te da. La familia
+    puede quitar paradas y mover la hora de arranque antes de aceptarla, asi
+    que no pasa nada por proponer una parada de mas: se dice y ya.
   · Para el dinero: anotarGasto apunta, listarGastos lee y ordena, quitarGasto
     borra lo que se apunto desde la app y sugerirGastos dice que FALTA por
     apuntar. Los importes van SIEMPRE en euros: si te los dan en pesos
@@ -101,7 +110,10 @@ export async function conversar({ apiKey, mensajes, contexto, herramientas }) {
     parts: [{ text: m.texto }],
   }))
 
-  const recogido = { tarjetas: [], rutas: [], propuestas: [], planes: [], gastos: [], itinerarios: [] }
+  const recogido = {
+    tarjetas: [], rutas: [], propuestas: [], planes: [], gastos: [],
+    itinerarios: [], borradores: [], borradoresPlan: [],
+  }
   let yaReintentado = false
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta += 1) {
@@ -174,6 +186,11 @@ export async function conversar({ apiKey, mensajes, contexto, herramientas }) {
       // Una ruta son hasta seis momentos, pero UN recibo: la interfaz ensena
       // el recorrido entero con un solo boton de quitar.
       if (salida?.ruta) recogido.itinerarios.push(salida.ruta)
+      // Los BORRADORES: calculados y sin escribir. Se le quitan al modelo
+      // enteros —traen coordenadas, placeIds y los horarios de Google— y se
+      // le deja solo el `resumen`. La interfaz los pinta con sus botones.
+      if (salida?.borrador) { recogido.borradores.push(salida.borrador); delete salida.borrador }
+      if (salida?.borradorPlan) { recogido.borradoresPlan.push(salida.borradorPlan); delete salida.borradorPlan }
       if (salida?.gasto) recogido.gastos.push(salida.gasto)
 
       resultados.push({ functionResponse: { name: llamada.name, response: salida ?? {} } })
@@ -204,7 +221,21 @@ const DICE_QUE_APUNTO = /\b(?:apunt|anot|registr).{0,24}(?:gasto|cuenta|cuentas)
 /** Qué dijo que hizo y no hizo, o null. */
 export function queMintio(texto, recogido) {
   const faltan = []
-  const agendo = recogido.planes.length > 0 || (recogido.itinerarios?.length ?? 0) > 0
+  /**
+   * Un BORRADOR cuenta como haber llamado a la herramienta.
+   *
+   * El guardia existe para cazar «ya te lo agregue» sin llamada, no para
+   * discutir el tiempo verbal. Desde que `agregarAlPlan` y `armarRuta`
+   * proponen en vez de escribir, exigir que el texto no mencione la agenda
+   * llenaria de avisos falsos cada ruta bien hecha: «te dejo propuesto el
+   * plan» ya casa con el patron. Que todavia no este agendado lo dice la
+   * propia tarjeta, con su boton sin pulsar; eso no se le puede escapar a
+   * nadie.
+   */
+  const agendo = recogido.planes.length > 0
+    || (recogido.itinerarios?.length ?? 0) > 0
+    || (recogido.borradores?.length ?? 0) > 0
+    || (recogido.borradoresPlan?.length ?? 0) > 0
   if (!agendo && DICE_QUE_AGENDO.test(texto)) faltan.push('agregarlo a la agenda')
   if (recogido.propuestas.length === 0 && DICE_QUE_PROPUSO.test(texto)) faltan.push('dejarlo en Decisiones')
   if ((recogido.gastos?.length ?? 0) === 0 && DICE_QUE_APUNTO.test(texto)) faltan.push('apuntar el gasto')

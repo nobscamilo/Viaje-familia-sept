@@ -1,5 +1,5 @@
 /**
- * Meter y quitar planes SIN pasar por el modelo.
+ * Meter, cambiar y quitar planes SIN pasar por el modelo.
  *
  * El copiloto ya sabe agregar planes, pero solo hablando: hay que escribirle
  * «agrega Rosi La Loca al jueves a la una» aunque la tarjeta con Rosi La Loca
@@ -13,6 +13,26 @@
  *
  * Y borrar va con crear a proposito: sin poder deshacer, nadie se atreve a
  * dejar que la app le escriba en la agenda del viaje.
+ *
+ * ---
+ * QUE SE PUEDE TOCAR (cambiado el 1 de septiembre de 2026)
+ *
+ * Hasta hoy habia tres candados: solo lo que tenia autor, solo mientras
+ * siguiera propuesto, y solo si era tuyo. El resultado era que confirmar un
+ * plan lo congelaba para siempre: ni el owner podia corregirle una hora, y la
+ * unica salida era borrarlo y volver a crearlo, lo que se lleva los votos.
+ *
+ * Ahora manda una sola regla: **cualquier adulto del viaje puede cambiar o
+ * quitar cualquier momento**. Los ninos no, y los `viewer` tampoco.
+ *
+ * Lo que sustituye a los candados no es otro candado, es una huella:
+ *   · Un momento de la siembra que se edita queda marcado `tocadoAMano`.
+ *   · Un momento de la siembra que se quita deja lapida en `borrados/`.
+ * `scripts/seed.mjs` mira las dos cosas. Sin ellas esto seria una funcion
+ * mentirosa: la siembra hace `set()` sin merge sobre TODO `src/data/`, asi
+ * que la proxima publicacion revertiria la edicion en silencio y resucitaria
+ * lo borrado. Un boton que deshace su propio efecto en el siguiente
+ * despliegue es peor que no tener boton.
  */
 import { HttpsError } from 'firebase-functions/v2/https'
 import { FieldValue } from 'firebase-admin/firestore'
@@ -32,10 +52,35 @@ async function exigirMiembro(tripId, uid) {
   return { rol, travelerId: trip.uidToTraveler?.[uid] ?? null }
 }
 
+/**
+ * Quien puede tocar la agenda: owner y adult. `viewer` mira y no escribe.
+ *
+ * Es el unico limite que queda, y no es sobre QUE se toca sino sobre QUIEN
+ * toca. Un rol de solo lectura que pudiera borrar el Vueling no seria un rol
+ * de solo lectura.
+ */
+function exigirAdulto(rol) {
+  if (rol !== 'owner' && rol !== 'adult') {
+    throw new HttpsError('permission-denied', 'Con tu rol solo se puede mirar.')
+  }
+}
+
+/**
+ * Lo escribio `scripts/seed.mjs`, no una persona.
+ *
+ * Se mira `origen` Y la ausencia de autor: `origen: 'seed'` lo pone la
+ * siembra desde el 28 de agosto, pero los documentos anteriores solo se
+ * distinguen por no tener `createdBy`.
+ */
+function esDeLaSiembra(ev) {
+  return ev?.origen === 'seed' || !ev?.createdBy
+}
+
 export async function crearPlan(peticion) {
   const uid = peticion.auth?.uid
   const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
-  const { travelerId } = await exigirMiembro(tripId, uid)
+  const { rol, travelerId } = await exigirMiembro(tripId, uid)
+  exigirAdulto(rol)
 
   const titulo = cleanText(peticion.data?.titulo ?? '').slice(0, 140)
   if (!titulo) throw new HttpsError('invalid-argument', 'Falta el nombre del plan.')
@@ -58,11 +103,16 @@ export async function crearPlan(peticion) {
       ? peticion.data.tipo : 'food',
     status: 'propuesto',
     start: inicio,
+    ...(peticion.data?.duracionMinutos > 0 && hhmm
+      ? { end: new Date(new Date(inicio).getTime() + Math.min(peticion.data.duracionMinutos, 1440) * 60000).toISOString() }
+      : {}),
     ...(peticion.data?.lugar ? { address: cleanText(peticion.data.lugar).slice(0, 200) } : {}),
     // Las coordenadas vienen de la tarjeta, que las saco de Places hace un
     // momento: no hace falta volver a preguntarle a Google por lo mismo.
     ...(coords ? { coords } : {}),
     ...(peticion.data?.placeId ? { placeId: cleanText(peticion.data.placeId).slice(0, 120) } : {}),
+    ...(peticion.data?.nota ? { notes: cleanText(peticion.data.nota).slice(0, 600) } : {}),
+    ...(peticion.data?.deCopiloto ? { createdByCopiloto: true } : {}),
     groupId: ['todos', 'f1', 'sin-f1'].includes(peticion.data?.grupo) ? peticion.data.grupo : 'todos',
     travelerIds: 'pendiente',
     createdBy: uid,
@@ -73,10 +123,28 @@ export async function crearPlan(peticion) {
   return { id: ref.id, title: titulo, fecha: dia, hora: hhmm }
 }
 
+/**
+ * La lapida de un momento sembrado que alguien quito.
+ *
+ * Sin esto, `npm run publicar` lo vuelve a crear al dia siguiente y la
+ * persona que lo quito piensa que la app no le hizo caso. Guarda ademas
+ * quien y cuando: borrar una reserva pagada es la accion mas cara de la app
+ * y tiene que quedar por escrito.
+ */
+async function ponerLapida(tripId, id, ev, uid) {
+  await db.doc(`trips/${tripId}/borrados/${id}`).set({
+    title: ev.title ?? null,
+    start: ev.start ?? null,
+    quitadoPor: uid,
+    quitadoEn: FieldValue.serverTimestamp(),
+  })
+}
+
 export async function borrarPlan(peticion) {
   const uid = peticion.auth?.uid
   const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
   const { rol } = await exigirMiembro(tripId, uid)
+  exigirAdulto(rol)
 
   const id = cleanText(peticion.data?.id ?? '').slice(0, 120)
   if (!id) throw new HttpsError('invalid-argument', 'Falta cual.')
@@ -86,22 +154,15 @@ export async function borrarPlan(peticion) {
   if (!snap.exists) return { ok: true, yaNoEstaba: true }
 
   const ev = snap.data()
+  const sembrado = esDeLaSiembra(ev)
 
-  // Tres candados, y ninguno sobra:
-  // - Lo puso una persona: los momentos de la siembra (vuelos, hoteles) no se
-  //   borran desde aqui ni por accidente.
-  // - Sigue propuesto: si alguien ya lo confirmo, deja de ser tuyo.
-  // - Es tuyo, o eres owner.
-  if (!ev.createdBy) throw new HttpsError('permission-denied', 'Eso no lo puso nadie desde la app.')
-  if ((ev.status ?? 'propuesto') !== 'propuesto') {
-    throw new HttpsError('failed-precondition', 'Ya está confirmado: eso lo quita quien organiza.')
-  }
-  if (ev.createdBy !== uid && rol !== 'owner') {
-    throw new HttpsError('permission-denied', 'Lo puso otra persona.')
-  }
+  // La lapida ANTES del borrado: si el borrado va bien y la lapida no, la
+  // siembra lo resucita. Al reves solo queda una lapida huerfana, que no
+  // hace dano — `seed.mjs` la ignora si el momento sigue en pie.
+  if (sembrado) await ponerLapida(tripId, id, ev, uid)
 
   await ref.delete()
-  return { ok: true, title: ev.title ?? null }
+  return { ok: true, title: ev.title ?? null, eraDeLaSiembra: sembrado }
 }
 
 
@@ -122,12 +183,7 @@ async function ciudadDelDia(tripId, dia) {
 }
 
 /**
- * Cambiar un plan que ya esta en la agenda.
- *
- * Los mismos tres candados que para borrarlo, y por lo mismo: lo puso una
- * persona, sigue propuesto, y es tuyo o eres quien organiza. Un vuelo de la
- * siembra no se toca desde el movil ni siendo owner — para eso esta el
- * archivo de datos, que ademas queda en el historial de git.
+ * Cambiar un plan que ya esta en la agenda, este en el estado que este.
  *
  * Solo se escribe lo que llega. Un campo que no viene no se borra: mandar el
  * formulario a medias no puede dejar un plan sin titulo.
@@ -136,6 +192,7 @@ export async function cambiarPlan(peticion) {
   const uid = peticion.auth?.uid
   const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
   const { rol } = await exigirMiembro(tripId, uid)
+  exigirAdulto(rol)
 
   const id = cleanText(peticion.data?.id ?? '').slice(0, 120)
   if (!id) throw new HttpsError('invalid-argument', 'Falta cual.')
@@ -144,14 +201,6 @@ export async function cambiarPlan(peticion) {
   const snap = await ref.get()
   if (!snap.exists) throw new HttpsError('not-found', 'Ese plan ya no está.')
   const ev = snap.data()
-
-  if (!ev.createdBy) throw new HttpsError('permission-denied', 'Eso no lo puso nadie desde la app.')
-  if ((ev.status ?? 'propuesto') !== 'propuesto') {
-    throw new HttpsError('failed-precondition', 'Ya está confirmado: eso lo cambia quien organiza.')
-  }
-  if (ev.createdBy !== uid && rol !== 'owner') {
-    throw new HttpsError('permission-denied', 'Lo puso otra persona.')
-  }
 
   const cambios = {}
   let sinPin = false
@@ -202,8 +251,54 @@ export async function cambiarPlan(peticion) {
 
   if (Object.keys(cambios).length === 0) return { ok: true, sinCambios: true }
 
+  // La huella que hace que la siembra no lo pise. Se pone solo cuando de
+  // verdad cambia algo: marcar un guardado en vacio dejaria un momento fuera
+  // del espejo sin que nadie lo hubiera tocado.
+  const sembrado = esDeLaSiembra(ev)
+  if (sembrado) cambios.tocadoAMano = true
+
   cambios.editadoPor = uid
   cambios.editadoEn = FieldValue.serverTimestamp()
   await ref.update(cambios)
-  return { ok: true, id, sinPin }
+  return { ok: true, id, sinPin, eraDeLaSiembra: sembrado }
+}
+
+/**
+ * Mover un momento de estado: confirmarlo o devolverlo a propuesto.
+ *
+ * Estaba en el cliente (`tripRepo.cambiarEstadoPlan`) y ahi seguiria si solo
+ * hubiera que confirmar planes propios. Pero desconfirmar un momento
+ * SEMBRADO —el tour del Bernabeu que resulta que no se va a hacer— es una
+ * escritura que las reglas de Firestore no dejan a un adulto, porque el
+ * documento no tiene `createdBy`. Aqui si, con la misma huella que la
+ * edicion.
+ */
+const ESTADOS = ['propuesto', 'confirmado', 'descartado']
+
+export async function moverEstado(peticion) {
+  const uid = peticion.auth?.uid
+  const tripId = cleanText(peticion.data?.tripId ?? '').slice(0, 60) || 'sept-2026'
+  const { rol } = await exigirMiembro(tripId, uid)
+  exigirAdulto(rol)
+
+  const id = cleanText(peticion.data?.id ?? '').slice(0, 120)
+  if (!id) throw new HttpsError('invalid-argument', 'Falta cual.')
+
+  const a = cleanText(peticion.data?.a ?? '')
+  if (!ESTADOS.includes(a)) throw new HttpsError('invalid-argument', `No conozco el estado «${a}».`)
+
+  const ref = db.doc(`trips/${tripId}/timeline/${id}`)
+  const snap = await ref.get()
+  if (!snap.exists) throw new HttpsError('not-found', 'Ese plan ya no está.')
+  const ev = snap.data()
+  if ((ev.status ?? 'confirmado') === a) return { ok: true, sinCambios: true }
+
+  const sembrado = esDeLaSiembra(ev)
+  await ref.update({
+    status: a,
+    statusBy: uid,
+    statusAt: FieldValue.serverTimestamp(),
+    ...(sembrado ? { tocadoAMano: true } : {}),
+  })
+  return { ok: true, id, a, eraDeLaSiembra: sembrado }
 }

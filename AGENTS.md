@@ -62,27 +62,76 @@ Para mantener la estética premium de grado desarrollador de la aplicación, se 
 
 ---
 
-## 🗳️ QUÉ SE PUEDE TOCAR Y QUÉ NO (desde 2026-08-28)
+## 🗳️ QUÉ SE PUEDE TOCAR (reescrito el 2026-09-01)
 
-La agenda del viaje son sobre todo **reservas pagadas**. Ninguna pantalla puede
-ofrecer una acción destructiva sobre algo que no creó la propia app:
+*Hasta hoy esta sección decía lo contrario: que un momento sin `createdBy` «se
+mira, no se borra» y que confirmar un plan lo cerraba. Camilo pidió quitar esos
+candados. Se quitaron enteros; lo que queda no son permisos, son huellas y una
+pregunta.*
 
-- Un momento **sin `createdBy`** salió de `scripts/seed.mjs`: se mira, no se
-  borra ni se descarta desde el móvil. No hay botón, y las reglas de Firestore
-  lo impiden aunque lo hubiera.
-- Un momento **`propuesto` con `createdBy`** (lo puso el copiloto o el botón
-  «Agregar») sí se vota, se confirma, **se edita** y se quita. Editar va con
-  quitar, no con confirmar: quien puede borrar puede corregir, y obligar a
-  borrar y recrear para cambiar una hora se lleva por delante los votos.
-- Una **ruta** son hasta seis momentos con un `rutaId` común. Se quitan de una
-  vez o no se quitan: una función que cuesta seis toques deshacer no la prueba
-  nadie. Los candados se aplican parada por parada, y se dice cuántas quedaron
-  por estar ya confirmadas.
-- Lo decide `viaje-app/src/domain/acciones.js`, que es puro y está probado.
-  **No se toma esa decisión en el JSX.**
+**Cualquier adulto puede editar o quitar cualquier momento de la agenda**,
+vuelos y hoteles incluidos. Los `viewer` no: es el único límite que queda, y es
+sobre *quién* toca, no sobre *qué*.
+
+Eso solo es honesto por lo que se hizo al mismo tiempo:
+
+- **La siembra respeta lo tocado a mano.** `scripts/seed.mjs` hace `set()` SIN
+  merge sobre todo `src/data/`. Editar un hotel desde el móvil habría durado
+  hasta el siguiente `npm run publicar`, y un vuelo borrado habría vuelto solo.
+  Ahora salta lo que lleva `tocadoAMano` y lo que tiene lápida en
+  `trips/{id}/borrados/{id}`. **Si alguien toca uno de los dos lados, tiene que
+  tocar el otro**, o la función se deshace sola en el siguiente despliegue.
+- **La lápida se escribe ANTES del borrado.** Al revés, si falla, el momento
+  resucita en la siguiente publicación.
+- **Fricción donde está el daño.** Quitar una reserva pide un segundo toque;
+  quitar una cena propuesta hace un minuto, no. Quién es «reserva» lo dice
+  `esReserva()` en `src/domain/acciones.js` — nunca el JSX.
+- **Mover el estado es del owner.** Confirmar y «volver a proponer». Devolver a
+  propuesto conserva los votos, que es justo lo que se perdía cuando la única
+  salida era borrar y recrear.
+- **Va por Cloud Function, no por Firestore directo.** Un momento sembrado no
+  tiene `createdBy` y las reglas no dejan que un adulto lo escriba desde el
+  navegador. Las reglas se quedaron igual de estrechas a propósito.
+- **Un `TOCADO` o un `QUITADO` en la consola de la siembra significa que
+  `src/data/` y lo que ve la familia ya no dicen lo mismo.** Se arregla en el
+  archivo, no dejándolo vivir en Firestore.
+
+Una **ruta** siguen siendo hasta seis momentos con un `rutaId` común, y se
+quitan de una vez: una función que cuesta seis toques deshacer no la prueba
+nadie.
 
 Y la regla que gobierna las votaciones sigue intacta: los niños son viajeros,
-no usuarios. Nunca votan y nunca entran en el denominador.
+no usuarios. Nunca votan y nunca entran en el denominador. Votar sigue siendo
+solo de lo `propuesto`: ponerle marcas de voto a un billete emitido sería
+fingir que la familia decide sobre él.
+
+---
+
+## 🤖 EL COPILOTO PROPONE, NO ESCRIBE (desde 2026-09-01)
+
+`agregarAlPlan` y `armarRuta` **ya no tocan Firestore**. Devuelven un borrador
+que se pinta en el chat con sus botones; la escritura la dispara una persona.
+
+    armarRuta      -> calcula y devuelve borrador   (no escribe)
+    recalcularRuta -> rehace horas y avisos          (no escribe)
+    guardarRuta    -> escribe las paradas, propuestas
+
+- **`recalcular` y `guardar` vuelven a calcular las horas en el servidor.** Si
+  el cliente las mandara, quitar la parada del medio dejaría la ruta en la
+  agenda con los horarios de la versión anterior: plausibles y falsos.
+  `limpiarParadas()` tira cualquier `llegada`, `salida` o `trasladoMin` que
+  llegue de fuera, y hay una prueba que lo vigila.
+- **Las coordenadas SÍ se aceptan del cliente.** Ya se resolvieron contra
+  Places al proponer, y un adulto podía escribirlas creando un plan a mano:
+  aceptarlas ahí no abre nada nuevo, y volver a preguntarle a Google es pagar
+  dos veces por lo mismo.
+- **Se recalcula al soltar el campo, no al teclear.** Cada recálculo es una
+  llamada a Routes por tramo; teclear «11:30» dispararía cuatro.
+- **Cambiar la herramienta sin cambiar las instrucciones produce un copiloto
+  mentiroso.** Si el prompt sigue diciendo «entra como PROPUESTO en la agenda»,
+  el modelo promete algo que no ha pasado. Y al revés con el guardia
+  anti-mentiras: un borrador **cuenta** como haber llamado a la herramienta, o
+  el aviso «⚠️ en realidad no llegué a…» salta en cada ruta bien hecha.
 
 ---
 

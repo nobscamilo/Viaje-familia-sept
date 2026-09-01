@@ -160,6 +160,18 @@ service cloud.firestore {
         }
       }
 
+      // --- Lapidas: los momentos SEMBRADOS que alguien quito desde la app.
+      //
+      // Existen para que `scripts/seed.mjs` no resucite en la siguiente
+      // publicacion el tour que la familia decidio no hacer. Se leen —para
+      // poder ensenar algun dia una papelera— y no se escriben desde aqui:
+      // las pone la Cloud Function que borra, que es la unica que sabe si lo
+      // que se quito era de la siembra o de una persona.
+      match /borrados/{eventId} {
+        allow read: if isMember(tripId);
+        allow write: if false;
+      }
+
       // --- El hilo del copiloto: uno por persona y SOLO suyo.
       //
       // No es un chat de grupo. Cada uno le pregunta lo suyo —cuanto debe,
