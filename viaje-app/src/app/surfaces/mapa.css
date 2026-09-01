@@ -12,20 +12,21 @@
 
 .mapa-dia {
   flex: 0 0 auto; min-height: 34px; padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-pill); border: 1px solid var(--line);
-  background: var(--s-raised); color: var(--ink-muted);
+  border-radius: var(--r-pill); border: 1px solid var(--glass-border-soft);
+  background: var(--glass-soft); color: var(--ink-muted);
   font: var(--t-small); white-space: nowrap; cursor: pointer;
   transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .mapa-dia:hover { color: var(--ink-soft); border-color: var(--line-strong); }
 .mapa-dia.es-activo {
-  background: var(--accent-wash); border-color: var(--accent); color: var(--ink);
+  background: var(--accent-grad); border-color: transparent; color: var(--on-accent);
+  box-shadow: var(--shadow-chip);
 }
 
 .mapa-lienzo {
   height: min(52vh, 420px); margin: 0 var(--sp-4);
   border-radius: var(--r-lg); overflow: hidden;
-  border: 1px solid var(--line); background: var(--s-raised);
+  border: 1px solid var(--glass-border); background: var(--glass-mid);
   box-shadow: var(--shadow-card);
 }
 
@@ -44,7 +45,9 @@
   width: 100%; min-height: var(--touch);
   display: flex; align-items: flex-start; gap: var(--sp-3);
   padding: var(--sp-3); border-radius: var(--r-md);
-  border: 1px solid var(--line); background: var(--s-raised);
+  border: 1px solid var(--glass-border-soft); background: var(--glass-soft);
+  backdrop-filter: var(--blur-glass-soft);
+  -webkit-backdrop-filter: var(--blur-glass-soft);
   box-shadow: var(--shadow-card);
   color: inherit; text-align: left; cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);

@@ -15,8 +15,10 @@
 }
 
 .prox-bloque {
-  background: var(--s-raised);
-  border: 1px solid var(--line);
+  background: var(--glass-mid);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
   padding: var(--sp-4);

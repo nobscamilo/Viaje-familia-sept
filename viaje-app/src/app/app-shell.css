@@ -14,19 +14,26 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  /* Compacta a proposito: esta barra sale en las cuatro pantallas y repite
+  /* Compacta a proposito: esta barra sale en las cinco pantallas y repite
      lo mismo siempre. Cada pixel que ocupa se lo quita a la agenda, que es
-     lo unico que cambia. */
+     lo unico que cambia. Desde el rediseno es una lamina de cristal, no una
+     franja solida: degradado translucido con blur sobre el fondo con brillo. */
   height: var(--topbar-h-compact);
   padding: 0 var(--sp-4);
-  border-bottom: 1px solid var(--line);
-  background: var(--s-raised);
+  border-bottom: 1px solid var(--glass-border-soft);
+  background: linear-gradient(180deg, var(--glass-strong), var(--glass-faint));
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: 0 8px 20px -14px rgb(0 0 0 / .5);
+  position: relative;
+  z-index: var(--z-sticky);
 }
 
 .shell-top-main { display: grid; gap: 1px; min-width: 0; }
 
 .shell-trip {
   font: var(--t-body);
+  font-family: var(--font-ui);
   font-weight: 600;
   letter-spacing: var(--track-tight);
   white-space: nowrap;
@@ -37,8 +44,9 @@
 .shell-dates { font: var(--t-label); letter-spacing: var(--track-label); color: var(--ink-faint); text-transform: uppercase; }
 
 .shell-countdown {
-  font: var(--t-label);
-  font-size: 1.05rem;
+  /* El numero grande en serif, como el titular de la maqueta. */
+  font: var(--t-title);
+  font-size: 1.15rem;
   color: var(--accent);
   display: flex;
   align-items: baseline;
@@ -53,34 +61,36 @@
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  border-top: 1px solid var(--line);
-  background: var(--s-raised);
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-2);
+  border-top: 1px solid var(--glass-border-soft);
+  background: linear-gradient(0deg, var(--glass-strong), var(--glass-mid));
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: 0 -8px 20px -14px rgb(0 0 0 / .45);
 }
 
+/* Pildoras, no franjas: la pestana activa es una pastilla lavada de acento,
+   el subrayado de antes ya no existe. */
 .shell-nav-item {
-  min-height: var(--navbar-h);
+  min-height: var(--touch);
   display: grid;
   place-items: center;
   color: var(--ink-faint);
   text-decoration: none;
   font: var(--t-small);
+  font-size: .8125rem;
   font-weight: 500;
-  position: relative;
-  transition: color var(--dur-fast) var(--ease);
+  border-radius: var(--r-md);
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
 .shell-nav-item:hover { color: var(--ink-soft); }
 
-.shell-nav-item.active { color: var(--accent); }
-
-.shell-nav-item.active::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  inset-inline: 22%;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 0 0 var(--r-sm) var(--r-sm);
+.shell-nav-item.active {
+  color: var(--accent);
+  background: var(--nav-pill);
+  font-weight: 600;
 }
 
 /* En movil la barra superior se comprime para dejar sitio a la lectura. */
@@ -143,6 +153,9 @@
     border-top: 0;
     border-right: 1px solid var(--line-subtle);
     background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
   }
 
   .shell-nav-item {
@@ -156,12 +169,10 @@
   .shell-nav-item:hover { background: var(--s-raised); }
 
   .shell-nav-item.active {
-    background: var(--accent-wash);
+    background: var(--nav-pill);
     color: var(--accent);
   }
 
-  /* La franja superior era para la barra inferior. En lateral estorba. */
-  .shell-nav-item.active::before { content: none; }
 }
 
 /* La columna de lectura se limita SIEMPRE, no solo en escritorio: una

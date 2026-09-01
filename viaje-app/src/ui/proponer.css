@@ -19,8 +19,10 @@
   max-width: 460px;
   max-height: 92vh;
   overflow-y: auto;
-  background: var(--s-raised);
-  border: 1px solid var(--line);
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border: 1px solid var(--glass-border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
   padding: var(--sp-5);

@@ -166,3 +166,42 @@ test('la tarjeta de un sitio lleva el boton de agregar, con su viaje', () => {
   assert.match(jsx, /<Lugar[^>]*tripId=\{tripId\}/s, 'Lugar necesita el viaje para poder escribir')
   assert.match(jsx, /<AgregarPlan/, 'y la tarjeta tiene que pintar el boton')
 })
+
+// ------------------------------------------ el dia a dia del rediseño
+
+test('un dia enseña lo que empieza ese dia MAS el alojamiento en curso', async () => {
+  const { eventosDelDia } = await import('../src/domain/agenda.js')
+  const tl = [
+    { id: 'hotel', kind: 'lodging', start: '2026-09-14T16:00:00+02:00', end: '2026-09-16T11:00:00.000Z', title: 'Sweett' },
+    { id: 'cena', kind: 'food', start: '2026-09-15T20:00:00+02:00', title: 'Cena' },
+    { id: 'vuelo', kind: 'flight', start: '2026-09-16T15:40:00+02:00', title: 'VY8002' },
+  ]
+  const dia15 = eventosDelDia(tl, '2026-09-15')
+  // El hotel se entro el 14, pero el 15 sigues durmiendo alli: un dia sin su
+  // alojamiento parece un dia sin dormir.
+  assert.deepEqual(dia15.map((e) => e.id), ['hotel', 'cena'])
+  // Y un vuelo de otro dia NO se arrastra: solo los alojamientos acompañan.
+  assert.ok(!dia15.some((e) => e.id === 'vuelo'))
+  // El dia de la salida, el hotel sale por su end.
+  assert.ok(eventosDelDia(tl, '2026-09-16').some((e) => e.id === 'hotel'))
+  // Y el 17 ya no.
+  assert.ok(!eventosDelDia(tl, '2026-09-17').some((e) => e.id === 'hotel'))
+})
+
+test('el punto de aviso del carrusel sale del warning del evento', async () => {
+  const { diasConAviso } = await import('../src/domain/agenda.js')
+  const avisos = diasConAviso([
+    { start: '2026-09-14', warning: 'OUIGO mide estrecho' },
+    { start: '2026-09-15', title: 'sin aviso' },
+  ])
+  assert.ok(avisos.has('2026-09-14'))
+  assert.ok(!avisos.has('2026-09-15'))
+})
+
+test('la agenda dia a dia monta el carrusel y las flechas de verdad', () => {
+  const src = readFileSync(new URL('../src/app/surfaces/Ahora.jsx', import.meta.url), 'utf8')
+  assert.match(src, /<DiasCarrusel/)
+  assert.match(src, /eventosDelDia\(timeline, dia\)/)
+  // Durante el viaje arranca anclada en hoy: era un pendiente desde agosto.
+  assert.match(src, /enViaje \? hoy :/)
+})

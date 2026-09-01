@@ -52,16 +52,41 @@
   --st-pagado:     var(--ok);
   --st-descartado: var(--ink-faint);
 
+  /* --- Cristal (rediseno del 1 de septiembre de 2026) ---
+     La maqueta «broadsheet» que trajo Camilo pinta las tarjetas como vidrio
+     esmerilado. Adaptado al zinc: superficies translucidas con blur, borde
+     de luz arriba y trazo claro alrededor. El blur solo se ve si detras hay
+     algo que difuminar: por eso el fondo de la app (--fondo-app) lleva dos
+     brillos suaves, no un negro plano. */
+  --glass-strong:      rgb(43 43 50 / .72);
+  --glass-mid:         rgb(39 39 46 / .55);
+  --glass-soft:        rgb(39 39 46 / .42);
+  --glass-faint:       rgb(39 39 46 / .30);
+  --glass-border:      rgb(255 255 255 / .13);
+  --glass-border-soft: rgb(255 255 255 / .09);
+  --divider-soft:      rgb(255 255 255 / .08);
+  --nav-pill:          rgb(167 139 250 / .16);
+  --blur-glass:        blur(20px) saturate(160%);
+  --blur-glass-soft:   blur(10px);
+  /* El degradado del acento: chips de dia seleccionados, burbujas mias del
+     copiloto, botones primarios de la maqueta. Un solo sitio, como todo. */
+  --accent-grad:       linear-gradient(135deg, var(--accent-strong), #6d28d9);
+  --fondo-app:
+    radial-gradient(60% 40% at 15% 0%, rgb(139 92 246 / .10), transparent 70%),
+    radial-gradient(50% 35% at 100% 100%, rgb(96 165 250 / .06), transparent 70%),
+    var(--s-base);
+
   /* --- Elevacion ---
      AGENTS.md: prohibido `box-shadow: none` en tarjetas y paneles.
      La profundidad tactil es parte de la identidad de la app. */
-  --shadow-card:   0 4px 20px -2px rgb(0 0 0 / .45), 0 2px 8px -1px rgb(0 0 0 / .25);
+  --shadow-card:   0 8px 24px rgb(0 0 0 / .35), inset 0 1px 0 rgb(255 255 255 / .06);
   --shadow-pop:    0 16px 48px -8px rgb(0 0 0 / .6), 0 4px 12px -2px rgb(0 0 0 / .4);
+  --shadow-chip:   0 6px 14px rgb(109 40 217 / .35), inset 0 1px 0 rgb(255 255 255 / .12);
 
-  /* --- Radios --- */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  /* --- Radios (subidos con el rediseno: pildoras y tarjetas blandas) --- */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
   --r-pill: 999px;
 
   /* --- Espaciado (escala de 4) --- */
@@ -81,11 +106,15 @@
   --topbar-h-compact: 48px;
   --navbar-h: 60px;
 
-  /* --- Tipografia --- */
-  --font-ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* --- Tipografia (rediseno del 1 de septiembre de 2026) ---
+     Source Serif 4 en titulares Y en texto: es la personalidad editorial de
+     la maqueta «broadsheet». La mono se queda para etiquetas, localizadores
+     y numeros tabulares, donde una serif marea. Si Google Fonts no carga
+     (movil sin cobertura en el viaje), Georgia responde y nada se rompe. */
+  --font-ui: "Source Serif 4", Georgia, "Times New Roman", ui-serif, serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --t-display: 700 1.75rem/1.15 var(--font-ui);
+  --t-display: 600 1.75rem/1.15 var(--font-ui);
   --t-title:   600 1.25rem/1.25 var(--font-ui);
   --t-body:    400 1rem/1.55 var(--font-ui);
   --t-small:   400 .875rem/1.5 var(--font-ui);

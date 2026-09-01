@@ -39,26 +39,38 @@ Este documento es la **fuente de verdad de configuración e instrucciones** para
 
 ---
 
-## 🎨 GUÍA DE DISEÑO ESTÉTICO Y RESPONSIVO (TEMA OSCURO PREMIUM)
+## 🎨 GUÍA DE DISEÑO (reescrita el 2026-09-01: OSCURO PREMIUM + CRISTAL EDITORIAL)
 
-Para mantener la estética premium de grado desarrollador de la aplicación, se deben seguir estrictamente estas pautas en el tema oscuro:
+*Hasta hoy esta sección describía el tema «zinc plano». El 1 de septiembre
+Camilo trajo una maqueta de Claude Design (sistema «broadsheet») y decidió un
+híbrido: se conserva el fondo zinc y el acento violeta, y se adopta de la
+maqueta la tipografía serif, las tarjetas de cristal, los radios blandos y la
+estructura (carrusel de días, barra de pestañas de píldoras).*
 
-1. **Definición de Bordes**: 
-   - No utilizar bordes opacos oscuros como `#27272a`.
-   - Utilizar siempre `--border: #3f3f46` (Zinc-700) para garantizar que los contenedores no se pierdan sobre el fondo oscuro en pantallas móviles.
-2. **Elevación y Profundidad (`box-shadow`)**:
-   - Está estrictamente prohibido utilizar `box-shadow: none !important` en paneles o tarjetas.
-   - Toda tarjeta (`.option-card`, `.trip-card`, `.ai-place-card`) y panel primario (`.segment-card`, `.side-panel`, `.main-panel`) debe llevar `--shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45), 0 2px 8px -1px rgba(0, 0, 0, 0.25)` para generar profundidad táctil.
-2b. **Los tokens mandan**: en `viaje-app/` ningún componente escribe un color,
-   un radio ni una sombra literal. Todo sale de `src/styles/tokens.css`. Esta
-   guía de estilo, en la app nueva, **es ese archivo**.
-3. **Optimización Móvil y Accesibilidad (Touch Targets)**:
-   - Todo botón interactivo, campo de formulario, o pestaña de navegación en vista móvil debe tener un área de contacto mínima de **`44px` de altura/ancho** para garantizar una ergonomía óptima para los dedos.
-   - En pantallas pequeñas, el encabezado superior (`.topbar-v2`) debe comprimirse verticalmente (`height: 48px`, `padding: 6px 14px`) para maximizar el área de lectura útil.
-4. **Interacción con Mapas (Google Maps)**:
-   - El mapa interactivo debe tener siempre habilitado `gestureHandling: 'cooperative'` para prevenir trampas de scroll táctil en pantallas móviles (requiere gestos con dos dedos para navegar por el mapa, dejando libre el desplazamiento de la página con un solo dedo).
-5. **Micro-animaciones**:
-   - Todo cambio de filtrado o renderizado de tarjetas de viaje debe ejecutarse a través de la animación fluida de entrada de opacidad y desplazamiento vertical `fadeInUp`.
+1. **Los tokens mandan, más que nunca**: en `viaje-app/` ningún componente
+   escribe un color, un radio ni una sombra literal. Todo sale de
+   `src/styles/tokens.css`. Esta guía, en la app, **es ese archivo**.
+2. **Tipografía**: `Source Serif 4` en titulares y cuerpo (`--font-ui`);
+   `Geist Mono` solo para etiquetas, horas y localizadores (`--font-mono`).
+   Si Google Fonts no carga, cae a Georgia y nada se rompe.
+3. **Cristal, no paneles sólidos**: tarjetas y barras usan `--glass-*` +
+   `--blur-glass`, con borde `--glass-border` y luz superior (el inset de
+   `--shadow-card`). El fondo de la app es `--fondo-app` (zinc con dos brillos
+   suaves): **un blur sobre negro plano no difumina nada** — si se quita el
+   brillo del fondo, el cristal muere con él.
+4. **Un solo elemento «lleno» por pantalla**: el degradado `--accent-grad`
+   marca la elección activa (chip del día, pestaña, burbuja mía del copiloto,
+   botón primario). Si dos cosas lo llevan a la vez, una sobra.
+5. **Prohibido `box-shadow: none` en tarjetas y paneles** (sigue vigente).
+6. **Touch targets de 44 px** (`--touch`) en todo lo interactivo (sigue).
+7. **Radios**: `--r-md` 14 px para controles, `--r-lg` 20 px para tarjetas.
+8. **Mapa**: `gestureHandling: 'cooperative'` (sigue).
+9. **Micro-animaciones**: entrada `fadeInUp`/`msgIn` en tarjetas (sigue), y
+   `prefers-reduced-motion` las apaga vía tokens de duración.
+10. **«Ahora» y «Mapa» navegan por día** con el mismo carrusel
+    (`ui/DiasCarrusel.jsx` / chips propios del mapa): un día en pantalla, no
+    la lista de catorce. El punto magenta del chip = un evento con `warning`
+    ese día, mismo criterio que la banda dentro de la tarjeta.
 
 ---
 

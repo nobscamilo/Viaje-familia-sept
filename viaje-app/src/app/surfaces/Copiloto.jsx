@@ -10,7 +10,7 @@ import BorradorPlan from '../../ui/BorradorPlan.jsx'
 import { motivoPlan, quitarPlan } from '../../services/planes.js'
 import { preguntarCopiloto } from '../../services/copiloto.js'
 import Icon from '../../ui/Icon.jsx'
-import { miles, plural } from '../../domain/cuentas.js'
+import { plural } from '../../domain/cuentas.js'
 import Marcado from '../../ui/Marcado.jsx'
 import './copiloto.css'
 
@@ -291,7 +291,7 @@ function Mensaje({ mensaje, tripId, alAgregar, alQuitar, alSoltar, conMapa = fal
  */
 function Lugar({ lugar, tripId, alAgregar, elegido = false, alElegir }) {
   const resenas = lugar.userRatingCount
-    ? `${miles(lugar.userRatingCount)} ${plural(lugar.userRatingCount, 'reseña', 'reseñas')}`
+    ? plural(lugar.userRatingCount, 'reseña', 'reseñas')
     : null
 
   return (

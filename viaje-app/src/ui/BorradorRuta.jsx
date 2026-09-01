@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { guardarRutaBorrador, motivoPlan, recalcularRuta } from '../services/planes.js'
 import { formatDay } from '../domain/dates.js'
-import { miles, plural } from '../domain/cuentas.js'
+import { plural } from '../domain/cuentas.js'
 import ReciboRuta from './ReciboRuta.jsx'
 import Icon from './Icon.jsx'
 import './borrador-ruta.css'
@@ -117,7 +117,7 @@ export default function BorradorRuta({ ruta: inicial, tripId, alDescartar }) {
               <strong>{p.titulo}</strong>
               {p.nota && (
                 <em className="br-nota">
-                  ★ {p.nota}{p.resenas ? ` · ${miles(p.resenas)} ${plural(p.resenas, 'reseña', 'reseñas')}` : ''}
+                  ★ {p.nota}{p.resenas ? ` · ${plural(p.resenas, 'reseña', 'reseñas')}` : ''}
                 </em>
               )}
               <label className="br-rato">

@@ -6,7 +6,9 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
-  background: var(--s-base);
+  /* No un negro plano: el cristal necesita algo detras que difuminar. */
+  background: var(--fondo-app);
+  background-attachment: fixed;
   color: var(--ink);
   font: var(--t-body);
   -webkit-font-smoothing: antialiased;

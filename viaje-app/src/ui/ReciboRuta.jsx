@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motivoPlan, quitarRuta } from '../services/planes.js'
 import { formatDay } from '../domain/dates.js'
-import { miles, plural } from '../domain/cuentas.js'
+import { plural } from '../domain/cuentas.js'
 import Icon from './Icon.jsx'
 import './recibo-ruta.css'
 
@@ -60,7 +60,7 @@ export default function ReciboRuta({ ruta, tripId, alQuitar }) {
               <strong>{p.titulo}</strong>
               {p.nota && (
                 <em className="rr-nota">
-                  ★ {p.nota}{p.resenas ? ` · ${miles(p.resenas)} ${plural(p.resenas, 'reseña', 'reseñas')}` : ''}
+                  ★ {p.nota}{p.resenas ? ` · ${plural(p.resenas, 'reseña', 'reseñas')}` : ''}
                 </em>
               )}
             </span>

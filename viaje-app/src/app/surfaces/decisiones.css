@@ -29,8 +29,8 @@
   min-height: 34px;
   padding: 0 var(--sp-4);
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: transparent;
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-faint);
   color: var(--ink-muted);
   font-size: .8125rem;
   font-weight: 500;
@@ -39,16 +39,18 @@
               border-color var(--dur-fast) var(--ease);
 }
 .dec-filter:hover { color: var(--ink-soft); border-color: var(--line-strong); }
-.dec-filter.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.dec-filter.is-on { background: var(--accent-grad); border-color: transparent; color: var(--on-accent); box-shadow: var(--shadow-chip); }
 
 /* ---------- tarjetas ---------- */
 
 .dec-list { list-style: none; margin: 0; padding: var(--sp-4); display: grid; gap: var(--sp-3); }
 
 .dec-card {
-  background: var(--s-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  background: var(--glass-mid);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border-radius: var(--r-lg);
   padding: var(--sp-4);
   box-shadow: var(--shadow-card);
   display: grid;

@@ -1,0 +1,73 @@
+/* El carrusel de dias. Chips de vidrio; el elegido, pildora con el degradado
+   del acento — el unico elemento "lleno" de la pantalla, porque es la unica
+   eleccion activa. */
+.dc-carril {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding: 2px 2px var(--sp-3);
+  margin-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--divider-soft);
+  scrollbar-width: none;
+}
+.dc-carril::-webkit-scrollbar { display: none; }
+
+.dc-dia {
+  flex: 0 0 auto;
+  min-width: 48px;
+  min-height: var(--touch);
+  padding: var(--sp-2) var(--sp-1);
+  border-radius: var(--r-md);
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-soft);
+  backdrop-filter: var(--blur-glass-soft);
+  -webkit-backdrop-filter: var(--blur-glass-soft);
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.dc-num {
+  display: block;
+  font: var(--t-title);
+  font-size: 1rem;
+  line-height: 1;
+}
+.dc-dow {
+  display: block;
+  font: var(--t-label);
+  font-size: .5625rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  margin-top: 3px;
+  color: var(--ink-faint);
+}
+
+.dc-dia.es-activo {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: var(--on-accent);
+  box-shadow: var(--shadow-chip);
+}
+.dc-dia.es-activo .dc-dow { color: var(--on-accent); opacity: .75; }
+
+/* Hoy, sin estar elegido, lleva el trazo del acento: se encuentra de reojo. */
+.dc-dia.es-hoy:not(.es-activo) { border-color: var(--accent); color: var(--ink); }
+
+.dc-aviso {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--danger);
+  margin: 4px auto 0;
+}
+/* El punto no puede mover el chip: los que no lo llevan reservan el hueco. */
+.dc-dia:not(:has(.dc-aviso))::after {
+  content: "";
+  display: block;
+  width: 5px;
+  height: 5px;
+  margin: 4px auto 0;
+}

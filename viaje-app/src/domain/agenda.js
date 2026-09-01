@@ -132,3 +132,41 @@ export function diasDelViaje(desde, hasta) {
   return Array.from({ length: total + 1 }, (_, i) =>
     new Date(base + i * 86_400_000).toISOString().slice(0, 10))
 }
+
+/**
+ * Los eventos que se enseñan mirando UN dia (rediseño del 1 de septiembre:
+ * «Ahora» ya no es una lista de catorce dias, es un dia con carrusel).
+ *
+ * Un evento sale el dia en que EMPIEZA. La excepcion son los alojamientos:
+ * el hotel de Barcelona se entra el 14, pero el 15 sigues durmiendo alli, y
+ * un dia sin su alojamiento parece un dia sin dormir. Se ordena por inicio,
+ * asi que el alojamiento arrastrado de ayer sale arriba, como el fondo del
+ * dia que es.
+ */
+export function eventosDelDia(timeline = [], dia) {
+  if (!dia) return []
+  return [...timeline]
+    .filter((e) => {
+      const desde = String(e.start ?? '').slice(0, 10)
+      if (!desde) return false
+      if (desde === dia) return true
+      const hasta = e.end ? String(e.end).slice(0, 10) : desde
+      return e.kind === 'lodging' && desde < dia && dia <= hasta
+    })
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)))
+}
+
+/**
+ * Que dias llevan punto de aviso en el carrusel: los que tienen algun evento
+ * con `warning`. Es el mismo criterio que la tarjeta — si el aviso merece
+ * banda dentro, merece punto fuera.
+ */
+export function diasConAviso(timeline = []) {
+  const dias = new Set()
+  for (const e of timeline) {
+    if (!e?.warning) continue
+    const desde = String(e.start ?? '').slice(0, 10)
+    if (desde) dias.add(desde)
+  }
+  return dias
+}

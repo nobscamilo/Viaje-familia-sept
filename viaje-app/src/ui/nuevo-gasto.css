@@ -37,8 +37,10 @@
   overflow-x: hidden;
   min-width: 0;
   padding: var(--sp-4) var(--sp-3) calc(var(--sp-4) + env(safe-area-inset-bottom));
-  background: var(--s-raised);
-  border-top: 1px solid var(--line);
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  border-top: 1px solid var(--glass-border);
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   box-shadow: var(--shadow-pop);
 }

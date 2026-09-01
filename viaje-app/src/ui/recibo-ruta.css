@@ -4,8 +4,11 @@
 .rr {
   display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2);
   margin-top: var(--sp-2); padding: var(--sp-3);
-  border: 1px solid var(--line); border-radius: var(--r-md);
-  background: var(--s-raised);
+  border: 1px solid var(--glass-border); border-radius: var(--r-lg);
+  background: var(--glass-mid);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: var(--shadow-card);
 }
 
 .rr-cab { display: flex; gap: var(--sp-2); align-items: flex-start; font: var(--t-small); }

@@ -2,13 +2,16 @@ import { useState } from 'react'
 import { TRIP } from '../../data/trip-madrid-2026.js'
 import { useTrip } from '../../hooks/useTrip.js'
 import { useAhora } from '../../hooks/useAhora.js'
-import { FASES, estadoDeEvento, faseDelViaje, loQueSigue } from '../../domain/agenda.js'
-import { daysUntil, formatDayLong, formatTime, groupByDay, mismoDia, noches } from '../../domain/dates.js'
+import {
+  diasConAviso, diasDelViaje, eventosDelDia, estadoDeEvento, FASES, faseDelViaje, loQueSigue,
+} from '../../domain/agenda.js'
+import { daysUntil, formatDayLong, formatTime, mismoDia, noches } from '../../domain/dates.js'
 import { diaDelViaje } from '../../domain/dates.js'
 import Icon from '../../ui/Icon.jsx'
 import Avatars from '../../ui/Avatars.jsx'
 import Proximo from '../../ui/Proximo.jsx'
 import Acciones from '../../ui/Acciones.jsx'
+import DiasCarrusel from '../../ui/DiasCarrusel.jsx'
 import './ahora.css'
 
 const KIND = {
@@ -20,19 +23,34 @@ const KIND = {
   transport: { icon: 'transport', label: 'Traslado' },
 }
 
+/**
+ * «Ahora», dia a dia (rediseño del 1 de septiembre de 2026).
+ *
+ * Hasta hoy esta pantalla era la lista entera: catorce dias de scroll, y el
+ * 11 en Madrid habia que pasar el 10 para llegar a lo tuyo. La maqueta que
+ * trajo Camilo la convierte en UN dia con un carrusel encima, y de paso
+ * resuelve un pendiente que estaba apuntado desde agosto: durante el viaje
+ * arranca anclada en hoy.
+ *
+ * `?hoy=` sigue mandando: el ancla sale de `useAhora`, nunca del reloj.
+ */
 export default function Ahora() {
   const { timeline } = useTrip()
   const { ahora, simulado } = useAhora()
-  const [verPasado, setVerPasado] = useState(false)
 
   const fase = faseDelViaje(TRIP, ahora)
   const enViaje = fase === FASES.DURANTE
   const hoy = diaDelViaje(ahora)
+  const dias = diasDelViaje(TRIP.startDate, TRIP.endDate)
 
-  const dias = groupByDay(timeline)
-  const pasados = dias.filter((d) => d.day < hoy)
-  const porVenir = dias.filter((d) => d.day >= hoy)
-  const visibles = enViaje && !verPasado ? porVenir : dias
+  // Antes del viaje se abre en el primer dia; durante, en hoy; despues, en
+  // el ultimo — el recuerdo del viaje, no una pantalla vacia.
+  const ancla = enViaje ? hoy : fase === FASES.ANTES ? dias[0] : dias[dias.length - 1]
+  const [dia, setDia] = useState(ancla)
+
+  const eventos = eventosDelDia(timeline, dia)
+  const avisos = diasConAviso(timeline)
+  const i = dias.indexOf(dia)
 
   return (
     <div className="ahora">
@@ -42,37 +60,46 @@ export default function Ahora() {
         </p>
       )}
 
-      {enViaje
+      {enViaje && dia === hoy
         ? <Proximo {...loQueSigue(timeline, ahora)} ahora={ahora} />
         : <Hero timeline={timeline} fase={fase} />}
 
-      {enViaje && pasados.length > 0 && (
-        <button type="button" className="ahora-pasado" onClick={() => setVerPasado((v) => !v)}>
-          {verPasado
-            ? 'Ocultar lo que ya pasó'
-            : pasados.length === 1
-              ? 'Ver el día que ya pasó'
-              : `Ver los ${pasados.length} días que ya pasaron`}
-        </button>
-      )}
+      <DiasCarrusel dias={dias} dia={dia} alElegir={setDia} avisos={avisos} hoy={enViaje ? hoy : null} />
 
-      <ol className="tl">
-        {visibles.map(({ day, items }) => (
-          <li key={day} className={`tl-day ${day === hoy ? 'es-hoy' : ''} ${day < hoy ? 'es-pasado' : ''}`}>
-            <h2 className="tl-day-head">
-              <span className="tl-day-name">
-                {day === hoy && enViaje ? 'Hoy · ' : ''}{formatDayLong(day)}
-              </span>
-              <span className="tl-day-count">{items.length}</span>
-            </h2>
-            <ol className="tl-events">
-              {items.map((ev) => (
-                <EventRow key={ev.id} event={ev} ahora={ahora} enViaje={enViaje} hoy={enViaje ? hoy : null} />
-              ))}
-            </ol>
-          </li>
-        ))}
-      </ol>
+      <div className="ahora-cabecera-dia">
+        <button
+          type="button" className="ahora-flecha" aria-label="Día anterior"
+          disabled={i <= 0} onClick={() => setDia(dias[i - 1])}
+        >
+          <Icon name="chevron-left" size={16} />
+        </button>
+        <h2 className="ahora-dia-titulo">
+          {dia === hoy && enViaje ? 'Hoy · ' : ''}{formatDayLong(dia)}
+        </h2>
+        <button
+          type="button" className="ahora-flecha" aria-label="Día siguiente"
+          disabled={i >= dias.length - 1} onClick={() => setDia(dias[i + 1])}
+        >
+          <Icon name="chevron-right" size={16} />
+        </button>
+      </div>
+
+      {eventos.length === 0 ? (
+        <p className="ahora-vacio">Este día no tiene nada en la agenda. El copiloto sabe proponer.</p>
+      ) : (
+        <ol className="tl-events">
+          {eventos.map((ev) => (
+            <EventRow
+              key={ev.id}
+              event={ev}
+              dia={dia}
+              ahora={ahora}
+              enViaje={enViaje}
+              hoy={enViaje ? hoy : null}
+            />
+          ))}
+        </ol>
+      )}
     </div>
   )
 }
@@ -100,9 +127,17 @@ function Hero({ timeline, fase }) {
   )
 }
 
-function cuando(event) {
+function cuando(event, dia) {
   const inicio = formatTime(event.start)
   const fin = formatTime(event.end)
+  // Un alojamiento arrastrado de otro dia no tiene hora HOY: lo que importa
+  // es hasta cuando te quedas.
+  if (String(event.start ?? '').slice(0, 10) !== dia) {
+    return {
+      principal: 'Sigues aquí',
+      secundario: event.end ? `hasta ${formatDayLong(event.end).replace(/ de \w+$/, '')}${fin ? ` · ${fin}` : ''}` : null,
+    }
+  }
   if (!inicio) return { principal: 'Sin hora', secundario: null }
   if (event.horaEs === 'llegada') return { principal: `llega ${inicio}`, secundario: null }
   if (!event.end || !fin) return { principal: inicio, secundario: null }
@@ -117,18 +152,14 @@ function cuando(event) {
 }
 
 /**
- * Una fila de la agenda.
+ * Una fila de la agenda: tarjeta de vidrio con la burbuja del tipo dentro.
  *
- * Compacta por defecto y se abre al tocarla. Antes lo enseñaba TODO siempre:
- * la tarjeta del apartamento de Madrid ocupaba una pantalla entera de movil
- * con notas, tres tareas y dos etiquetas. Nadie lee eso de pie en Barajas.
- *
- * Lo que nunca se pliega es el aviso: un evento que avisa de algo lo avisa
- * aunque no lo abras. Esconderlo detras de un toque seria como no ponerlo.
+ * Compacta por defecto y se abre al tocarla. Lo que nunca se pliega es el
+ * aviso: un evento que avisa de algo lo avisa aunque no lo abras.
  */
-function EventRow({ event, ahora, enViaje, hoy }) {
+function EventRow({ event, dia, ahora, enViaje, hoy }) {
   const kind = KIND[event.kind] ?? KIND.activity
-  const { principal, secundario } = cuando(event)
+  const { principal, secundario } = cuando(event, dia)
   const estado = enViaje ? estadoDeEvento(event, ahora) : null
   const [abierto, setAbierto] = useState(false)
 
@@ -136,16 +167,18 @@ function EventRow({ event, ahora, enViaje, hoy }) {
 
   return (
     <li className={`ev ev-${event.status} ev-kind-${event.kind} ${estado ? `ev-t-${estado}` : ''} ${abierto ? 'es-abierto' : ''}`}>
-      <div className="ev-dot" aria-hidden="true"><Icon name={kind.icon} size={14} /></div>
-
       <div className="ev-card">
         <header className="ev-head">
-          <span className="ev-when">{principal}</span>
-          {secundario && <span className="ev-hasta">{secundario}</span>}
-          <Avatars travelerIds={event.travelerIds} />
+          <span className="ev-burbuja" aria-hidden="true"><Icon name={kind.icon} size={15} /></span>
+          <div className="ev-head-txt">
+            <div className="ev-linea1">
+              <span className="ev-when">{principal}</span>
+              <Avatars travelerIds={event.travelerIds} max={4} />
+            </div>
+            {secundario && <span className="ev-hasta">{secundario}</span>}
+            <h3 className="ev-title">{event.title}</h3>
+          </div>
         </header>
-
-        <h3 className="ev-title">{event.title}</h3>
 
         {(event.address || event.venue) && (
           <p className="ev-sub"><span className="ev-addr">{event.address ?? event.venue}</span></p>

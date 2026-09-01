@@ -23,8 +23,8 @@
 .aj-fila {
   display: flex; align-items: center; gap: var(--sp-3);
   min-height: var(--touch); padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md); border: 1px solid var(--line);
-  background: var(--s-raised);
+  border-radius: var(--r-md); border: 1px solid var(--glass-border-soft);
+  background: var(--glass-soft);
 }
 /* Quien ya entro se ve entero; quien no, apagado. La lista se lee de un
    vistazo sin tener que comparar textos. */

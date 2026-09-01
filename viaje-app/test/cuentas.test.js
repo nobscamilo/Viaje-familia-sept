@@ -427,3 +427,17 @@ test('el abuelo cubre a Julián David', () => {
   assert.equal(s.padres.debe, 281804, 'tres adultos, no dos')
   assert.equal(Object.values(s).reduce((n, c) => n + c.saldo, 0), 0)
 })
+
+test('plural() trae el numero CON separador de miles, y nadie se lo antepone', async () => {
+  // «18.420 18420 reseñas» salio en una captura real el 1 de septiembre:
+  // tres call sites hacian `miles(n) + plural(n, …)` y plural ya traia el
+  // numero, sin separador. La regla queda dentro de plural().
+  const { plural } = await import('../src/domain/cuentas.js')
+  assert.equal(plural(18420, 'reseña', 'reseñas'), '18.420 reseñas')
+  assert.equal(plural(1, 'reseña', 'reseñas'), '1 reseña')
+  const { readFileSync } = await import('node:fs')
+  for (const f of ['../src/app/surfaces/Copiloto.jsx', '../src/ui/ReciboRuta.jsx', '../src/ui/BorradorRuta.jsx']) {
+    const src = readFileSync(new URL(f, import.meta.url), 'utf8')
+    assert.ok(!/miles\([^)]*\)\s*\}?\s*\$?\{?plural\(/.test(src), `${f} duplica el numero`)
+  }
+})

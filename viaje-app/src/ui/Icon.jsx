@@ -1,5 +1,5 @@
 /**
- * Iconos en linea. Sin libreria: son seis, pesan nada y asi no hay
+ * Iconos en linea. Sin libreria: son unos pocos, pesan nada y asi no hay
  * una dependencia entera para dibujar un avion.
  * Todos comparten caja de 24 y trazo de 1.6 para que se vean hermanos.
  */
@@ -10,6 +10,8 @@ const PATHS = {
   activity: 'M12 21s-7-5.2-7-10a7 7 0 0 1 14 0c0 4.8-7 10-7 10Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z',
   transport: 'M6 16V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2Zm0-6h12M9 21l-2 2m8-2 2 2M9.5 14h.01m4.99 0h.01',
   alert: 'M12 8v5m0 3h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z',
+  'chevron-left': 'M15 6l-6 6 6 6',
+  'chevron-right': 'M9 6l6 6-6 6',
 }
 
 export default function Icon({ name, size = 18, className = '' }) {

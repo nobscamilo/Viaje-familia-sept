@@ -7,8 +7,10 @@
   display: grid;
   gap: var(--sp-3);
   padding: var(--sp-3);
-  background: var(--s-raised);
-  border: 1px solid var(--line);
+  background: var(--glass-mid);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-card);
 }

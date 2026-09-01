@@ -1,99 +1,88 @@
-.ahora { padding: 0 0 var(--sp-7); }
+/* «Ahora», dia a dia. Rediseño del 1 de septiembre de 2026: tarjetas de
+   vidrio con la burbuja del tipo dentro, carrusel de dias encima (vive en
+   ui/dias-carrusel.css) y flechas anterior/siguiente. El rail lateral de la
+   version-lista murio con la lista. */
+
+.ahora { padding: 0 var(--sp-4) var(--sp-7); }
 
 /* ---------- hero ---------- */
 
-/* El heroe, ahora una linea. Ver el comentario de Hero() en Ahora.jsx. */
+/* El heroe, una linea. Ver el comentario de Hero() en Ahora.jsx. */
 .hero {
-  margin: 0; padding: var(--sp-3) var(--sp-4);
-  font: var(--t-small); color: var(--ink-muted);
-  border-bottom: 1px solid var(--line-subtle);
+  padding: var(--sp-4) 0 var(--sp-3);
+  font: var(--t-body);
+  color: var(--ink-muted);
 }
 .hero strong { color: var(--ink); font-weight: 600; }
-.hero em { font-style: normal; color: var(--warn); }
+.hero em { font-style: italic; color: var(--warn); }
 
-.tl, .tl-events { list-style: none; margin: 0; padding: 0; }
+/* ---------- cabecera del dia ---------- */
 
-.tl-day-head {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  /* El desenfoque mantiene legible la cabecera sobre las tarjetas que pasan
-     por debajo, sin tapar del todo lo que hay detras. */
-  background: color-mix(in srgb, var(--s-base) 88%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line-subtle);
-  font: var(--t-small);
-  font-weight: 600;
-  letter-spacing: -.01em;
-}
-
-.tl-day-name { color: var(--ink-soft); }
-/* Solo la primera letra. `text-transform: capitalize` daria "10 De Septiembre". */
-.tl-day-name::first-letter { text-transform: uppercase; }
-
-.tl-day-count {
-  font-family: var(--font-mono);
-  font-size: .625rem;
-  color: var(--ink-faint);
-  background: var(--s-overlay);
-  border-radius: var(--r-pill);
-  padding: 2px 7px;
-}
-
-.tl-events { padding: var(--sp-4) var(--sp-4) var(--sp-5); display: grid; gap: var(--sp-3); }
-
-/* En pantallas anchas el texto de la tarjeta no debe pasar de una medida
-   legible, aunque la tarjeta sea mas ancha. */
-.ev-title, .ev-note, .ev-warn span { max-width: 62ch; }
-
-/* ---------- evento ---------- */
-
-.ev {
+.ahora-cabecera-dia {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: var(--sp-3);
-  position: relative;
-  animation: evIn var(--dur-base) var(--ease) both;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
 }
 
-/* El raíl continuo: es lo que convierte una lista de tarjetas en una
-   linea de tiempo. Se corta en el ultimo evento del dia. */
-.ev::before {
-  content: "";
-  position: absolute;
-  left: 13px;
-  top: 28px;
-  bottom: calc(var(--sp-3) * -1);
-  width: 1px;
-  background: var(--line);
+.ahora-dia-titulo {
+  font: var(--t-title);
+  font-size: 1.0625rem;
+  text-align: center;
+  color: var(--ink-soft);
 }
-.ev:last-child::before { display: none; }
+.ahora-dia-titulo::first-letter { text-transform: uppercase; }
 
-.ev-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-pill);
+.ahora-flecha {
+  min-width: var(--touch);
+  min-height: var(--touch);
   display: grid;
   place-items: center;
-  background: var(--s-overlay);
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-  z-index: 1;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: var(--r-md);
+}
+.ahora-flecha:hover { background: var(--glass-soft); }
+.ahora-flecha:disabled { color: var(--ink-faint); opacity: .4; cursor: default; }
+
+.ahora-vacio { font: var(--t-small); color: var(--ink-faint); padding: var(--sp-4) 0; }
+
+/* ---------- eventos del dia ---------- */
+
+.tl-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-4);
 }
 
-/* Un color por tipo de cosa, declarado UNA vez.
-   El punto, el lomo de la tarjeta y el icono salen todos de aqui: asi un
-   vuelo se distingue de una cama sin leer una palabra. */
-/* El valor por defecto va PRIMERO. `.ev` y `.ev-kind-flight` tienen la misma
-   especificidad, asi que gana la ultima declarada: ponerlo despues dejaba
-   todo gris y el color por tipo no aparecia en ningun sitio. */
-.ev { --ev-color: var(--ink-muted); }
+/* En pantallas anchas el texto de la tarjeta no debe pasar de una medida
+   comoda de lectura. */
+.ev-title, .ev-note, .ev-warn span { max-width: 62ch; }
 
+/* La tarjeta: vidrio esmerilado con luz arriba. El lomo de color por tipo se
+   queda — es lo que hace legible la agenda de un vistazo — pero fino. */
+.ev-card {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--ev-color);
+  border-radius: var(--r-lg);
+  background: var(--glass-mid);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: var(--shadow-card);
+}
+
+/* Un color por tipo de cosa, declarado UNA vez. El valor por defecto va
+   PRIMERO: `.ev` y `.ev-kind-flight` tienen la misma especificidad y con
+   cascada invertida el defecto pisaria a todos. */
+.ev { --ev-color: var(--ink-muted); }
 .ev-kind-flight    { --ev-color: var(--info); }
 .ev-kind-lodging   { --ev-color: var(--ok); }
 .ev-kind-f1        { --ev-color: var(--accent); }
@@ -101,96 +90,104 @@
 .ev-kind-activity  { --ev-color: #f0a05a; }
 .ev-kind-food      { --ev-color: #f0a05a; }
 
-.ev-dot { color: var(--ev-color); border-color: var(--ev-color); }
-
-.ev-card {
-  background: var(--s-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: var(--sp-3) var(--sp-4) var(--sp-4);
-  box-shadow: var(--shadow-card);
-  display: grid;
-  gap: var(--sp-1);
-  min-width: 0;
-}
-
-/* Lo que no esta cerrado se ve que no esta cerrado, sin gritar. */
-/* El lomo: la franja de color a la izquierda. Es lo que hace que la agenda se
-   lea como una linea de tiempo y no como una lista. Va aqui, despues de
-   `.ev-card`, porque la forma abreviada `border:` de arriba lo borraria. */
-.ev-card { border-left: 3px solid var(--ev-color); }
-
+/* Lo propuesto se ve que no esta cerrado, sin gritar: trazo discontinuo y
+   vidrio mas tenue. */
 .ev-pendiente .ev-card,
-.ev-propuesto .ev-card { border-style: dashed; background: transparent; box-shadow: none; }
+.ev-propuesto .ev-card { border-style: dashed; border-left-style: solid; background: var(--glass-faint); }
 
-.ev-head {
-  display: flex; align-items: baseline; gap: var(--sp-2);
-  flex-wrap: wrap; row-gap: 2px;
+/* ---------- cabecera de la tarjeta ---------- */
+
+.ev-head { display: flex; gap: var(--sp-3); align-items: flex-start; }
+
+.ev-burbuja {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--ev-color) 16%, transparent);
+  color: var(--ev-color);
+  box-shadow: inset 0 1px 0 var(--glass-border-soft);
 }
-.ev-head .avatars { margin-left: auto; align-self: center; }
-.ev-head .avatars-all, .ev-head .avatars-unknown { margin-left: auto; }
+
+.ev-head-txt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+
+.ev-linea1 { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 
 .ev-when {
   font-family: var(--font-mono);
-  font-size: .8125rem;
-  font-weight: 500;
-  color: var(--ink);
+  font-size: .75rem;
+  color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.ev-title { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; margin-top: 2px; }
+.ev-hasta {
+  font: var(--t-label); font-family: var(--font-mono);
+  color: var(--ink-faint); letter-spacing: 0;
+}
+
+.ev-title { font: var(--t-title); font-size: 1.0625rem; line-height: 1.25; margin-top: 3px; }
 
 .ev-sub { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); font: var(--t-small); color: var(--ink-faint); }
-
-.ev-kindlabel {
-  font-family: var(--font-mono);
-  font-size: .625rem;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-}
-.ev-kindlabel:not(:only-child)::after { content: "·"; margin-left: var(--sp-2); }
-
 .ev-addr { color: var(--ink-muted); }
 
-.ev-foot { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+/* ---------- etiquetas ---------- */
+
+.ev-foot { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .ev-foot:empty { display: none; }
 
 .tag {
-  font-size: .6875rem;
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--glass-border-soft);
   border-radius: var(--r-sm);
-  background: var(--s-overlay);
+  font: var(--t-label);
+  letter-spacing: .04em;
   color: var(--ink-muted);
-  border: 1px solid var(--line-subtle);
+  background: var(--glass-faint);
 }
 .tag-mono { font-family: var(--font-mono); font-size: .625rem; letter-spacing: .04em; }
 .tag-pendiente { color: var(--warn); background: var(--warn-wash); border-color: transparent; }
-.tag-propuesto { color: var(--ink-faint); }
+.tag-propuesto { color: var(--ink-soft); border-color: var(--line-strong); background: transparent; }
 .tag-danger { color: var(--danger); background: var(--danger-wash); border-color: transparent; }
+.tag-curso { color: var(--accent); background: var(--nav-pill); border-color: transparent; }
 
-.ev-note { font: var(--t-small); color: var(--ink-muted); margin-top: var(--sp-2); }
+/* ---------- aviso: banda de vidrio tintado, nunca plegada ---------- */
 
 .ev-warn {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
   gap: var(--sp-2);
-  align-items: start;
-  font: var(--t-small);
-  color: var(--warn);
-  background: var(--warn-wash);
-  border-radius: var(--r-sm);
+  align-items: flex-start;
   padding: var(--sp-3);
-  margin-top: var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent);
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--danger) 20%, transparent),
+    color-mix(in srgb, var(--danger) 8%, transparent));
+  color: var(--danger);
+  font: var(--t-small);
+  font-size: .8125rem;
+  font-weight: 500;
+  box-shadow: inset 0 1px 0 var(--glass-border-soft);
 }
-.ev-warn svg { margin-top: 2px; }
+.ev-warn svg { margin-top: 2px; flex: 0 0 auto; }
+
+/* ---------- detalle plegado ---------- */
+
+.ev-note { font: var(--t-small); color: var(--ink-muted); }
 
 .ev-todos {
-  margin: var(--sp-2) 0 0;
-  padding: 0;
   list-style: none;
+  margin: 0;
+  padding: var(--sp-2) 0 0;
+  border-top: 1px solid var(--divider-soft);
   display: grid;
   gap: var(--sp-2);
   font: var(--t-small);
+  font-size: .8125rem;
   color: var(--ink-muted);
 }
 .ev-todos li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-2); }
@@ -207,9 +204,9 @@
 
 .ses {
   list-style: none;
-  margin: var(--sp-3) 0 0;
+  margin: var(--sp-2) 0 0;
   padding: var(--sp-2) 0 0;
-  border-top: 1px solid var(--line-subtle);
+  border-top: 1px solid var(--divider-soft);
   display: grid;
   gap: 1px;
 }
@@ -230,11 +227,6 @@
 .ses-key { color: var(--ink); font-weight: 600; }
 .ses-key .ses-time { color: var(--accent); }
 
-@keyframes evIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
-}
-
 /* ---------- durante el viaje ---------- */
 
 .ahora-simulado {
@@ -243,40 +235,16 @@
   color: var(--warn);
   background: var(--warn-wash);
   padding: var(--sp-2) var(--sp-4);
+  margin: 0 calc(-1 * var(--sp-4));
 }
 .ahora-simulado code { font-family: var(--font-mono); font-size: .75rem; }
 
-.ahora-pasado {
-  justify-self: start;
-  margin: var(--sp-3) var(--sp-4) 0;
-  min-height: 36px;
-  padding: 0 var(--sp-3);
-  border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-faint);
-  font-size: .8125rem;
-  cursor: pointer;
-}
-.ahora-pasado:hover { color: var(--ink-soft); border-color: var(--line-strong); }
-
-/* El dia de hoy manda: su cabecera lleva el acento. */
-.es-hoy .tl-day-head { color: var(--accent); border-bottom-color: var(--accent); }
-.es-hoy .tl-day-name { color: var(--accent); }
-
-/* Lo pasado se apaga, pero sigue ahi para consultarlo. */
-.es-pasado { opacity: .5; }
-.es-pasado:hover { opacity: .85; }
-
-.ev-t-enCurso .ev-card { border-color: var(--accent); }
-.ev-t-pasado .ev-card { background: transparent; box-shadow: none; }
-
-.tag-curso { color: var(--accent); background: var(--accent-wash); border-color: transparent; }
+.ev-t-enCurso .ev-card { border-color: var(--accent); border-left-color: var(--accent); }
+.ev-t-pasado .ev-card { opacity: .55; }
 
 /* Abrir la tarjeta. Dice lo que hay dentro («3 por hacer · detalle») en vez
    de un «ver mas» a ciegas: abrir para descubrir que no habia nada cansa. */
 .ev-mas {
-  margin-top: var(--sp-3);
   min-height: 32px; padding: 0;
   background: none; border: 0;
   color: var(--ink-muted); font: var(--t-small);
@@ -286,10 +254,5 @@
 .ev-mas:hover { color: var(--ink-soft); }
 .es-abierto .ev-mas::before { content: "− "; }
 
-/* Al abrirla, la tarjeta se despega un poco del resto. */
-.es-abierto .ev-card { background: var(--s-overlay); }
-
-.ev-hasta {
-  font: var(--t-label); font-family: var(--font-mono);
-  color: var(--ink-faint); letter-spacing: 0;
-}
+/* Al abrirla, la tarjeta sube un punto de opacidad: se despega sin saltar. */
+.es-abierto .ev-card { background: var(--glass-strong); }

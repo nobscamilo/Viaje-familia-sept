@@ -41,8 +41,8 @@
   display: grid;
   grid-template-columns: 3px 1fr;
   align-items: stretch;
-  background: var(--s-raised);
-  border: 1px solid var(--line-subtle);
+  background: var(--glass-soft);
+  border: 1px solid var(--glass-border-soft);
   border-radius: var(--r-md);
   overflow: hidden;
 }

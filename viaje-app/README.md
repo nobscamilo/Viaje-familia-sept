@@ -1308,6 +1308,50 @@ elegir un día en tres pantallas sería una app distinta cada vez.
   repositorio y ESLint 10 no lee `.eslintrc`. No se arregló aquí para no
   mezclarlo con este cambio, pero conviene arreglarlo o quitar el script.
 
+## El rediseño: cristal editorial sobre el zinc (1 de septiembre, segunda sesión)
+
+Camilo trajo una maqueta de Claude Design (`UX review and suggestions`,
+sistema «broadsheet»: papel claro, serif, cian/magenta, tarjetas de vidrio) y
+eligió un **híbrido** explícito: quedarse con el oscuro zinc + violeta y
+adoptar de la maqueta la serif, el cristal, los radios y la estructura.
+
+Lo que cambió, por capas:
+
+- **Tokens** (`tokens.css`): `--font-ui` pasa a Source Serif 4 (la mono se
+  queda para horas y localizadores); familia `--glass-*` + `--blur-glass`;
+  radios 14/20; `--accent-grad`; y `--fondo-app`, un zinc con dos brillos —
+  porque un blur sobre negro plano no difumina nada.
+- **Armazón**: cabecera y barra inferior son láminas de cristal; las pestañas
+  son píldoras y la activa lleva `--nav-pill`.
+- **«Ahora» es día a día**: `ui/DiasCarrusel.jsx` (chips con punto de aviso
+  magenta), flechas, y **anclada en hoy durante el viaje** — el pendiente
+  apuntado desde agosto. `eventosDelDia()` en `domain/agenda.js` decide qué
+  sale: lo que empieza ese día MÁS el alojamiento en curso («Sigues aquí»),
+  porque un día sin su alojamiento parece un día sin dormir. Con prueba.
+- **Copiloto**: mis burbujas llevan el degradado del acento y las suyas son
+  vidrio; atajos, tarjetas de sitio, borradores y recibos, restilizados.
+- **Decidir/Cuentas/Mapa/Ajustes/Entrar**: mismas piezas, piel de cristal.
+  Los filtros de Decidir ya existían — la maqueta los había copiado de la app.
+
+Lo que NO se adoptó de la maqueta, y por qué:
+
+- **El tema claro y el botón claro/oscuro**: Camilo eligió seguir oscuro.
+- **«Cómo llegar» en toda tarjeta**: sigue siendo solo en lo de hoy
+  (`accionesDe` + `pasaHoy`), regla medida que la maqueta ignoraba.
+- **La imagen estática del mapa**: el mapa real interactivo se queda.
+- **El botón de tema, el «Me da igual» como texto de voto y los datos de
+  ejemplo** de la maqueta (viajeros con otros colores, un `buildReply`
+  simulado): eran atrezzo del prototipo, no producto.
+
+Una captura del hilo del copiloto cazó un fallo que llevaba días en
+producción: «18.420 18420 reseñas». `plural()` ya incluye el número y tres
+call sites le anteponían `miles()`. El arreglo fue meter el separador de
+miles DENTRO de `plural()` y una prueba que vigila que nadie lo duplique.
+
+Verificado: `npm run medir` en las cinco rutas a 1280/430/390/375 px — cero
+desbordes — y capturas revisadas una a una (agenda antes y durante el viaje,
+copiloto con borradores, decidir, cuentas, escritorio).
+
 ## Reglas innegociables
 
 - Ningún archivo por encima de **400 líneas**.

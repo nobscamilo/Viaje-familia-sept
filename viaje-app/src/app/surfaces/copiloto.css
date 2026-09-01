@@ -27,7 +27,7 @@
   color: var(--accent);
 }
 
-.cop-titulo { font-size: 1.35rem; font-weight: 600; letter-spacing: -.03em; }
+.cop-titulo { font: var(--t-display); font-size: 1.55rem; letter-spacing: -.02em; }
 .cop-lede { font: var(--t-small); color: var(--ink-muted); max-width: 46ch; }
 
 /* Fichas que fluyen, no cinco botones de ancho completo apilados. Ocupan la
@@ -40,8 +40,10 @@
   text-align: left;
   min-height: var(--touch);
   padding: var(--sp-2) var(--sp-4);
-  border: 1px solid var(--line);
-  background: var(--s-raised);
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-soft);
+  backdrop-filter: var(--blur-glass-soft);
+  -webkit-backdrop-filter: var(--blur-glass-soft);
   color: var(--ink-soft);
   font-size: .875rem;
   cursor: pointer;
@@ -55,19 +57,30 @@
 
 .cop-de-mi { justify-items: end; }
 
+/* Mis burbujas llevan el degradado del acento, como en la maqueta: son lo
+   unico "lleno" del hilo, igual que el chip del dia elegido en la agenda. */
 .cop-de-mi .cop-texto {
-  background: var(--accent-wash);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  color: var(--ink);
-  border-radius: var(--r-md) var(--r-md) var(--r-sm) var(--r-md);
+  background: var(--accent-grad);
+  border: 0;
+  color: var(--on-accent);
+  border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg);
   padding: var(--sp-3) var(--sp-4);
   max-width: 85%;
+  box-shadow: var(--shadow-chip);
 }
 
+/* Las suyas, vidrio: burbuja de verdad, no texto suelto sobre el fondo. */
 .cop-de-copiloto .cop-texto {
   color: var(--ink-soft);
   max-width: 62ch;
   white-space: pre-wrap;
+  background: var(--glass-mid);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-sm) var(--r-lg) var(--r-lg) var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: var(--shadow-card);
 }
 
 .cop-texto { font: var(--t-body); font-size: .9375rem; overflow-wrap: anywhere; }
@@ -92,8 +105,10 @@
   display: inline-flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-pill);
-  border: 1px solid var(--line);
-  background: var(--s-raised);
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-faint);
+  backdrop-filter: var(--blur-glass-soft);
+  -webkit-backdrop-filter: var(--blur-glass-soft);
   color: var(--modo-color, var(--ink-muted));
 }
 .cop-modo-metro, .cop-modo-transporte { --modo-color: var(--info); }
@@ -122,8 +137,10 @@
 
 .cop-lugar {
   border-radius: var(--r-lg);
-  border: 1px solid var(--line);
-  background: var(--s-raised);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-mid);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
@@ -173,8 +190,10 @@
   display: flex;
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);
-  border-top: 1px solid var(--line);
-  background: var(--s-raised);
+  border-top: 1px solid var(--glass-border-soft);
+  background: linear-gradient(0deg, var(--glass-strong), var(--glass-mid));
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
 }
 
 .cop-campo {
@@ -182,8 +201,8 @@
   min-width: 0;
   min-height: var(--touch);
   border-radius: var(--r-md);
-  border: 1px solid var(--line);
-  background: var(--s-base);
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-soft);
   color: var(--ink);
   padding: 0 var(--sp-4);
   font-size: .9375rem;
@@ -195,12 +214,13 @@
   min-height: var(--touch);
   padding: 0 var(--sp-4);
   border-radius: var(--r-md);
-  border: 1px solid var(--accent);
-  background: var(--accent);
+  border: 0;
+  background: var(--accent-grad);
   color: var(--on-accent);
   font-size: .875rem;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: var(--shadow-chip);
 }
 .cop-enviar:disabled { opacity: .4; cursor: not-allowed; }
 

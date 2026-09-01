@@ -214,7 +214,11 @@ export function miles(n) {
  * `s` a mano es un error que se comete solo.
  */
 export function plural(n, singular, pluralForma) {
-  return n === 1 ? `${n} ${singular}` : `${n} ${pluralForma}`
+  // Con separador de miles SIEMPRE: es la regla de la casa, y ponerla aqui
+  // dentro evita el fallo que salio en la captura del 1 de septiembre —
+  // «18.420 18420 reseñas» — de call sites que anteponian miles() a un
+  // plural() que ya traia el numero.
+  return n === 1 ? `1 ${singular}` : `${miles(n)} ${pluralForma}`
 }
 
 /**
