@@ -19,6 +19,50 @@
   border-left: 2px solid var(--warn);
   background: var(--warn-wash);
 }
+/* Abierta: se despega un punto para que se vea cual estas tocando cuando hay
+   tres notas seguidas y los botones salen debajo de una de ellas. */
+.nts-item.es-abierta { background: var(--s-overlay); }
+
+/* La nota entera es el boton cuando puedes tocarla. Sin caja propia ni
+   min-height heredado: es texto que reacciona, no un control mas. */
+.nts-toque {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* Separados y a 44 px: uno de los dos BORRA. Los botones inline de esta app
+   viven en 32 px (`.acc-editar`, `.ev-mas`), pero ninguno de esos destruye
+   nada. Aqui el hueco entre «Editar» y «Quitar» es lo unico que separa una
+   correccion de una perdida. */
+.nts-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-1);
+}
+
+.nts-editar, .nts-quitar {
+  flex: 0 1 auto;
+  min-height: var(--touch);
+  padding: 0 var(--sp-2);
+  border: 0;
+  background: none;
+  font: var(--t-small);
+  font-size: .75rem;
+  cursor: pointer;
+}
+.nts-editar { color: var(--accent); }
+.nts-editar:hover { color: var(--ink); }
+.nts-quitar { color: var(--ink-faint); }
+.nts-quitar:hover { color: var(--danger); }
 /* Lo mio se marca con el acento, no con la posicion: alinear a la derecha en
    una lista de nueve personas hace ilegible quien dice que. */
 .nts-item.es-mia { border-left-color: var(--accent); }

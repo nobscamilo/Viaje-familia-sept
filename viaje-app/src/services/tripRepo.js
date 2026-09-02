@@ -180,6 +180,34 @@ export async function comentar(tripId, id, { uid, travelerId, text, rama = 'deci
   })
 }
 
+/**
+ * Corregir una nota o un comentario, y quitarlo.
+ *
+ * Las reglas ya lo permitían desde que existen los comentarios —tu autor
+ * edita, y borra su autor o quien organiza— pero no había camino desde la
+ * pantalla: media función, que en este proyecto es una función que no está.
+ *
+ * `authorUid` NO se toca nunca: la regla exige que quede como estaba, así que
+ * mandarlo aquí sería pedirle a Firestore que rechace la escritura. Se guarda
+ * quién y cuándo editó, que es lo que hace que una nota corregida no parezca
+ * la original.
+ */
+export async function editarComentario(tripId, id, comentarioId, { text, uid, rama = 'decisions' }) {
+  const limpio = String(text ?? '').trim().slice(0, 2000)
+  if (!limpio) return
+  const fb = await fbOFallo()
+  await fb.fs.updateDoc(fb.fs.doc(commentsRef(fb, tripId, id, rama), comentarioId), {
+    text: limpio,
+    editadoPor: uid,
+    editadoEn: fb.fs.serverTimestamp(),
+  })
+}
+
+export async function borrarComentario(tripId, id, comentarioId, { rama = 'decisions' } = {}) {
+  const fb = await fbOFallo()
+  await fb.fs.deleteDoc(fb.fs.doc(commentsRef(fb, tripId, id, rama), comentarioId))
+}
+
 /** Cambio de estado. Parche mínimo: nunca se reescribe la decisión entera. */
 export async function cambiarEstado(tripId, decisionId, { status, uid }) {
   const fb = await fbOFallo()

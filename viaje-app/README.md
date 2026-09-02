@@ -1499,6 +1499,36 @@ Verificado con `node scripts/probar-reglas.mjs` —el motor real de Google, no
 el emulador— en siete casos: quién puede escribir, quién no puede firmar por
 otro, quién borra y que nadie reasigne el autor de una nota ajena.
 
+### Corregir y quitar (la media función que faltaba)
+
+Las notas nacieron sin papelera ni lápiz: las reglas ya lo permitían y no
+había camino desde la pantalla. Es el fallo recurrente de este proyecto —el
+borrado de gastos, `olvidar()`— así que se cerró el mismo día.
+
+**Tocas tu nota y aparecen «Editar» y «Quitar».** Coherente con lo demás:
+gestionar se pliega. Una nota ajena no reacciona al toque, salvo que
+organices. Y quitar no pide confirmación: lo que se pierde es una línea que
+escribiste tú, dentro de un panel que abriste a propósito — acostumbrarse a
+confirmar lo trivial es lo que hace que la confirmación deje de significar
+algo cuando de verdad importa.
+
+Dos detalles que no son detalles:
+
+- **`domain/notas.js` espeja las reglas de Firestore**, y la asimetría es
+  deliberada: edita solo su autor, borra su autor **o quien organiza**.
+  Alguien tiene que poder limpiar una nota que sobra cuando su autor no
+  mira; nadie debería poder reescribir lo que dijo otro. Hay una prueba que
+  compara el dominio con `firestore.rules` línea a línea.
+- **`editarComentario` no manda `authorUid`.** La regla lleva
+  `unchanged('authorUid')`, que rechaza la escritura si el campo viaja
+  *aunque lleve el mismo valor*. Mandarlo sería pedirle a Firestore que diga
+  que no. Hay una prueba que lo vigila.
+
+Los botones van a **44 px y separados**, no a los 32 px de los botones inline
+de esta app (`.acc-editar`, `.ev-mas`): ninguno de esos destruye nada, y aquí
+el hueco entre «Editar» y «Quitar» es lo único que separa una corrección de
+una pérdida.
+
 ## Reglas innegociables
 
 - Ningún archivo por encima de **400 líneas**.

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { comentar as escribirComentario, suscribirComentarios } from '../services/tripRepo.js'
+import {
+  borrarComentario, comentar as escribirComentario, editarComentario, suscribirComentarios,
+} from '../services/tripRepo.js'
 import { useTrip } from './useTrip.js'
 
 /**
@@ -32,5 +34,22 @@ export function useComentarios(id, activo = true, rama = 'decisions') {
     }
   }, [tripId, id, user, yo, rama])
 
-  return { comentarios, enviar, error }
+  const editar = useCallback(async (comentarioId, texto) => {
+    if (!user) return
+    try {
+      await editarComentario(tripId, id, comentarioId, { text: texto, uid: user.uid, rama })
+    } catch (e) {
+      setError(e)
+    }
+  }, [tripId, id, user, rama])
+
+  const borrar = useCallback(async (comentarioId) => {
+    try {
+      await borrarComentario(tripId, id, comentarioId, { rama })
+    } catch (e) {
+      setError(e)
+    }
+  }, [tripId, id, rama])
+
+  return { comentarios, enviar, editar, borrar, error }
 }

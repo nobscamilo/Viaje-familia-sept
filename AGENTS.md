@@ -128,7 +128,14 @@ Se ponen en cualquier momento, vuelos incluidos, y **no chocan con la siembra
 porque viven en una subcolección**: `set()` no alcanza a los hijos, así que
 una nota no marca el momento `tocadoAMano`. Y **gestionar se pliega, avisar
 no**: las notas escritas se leen sin tocar nada; lo que se esconde tras un
-«+ Nota» es el campo de escribir.
+«+ Nota» es el campo de escribir, y tras tocar la propia nota, «Editar» y
+«Quitar».
+
+Quién puede tocar una nota lo dice **`src/domain/notas.js`, que espeja
+`firestore.rules`** — nunca el JSX. La asimetría es deliberada: **edita solo
+su autor; borra su autor o quien organiza**. Y **`editarComentario` NO manda
+`authorUid`**: la regla lleva `unchanged('authorUid')` y rechaza la escritura
+si el campo viaja, aunque lleve el mismo valor.
 
 Y la regla que gobierna las votaciones sigue intacta: los niños son viajeros,
 no usuarios. Nunca votan y nunca entran en el denominador. Votar sigue siendo
