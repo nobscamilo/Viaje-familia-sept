@@ -143,6 +143,41 @@ function enLaAgenda() {
       ahora: { travelerId: 'julian-padre', value: 'x'.repeat(200) },
     }),
 
+    // --- Las notas de un momento (1 sept 2026) ---
+    //
+    // Son comentarios colgando de `timeline` en vez de `decisions`. Sin una
+    // regla propia Firestore deniega por defecto: la nota fallaria al
+    // guardarse y la persona veria un error que no entiende.
+    enAgenda('cualquier miembro deja una nota en un vuelo', 'ALLOW', {
+      uid: 'uid-julian', method: 'create', path: 'timeline/vuelo-bcn-ory/comments/n1',
+      ahora: { authorUid: 'uid-julian', travelerId: 'julian-padre', text: 'Recordar reservar' },
+    }),
+    enAgenda('nadie firma una nota con el nombre de otro', 'DENY', {
+      uid: 'uid-julian', method: 'create', path: 'timeline/camp-nou/comments/n1',
+      ahora: { authorUid: 'uid-camilo', travelerId: 'camilo', text: 'Recordar reservar' },
+    }),
+    enAgenda('una nota vacia no es una nota', 'DENY', {
+      uid: 'uid-julian', method: 'create', path: 'timeline/camp-nou/comments/n1',
+      ahora: { authorUid: 'uid-julian', travelerId: 'julian-padre', text: '' },
+    }),
+    enAgenda('cada uno borra sus propias notas', 'ALLOW', {
+      uid: 'uid-julian', method: 'delete', path: 'timeline/camp-nou/comments/n1',
+      antes: { authorUid: 'uid-julian', text: 'Recordar reservar' },
+    }),
+    enAgenda('no se borra la nota de otro', 'DENY', {
+      uid: 'uid-julian', method: 'delete', path: 'timeline/camp-nou/comments/n1',
+      antes: { authorUid: 'uid-cielo', text: 'Llevar el contrato' },
+    }),
+    enAgenda('quien organiza si puede quitar la nota de otro', 'ALLOW', {
+      uid: 'uid-camilo', method: 'delete', path: 'timeline/camp-nou/comments/n1',
+      antes: { authorUid: 'uid-cielo', text: 'Llevar el contrato' },
+    }),
+    enAgenda('una nota no se puede reasignar a otro autor', 'DENY', {
+      uid: 'uid-julian', method: 'update', path: 'timeline/camp-nou/comments/n1',
+      antes: { authorUid: 'uid-julian', text: 'Recordar reservar' },
+      ahora: { authorUid: 'uid-camilo', text: 'Recordar reservar' },
+    }),
+
     // --- Las cuentas ---
     enAgenda('un adulto anota un gasto', 'ALLOW', {
       uid: 'uid-julian', method: 'create', path: 'gastos/g1',

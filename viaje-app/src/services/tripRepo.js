@@ -111,11 +111,11 @@ export function suscribirVotos(tripId, decisionId, alRecibir, alFallar, rama = '
     ))
 }
 
-export function suscribirComentarios(tripId, decisionId, alRecibir, alFallar) {
+export function suscribirComentarios(tripId, id, alRecibir, alFallar, rama = 'decisions') {
   if (!firebaseListo) return local([], alRecibir)
   return conFirebase((fb) =>
     fb.fs.onSnapshot(
-      fb.fs.query(commentsRef(fb, tripId, decisionId), fb.fs.orderBy('createdAt')),
+      fb.fs.query(commentsRef(fb, tripId, id, rama), fb.fs.orderBy('createdAt')),
       (s) => alRecibir(docsA(s)),
       alFallar,
     ))
@@ -168,11 +168,11 @@ export async function retirarVoto(tripId, decisionId, uid, rama = 'decisions') {
  * ademas deja la huella que impide que la siembra lo revierta.
  */
 
-export async function comentar(tripId, decisionId, { uid, travelerId, text }) {
+export async function comentar(tripId, id, { uid, travelerId, text, rama = 'decisions' }) {
   const limpio = String(text ?? '').trim().slice(0, 2000)
   if (!limpio) return
   const fb = await fbOFallo()
-  await fb.fs.addDoc(commentsRef(fb, tripId, decisionId), {
+  await fb.fs.addDoc(commentsRef(fb, tripId, id, rama), {
     authorUid: uid,
     travelerId,
     text: limpio,

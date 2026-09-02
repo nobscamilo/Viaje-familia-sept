@@ -6,8 +6,10 @@ rules_version = '2';
 //     .uidToTraveler  { uid: travelerId }
 //     /travelers/{travelerId}
 //     /timeline/{eventId}
-//     /decisions/{decisionId}
 //       /votes/{uid}          <- un documento POR PERSONA
+//       /comments/{commentId} <- notas: «recordar reservar»
+//     /decisions/{decisionId}
+//       /votes/{uid}
 //       /comments/{commentId}
 //
 // El voto vive en su propio documento y su id es el uid de quien vota. Esa
@@ -147,6 +149,26 @@ service cloud.firestore {
           (isAdult(tripId) && resource.data.createdBy != null);
 
         allow delete: if isOwner(tripId);
+
+        // --- Notas de un momento de la agenda: «recordar reservar», «llevar
+        // el contrato firmado». Misma forma y mismas reglas que los
+        // comentarios de una decision, porque son la misma cosa colgando de
+        // otra rama.
+        //
+        // Cualquier MIEMBRO escribe (tambien un viewer: dejar constancia de
+        // algo no es tocar el viaje), y solo su autor las edita o borra. No
+        // modifican el momento, asi que la siembra ni se entera: viven en su
+        // propia subcoleccion y `set()` sin merge no las alcanza.
+        match /comments/{commentId} {
+          allow read: if isMember(tripId);
+          allow create: if isMember(tripId) &&
+            request.resource.data.authorUid == request.auth.uid &&
+            request.resource.data.text is string &&
+            request.resource.data.text.size() > 0 &&
+            request.resource.data.text.size() <= 2000;
+          allow update: if resource.data.authorUid == request.auth.uid && unchanged('authorUid');
+          allow delete: if resource.data.authorUid == request.auth.uid || isOwner(tripId);
+        }
 
         // --- Votar un plan propuesto. Misma forma que los votos de una
         // decision: un documento por persona, con su uid de id.

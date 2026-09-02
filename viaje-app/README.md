@@ -1457,6 +1457,48 @@ cuatro anchos, y los 20 elementos que asoman viven **todos** dentro de un
 carril con `overflow-x: auto` — los carruseles de sitios y de días haciendo su
 trabajo. Si `medir.mjs` da 0 en `?demo`, desconfía: sube la espera.
 
+## Notas en las tarjetas de «Ahora» (1 de septiembre, quinta pasada)
+
+Camilo, probándola: *«poder dejar comentarios o notas, por ejemplo recordar
+reservar»*. **No era una función nueva**: es el hilo de comentarios de una
+decisión colgando de la otra rama. Los votos habían hecho ese mismo camino en
+agosto, cuando los planes propuestos empezaron a votarse, y `paths.js` ya
+tenía el `RAMAS = ['decisions', 'timeline']` esperando.
+
+Así que el cambio es sobre todo **no duplicar**: `commentsRef`,
+`suscribirComentarios`, `comentar` y `useComentarios` pasan a llevar una
+`rama` con `'decisions'` por defecto — la llamada de Decisiones no se toca —
+y `Notas.jsx` reusa el mismo hook con `'timeline'`. Las reglas de Firestore
+se copian bajo `timeline/{eventId}`, porque **sin regla propia Firestore
+deniega por defecto** y la nota fallaría al guardarse con un error que nadie
+entiende.
+
+Dos decisiones que parecen una sola:
+
+- **Las notas escritas se ven sin tocar nada.** «Recordar reservar» tiene que
+  saltarte al ojo cuando miras el día; una nota detrás de un toque no recuerda
+  nada. Es exactamente lo contrario de los botones de gestión, que se
+  plegaron esa misma tarde. **Gestionar se pliega, avisar no.**
+- **Escribir sí está plegado**, tras un «+ Nota». Un formulario en cada
+  tarjeta del día convertiría la agenda en un cuaderno.
+
+Son **de todos y van firmadas**: nueve personas apuntando cada una por su lado
+«hay que reservar» es el problema del que sale esta app, no la solución. Las
+edita y borra su autor (o quien organiza), igual que en Decisiones.
+
+**Van en cualquier momento, vuelos y hoteles incluidos, y eso no choca con la
+siembra**: viven en una subcolección, y `seed.mjs` hace `set()` sobre el
+documento del momento — no alcanza a los hijos. Ponerle una nota al Vueling no
+lo marca `tocadoAMano` ni lo saca del espejo. Hay una prueba que vigila que la
+siembra no aprenda nunca lo que es un comentario.
+
+El coste de suscripción resultó barato **gracias al rediseño**: «Ahora» enseña
+un día, así que son dos o tres escuchas de Firestore, no diecisiete.
+
+Verificado con `node scripts/probar-reglas.mjs` —el motor real de Google, no
+el emulador— en siete casos: quién puede escribir, quién no puede firmar por
+otro, quién borra y que nadie reasigne el autor de una nota ajena.
+
 ## Reglas innegociables
 
 - Ningún archivo por encima de **400 líneas**.

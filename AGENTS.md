@@ -119,6 +119,17 @@ Una **ruta** siguen siendo hasta seis momentos con un `rutaId` común, y se
 quitan de una vez: una función que cuesta seis toques deshacer no la prueba
 nadie.
 
+**Las NOTAS de un momento** (desde el 1 de septiembre) son comentarios
+colgando de `timeline/{id}/comments`, la misma forma que los de una decisión:
+`commentsRef`, `suscribirComentarios`, `comentar` y `useComentarios` llevan
+todos una `rama`, igual que los votos. **Dos ramas, una sola forma** — si
+alguien arregla un fallo en una y no en la otra, hay pruebas que lo cazan.
+Se ponen en cualquier momento, vuelos incluidos, y **no chocan con la siembra
+porque viven en una subcolección**: `set()` no alcanza a los hijos, así que
+una nota no marca el momento `tocadoAMano`. Y **gestionar se pliega, avisar
+no**: las notas escritas se leen sin tocar nada; lo que se esconde tras un
+«+ Nota» es el campo de escribir.
+
 Y la regla que gobierna las votaciones sigue intacta: los niños son viajeros,
 no usuarios. Nunca votan y nunca entran en el denominador. Votar sigue siendo
 solo de lo `propuesto`: ponerle marcas de voto a un billete emitido sería

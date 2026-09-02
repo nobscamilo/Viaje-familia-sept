@@ -1,0 +1,83 @@
+/* Notas de un momento de la agenda. Papel amarillo sobre el cristal: son lo
+   unico de la tarjeta escrito a mano por una persona, y tienen que leerse
+   como tal. Se usa el token de aviso porque eso es lo que son — «recordar
+   reservar» es un aviso que se ha puesto alguien. */
+.nts {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--divider-soft);
+}
+
+.nts-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+
+.nts-item {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  border-left: 2px solid var(--warn);
+  background: var(--warn-wash);
+}
+/* Lo mio se marca con el acento, no con la posicion: alinear a la derecha en
+   una lista de nueve personas hace ilegible quien dice que. */
+.nts-item.es-mia { border-left-color: var(--accent); }
+
+.nts-texto {
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.nts-autor {
+  font-family: var(--font-mono);
+  font-size: .5625rem;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.nts-abrir {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 var(--sp-2) 0 0;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: var(--t-small);
+  font-size: .8125rem;
+  cursor: pointer;
+}
+.nts-abrir:hover { color: var(--ink-soft); }
+
+/* `flex-wrap` y `flex: 0 1 auto`: sin envolver, tres controles en 375 px se
+   encogen hasta que el campo no admite ni una palabra. Medido. */
+.nts-form { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.nts-campo {
+  flex: 1 1 100%;
+  min-height: var(--touch);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: var(--r-md);
+  background: var(--glass-soft);
+  color: var(--ink);
+  font-size: .875rem;
+}
+.nts-campo::placeholder { color: var(--ink-faint); }
+
+.nts-guardar, .nts-cancelar {
+  flex: 0 1 auto;
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-md);
+  font: var(--t-small);
+  font-size: .8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nts-guardar { border: 0; background: var(--accent-grad); color: var(--on-accent); }
+.nts-guardar:disabled { opacity: .45; cursor: not-allowed; }
+.nts-cancelar { border: 1px solid var(--glass-border-soft); background: transparent; color: var(--ink-muted); }
+.nts-cancelar:hover { color: var(--ink); }

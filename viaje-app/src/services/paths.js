@@ -43,8 +43,16 @@ export const voteRef = (fb, tripId, id, uid, de = 'decisions') =>
 export const eventRef = (fb, tripId, eventId) =>
   fb.fs.doc(fb.db, 'trips', tripId, 'timeline', eventId)
 
-export const commentsRef = (fb, tripId, decisionId) =>
-  fb.fs.collection(fb.db, 'trips', tripId, 'decisions', decisionId, 'comments')
+/**
+ * Los comentarios tampoco cuelgan solo de una decision.
+ *
+ * Mismo camino que los votos, y por lo mismo: el 1 de septiembre Camilo pidio
+ * poder dejar notas en las tarjetas de «Ahora» —«recordar reservar»—, y una
+ * nota pegada a un momento de la agenda es exactamente lo que ya era un
+ * comentario pegado a una decision. Misma forma, otra rama.
+ */
+export const commentsRef = (fb, tripId, id, de = 'decisions') =>
+  fb.fs.collection(fb.db, 'trips', tripId, rama(de), id, 'comments')
 
 /**
  * El hilo del copiloto, UNO POR PERSONA.

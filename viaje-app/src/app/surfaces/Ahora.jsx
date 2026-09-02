@@ -11,6 +11,7 @@ import Icon from '../../ui/Icon.jsx'
 import Avatars from '../../ui/Avatars.jsx'
 import Proximo from '../../ui/Proximo.jsx'
 import Acciones from '../../ui/Acciones.jsx'
+import Notas from '../../ui/Notas.jsx'
 import DiasCarrusel from '../../ui/DiasCarrusel.jsx'
 import './ahora.css'
 
@@ -211,6 +212,11 @@ function EventRow({ event, dia, ahora, enViaje, hoy }) {
             {abierto ? 'Menos' : detalleResumen(event)}
           </button>
         )}
+
+        {/* Las notas van ANTES de las acciones y con las escritas a la
+            vista: «recordar reservar» tiene que verse al mirar el dia, no
+            detrás de un toque. Lo que se pliega es escribir, no leer. */}
+        <Notas eventoId={event.id} />
 
         {/* Siempre visible, nunca plegado: un plan que se puede votar y no
             enseña como se vota es exactamente el cartel del que venimos. */}
