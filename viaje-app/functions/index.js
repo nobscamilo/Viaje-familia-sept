@@ -12,6 +12,7 @@ import { db } from './lib/admin.js'
 
 import { geminiApiKey, mapsApiKey } from './lib/secrets.js'
 import { conversar } from './lib/copiloto.js'
+import { buscarLugares } from './lib/herramientas.js'
 import { cleanText } from './lib/text.js'
 import { anotar, listar, quitar, sugerir } from './gastos.js'
 import { construirContexto } from './lib/contexto.js'
@@ -31,6 +32,19 @@ const opciones = {
   // bucle en el cliente puede escalar a cien contenedores y a una factura.
   maxInstances: 3,
 }
+
+/** Más sitios: lectura autenticada de Places, sin una llamada al modelo. */
+export const masLugares = onCall({ ...opciones, secrets: [mapsApiKey] }, async (peticion) => {
+  if (!peticion.auth?.uid) throw new HttpsError('unauthenticated', 'Hay que entrar primero.')
+  const tripId = cleanText(peticion.data?.tripId)
+  if (!tripId) throw new HttpsError('invalid-argument', 'Falta el viaje.')
+  await exigirMiembro(tripId, peticion.auth.uid)
+  const { consulta, ciudad, excluir } = peticion.data ?? {}
+  if (!cleanText(ciudad) || !cleanText(consulta)) {
+    throw new HttpsError('invalid-argument', 'Falta la búsqueda o la ciudad.')
+  }
+  return buscarLugares({ consulta: cleanText(consulta).slice(0, 400), ciudad: cleanText(ciudad).slice(0, 80), excluir, cuantos: 5 }, {})
+})
 
 /** Solo miembros del viaje. Devuelve ademas quien eres dentro de el. */
 async function exigirMiembro(tripId, uid) {
@@ -63,7 +77,7 @@ export const copiloto = onCall(opciones, async (peticion) => {
   const apiKey = process.env.GEMINI_API_KEY || geminiApiKey.value()
   if (!apiKey) throw new HttpsError('failed-precondition', 'Falta la clave de Gemini.')
 
-  const contexto = await construirContexto(tripId)
+  const contexto = await construirContexto(tripId, travelerId)
 
   const herramientas = {
     /**

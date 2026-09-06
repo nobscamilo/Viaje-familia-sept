@@ -25,7 +25,7 @@ import './borrador-ruta.css'
  * recalculo es una llamada a Routes por tramo, y teclear «11:30» dispararia
  * cuatro.
  */
-export default function BorradorRuta({ ruta: inicial, tripId, alDescartar }) {
+export default function BorradorRuta({ ruta: inicial, tripId, alDescartar, alCambiar, alGuardada }) {
   const [ruta, setRuta] = useState(inicial)
   const [hora, setHora] = useState(inicial.horaInicio ?? '10:00')
   const [estado, setEstado] = useState(null)
@@ -42,6 +42,7 @@ export default function BorradorRuta({ ruta: inicial, tripId, alDescartar }) {
     try {
       const r = await recalcularRuta(tripId, siguiente)
       setRuta(r.borrador)
+      alCambiar?.(r.borrador)
       setHora(r.borrador.horaInicio)
     } catch (e) {
       setFallo(motivoPlan(e))
@@ -57,7 +58,7 @@ export default function BorradorRuta({ ruta: inicial, tripId, alDescartar }) {
 
   const cambiarMinutos = (orden, minutos) => {
     const n = Number(minutos)
-    if (!Number.isFinite(n) || n <= 0) return
+    if (!Number.isFinite(n) || n <= 0 || n === ruta.paradas.find((p) => p.orden === orden)?.minutos) return
     const paradas = ruta.paradas.map((p) => (p.orden === orden ? { ...p, minutos: n } : p))
     rehacer({ ...ruta, paradas })
   }
@@ -71,8 +72,9 @@ export default function BorradorRuta({ ruta: inicial, tripId, alDescartar }) {
     setEstado('guardando')
     setFallo(null)
     try {
-      const r = await guardarRutaBorrador(tripId, ruta)
+      const r = await guardarRutaBorrador(tripId, { ...ruta, horaInicio: hora })
       setGuardada(r.ruta)
+      alGuardada?.(r.ruta)
     } catch (e) {
       setFallo(motivoPlan(e))
       setEstado(null)

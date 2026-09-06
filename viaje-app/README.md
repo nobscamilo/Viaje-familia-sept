@@ -21,9 +21,9 @@ Sin `.env.local` arranca en **modo local** con los datos de `src/data/`: funcion
 ## Comprobaciones
 
 ```bash
-npm run check         # tamano de archivo + referencias colgando + 40 pruebas
+npm run check         # tamaño de archivo + referencias colgando + 220 pruebas
 npm test              # solo las pruebas
-npm run build         # la entrada debe quedarse en ~280 kB
+npm run build         # revisar el tamaño de entrada; ~361 kB a 6 sep
 ```
 
 `check:dangling` existe porque una constante que se usaba pero no se declaraba
@@ -1583,7 +1583,8 @@ Auditoría del código en `cd3143d` y de una compilación local nueva. No se
 modificó la aplicación ni se desplegaron cambios. La web pública llega al
 acceso por código; no se evaluaron respuestas nuevas de Gemini autenticadas.
 
-Prioridades pendientes, no funcionalidades ya corregidas:
+Hallazgos de aquella revisión. La implementación posterior se detalla en
+«Mejoras del copiloto — 6 de septiembre de 2026» al final de este archivo:
 
 - La cuadrícula de `copiloto.css` declara tres filas, pero sin conversación
   el JSX solo monta dos hijos. La barra de escribir ocupa la fila flexible:
@@ -1613,3 +1614,62 @@ recorrido local; «Empezar de cero» devuelve la bienvenida. Browser plugin no
 está disponible y se utilizó Playwright instalado. El ejemplo local contiene
 solo dos sitios antiguos: no demuestra la búsqueda actual de cinco opciones,
 la vigencia de las fotos ni el servicio autenticado de Maps/Gemini.
+
+
+## Mejoras del copiloto — 6 de septiembre de 2026
+
+**Implementado y probado en local; pendiente de publicación.** El modelo no
+se cambió: el código usa `gemini-2.5-flash` y la función desplegada no tiene
+un valor alternativo de `GEMINI_MODEL` (consulta de configuración, sin secretos).
+
+- Cinco sitios iniciales y **«Ver 5 opciones más»**. La callable `masLugares`
+  exige pertenecer al viaje y consulta Places directamente, sin Gemini. Conserva
+  consulta, ciudad e IDs vistos; no duplica sitios y avisa al agotar el lote.
+  Cada consulta examina hasta 20 candidatos. No es una búsqueda infinita ni
+  garantiza veinte sitios: depende de lo que devuelva Google. Si el usuario
+  pide una cantidad concreta, `buscarLugares` acepta de 5 a 20. Solo se pide
+  una foto por sitio mostrado, en vez de hasta cinco fotos que nadie veía.
+- El formulario ocupa su fila explícita, también sin cabecera de sesión.
+  El botón Enviar mide 44 px en las pruebas a 1280, 430, 390 y 375 px.
+- Se fecha cada mensaje nuevo y se recorta el contexto antes de enviarlo.
+  Los borradores pendientes sobreviven al cambio de día y a «Empezar de cero»,
+  pero no se incluyen como conversación vieja del modelo. Se descartan en su
+  propia tarjeta. La ampliación de sitios ya no fuerza el scroll al final del chat.
+- `hilos/{travelerId}/estado/actual` conserva conversación y borradores con sus
+  cambios, descartes y recibos. Es privado incluso frente al owner. Las
+  transacciones comprueban una revisión para impedir sobrescrituras desde
+  otra pestaña desactualizada; los conflictos se muestran al usuario. Las
+  URLs efímeras de fotos no se guardan. Los mensajes de texto siguen en el
+  historial inmutable y sirven de respaldo para migrar conversaciones antiguas.
+- El guardia distingue un borrador de una escritura real: una afirmación falsa
+  de «ya está en la agenda» se sustituye por un estado verdadero. Las tarjetas
+  mantienen sus avisos. Se retiró la promesa «no me invento nada».
+- El contexto incluye quién pregunta, fecha en Europe/Madrid y las tres últimas
+  notas de cada uno de los diez próximos eventos. Las notas se identifican como
+  datos familiares, no instrucciones. Los atajos ya no están fijados a Sol,
+  IFEMA ni «mis papás». Un selector manual de día/ciudad y una recomendación
+  destacada entre las opciones siguen siendo propuestas, no funciones añadidas.
+
+**Validación:** 220 pruebas pasan; 47 casos contra el motor de reglas de Google
+pasan, incluidos lectura propia y denegación a terceros. Build correcto, con
+el aviso conocido del chunk de Firebase superior a 500 kB. Playwright prueba
+la app y sus componentes reales con transporte Firebase/Gemini simulado:
+5 → 10 sitios, fallo y reintento, final de resultados, recarga con hora editada,
+reinicio con borrador pendiente y guardado sin reaparición del borrador. Sin
+excepciones JavaScript ni desbordamiento horizontal en los cuatro anchos.
+Places real devuelve dos lotes de cinco, diez IDs distintos y fotos en el
+primer lote. No se escribieron pruebas en el viaje de la familia.
+
+**Modelo:** la API del proyecto también lista `gemini-3.8-flash`. Es candidato
+para una evaluación con preguntas reales del viaje, no un cambio automático.
+[Catálogo oficial](https://ai.google.dev/gemini-api/docs/models) y
+[precios oficiales](https://ai.google.dev/gemini-api/docs/pricing), consultados
+el 6 de septiembre: 2.5 Flash cuesta $0,30/$2,50 por millón de tokens de
+entrada/salida de texto; 3.8 Flash figura a $0,75/$3,75 hasta el 31 de diciembre
+de 2026. No se ha realizado un benchmark comparativo del copiloto. Revisar
+compatibilidad de configuración y herramientas antes de cambiar la variable.
+
+**Publicación:** desplegar primero las reglas de la instantánea y las funciones
+`copiloto` y `masLugares`; después, hosting. `npm run publicar` solo despliega
+hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
+`src/data/` y no requiere siembra. No publicar solo la web con reglas antiguas.

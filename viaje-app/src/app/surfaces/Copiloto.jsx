@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTrip } from '../../hooks/useTrip.js'
 import { useHilo } from '../../hooks/useHilo.js'
 import { formatDay } from '../../domain/dates.js'
-import MiniMapa from '../../ui/MiniMapa.jsx'
-import Lugar from '../../ui/LugarTarjeta.jsx'
+import SitiosCopiloto from '../../ui/SitiosCopiloto.jsx'
+import { contextoVivo, restaurarConversacion } from '../../domain/hilo.js'
 import ReciboRuta from '../../ui/ReciboRuta.jsx'
 import BorradorRuta from '../../ui/BorradorRuta.jsx'
 import BorradorPlan from '../../ui/BorradorPlan.jsx'
@@ -14,11 +14,10 @@ import Marcado from '../../ui/Marcado.jsx'
 import './copiloto.css'
 
 const ATAJOS = [
-  'Dónde cenamos cerca de Sol con dos niños',
-  '¿Cuánto se tarda del apartamento a IFEMA en metro?',
-  'Qué hacemos el viernes los que no vamos al circuito',
-  'Un plan de mañana para mis papás, tranquilo',
-  'Busca dónde cenar cerca de Sol y agrégalo al jueves',
+  'Busca cinco opciones para cenar en la ciudad donde estaremos hoy',
+  '¿Cómo llegamos a la próxima actividad de la agenda?',
+  'Propón una ruta tranquila para el próximo día libre',
+  '¿Qué nos falta por decidir para el viaje?',
 ]
 
 /**
@@ -32,8 +31,7 @@ const demoPedida = () =>
 
 export default function Copiloto() {
   const { tripId, yo, modoLocal } = useTrip()
-  const { guardados, cargando, guardar, olvidar } = useHilo()
-  const [mensajes, setMensajes] = useState([])
+  const { mensajes, setMensajes, cargando, errorGuardado, guardar, olvidar, reintentar } = useHilo()
   const [texto, setTexto] = useState('')
   const [pensando, setPensando] = useState(false)
   const [borrando, setBorrando] = useState(false)
@@ -41,25 +39,7 @@ export default function Copiloto() {
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [mensajes, pensando])
-
-  /**
-   * El hilo guardado, al abrir.
-   *
-   * Antes la conversacion vivia solo en memoria: recargar la borraba, y con
-   * ella el contexto. Preguntabas «¿y en metro?» despues de recargar y el
-   * copiloto no sabia de que hablabas.
-   *
-   * Desde el 1 de septiembre `useHilo` devuelve SOLO la conversacion viva
-   * —corta por silencio largo o cambio de dia—, asi que esto ya no vuelca
-   * anteayer. Solo se vuelca si aun no se ha escrito nada en esta sesion: si
-   * alguien ya esta hablando, una respuesta tardia del servidor no le pisa el
-   * hilo.
-   */
-  useEffect(() => {
-    if (cargando || guardados.length === 0) return
-    setMensajes((ms) => (ms.length === 0 ? guardados : ms))
-  }, [cargando, guardados])
+  }, [mensajes.length, pensando])
 
   // Carga diferida: la conversacion de ejemplo son unos kilobytes de fotos y
   // texto que no pinta nada en produccion. Con `import()` solo se descarga si
@@ -67,7 +47,7 @@ export default function Copiloto() {
   useEffect(() => {
     if (!modoLocal || !demoPedida()) return
     import('../../data/demo-copiloto.js').then((m) => setMensajes(m.DEMO))
-  }, [modoLocal])
+  }, [modoLocal, setMensajes])
 
   /**
    * Un plan agregado desde una tarjeta se pega al mensaje que la enseño.
@@ -89,20 +69,22 @@ export default function Copiloto() {
 
   const preguntar = async (pregunta) => {
     const limpio = (pregunta ?? texto).trim()
-    if (!limpio || pensando) return
+    if (!limpio || pensando || cargando || modoLocal) return
 
-    const mio = { rol: 'yo', texto: limpio }
-    const nuevos = [...mensajes, mio]
+    const ahora = new Date()
+    const mio = { rol: 'yo', texto: limpio, en: ahora.getTime() }
+    const nuevos = [...restaurarConversacion(mensajes, ahora), mio]
     setMensajes(nuevos)
     setTexto('')
     setPensando(true)
     guardar(mio)
 
     try {
-      const r = await preguntarCopiloto(tripId, nuevos)
+      const r = await preguntarCopiloto(tripId, contextoVivo(nuevos, ahora))
       const suyo = {
-        rol: 'copiloto',
+        rol: 'copiloto', en: Date.now(),
         texto: r.texto,
+        busquedas: r.busquedas,
         tarjetas: r.tarjetas,
         rutas: r.rutas,
         propuestas: r.propuestas,
@@ -111,15 +93,13 @@ export default function Copiloto() {
         borradores: r.borradores,
         borradoresPlan: r.borradoresPlan,
       }
-      setMensajes([...nuevos, suyo])
-      // Solo se guarda el texto: las fotos y las rutas se vuelven a pedir si
-      // hacen falta, y guardarlas seria pagar almacenamiento por decoracion.
-      guardar({ rol: 'copiloto', texto: r.texto })
+      setMensajes((ms) => [...ms, suyo])
+      guardar(suyo)
     } catch (e) {
-      setMensajes([...nuevos, {
+      setMensajes((ms) => [...ms, {
         rol: 'copiloto',
         texto: `No pude responder: ${e?.message ?? 'error desconocido'}`,
-        fallo: true,
+        fallo: true, en: Date.now(),
       }])
     }
     setPensando(false)
@@ -143,13 +123,13 @@ export default function Copiloto() {
    * Va arriba y pegajoso —alcanzable con el hilo largo— y lo mas lejos
    * posible del boton de enviar. No pide confirmacion a proposito: lo que se
    * pierde es contexto, no datos. Los planes estan en la agenda, los gastos
-   * en las cuentas y las decisiones en Decisiones; aqui solo queda charla.
+   * en las cuentas y las decisiones en Decisiones. Los borradores pendientes
+   * se conservan fuera de la conversación hasta guardarlos o descartarlos.
    */
   const empezarDeCero = async () => {
     setBorrando(true)
-    setMensajes([])
     setTexto('')
-    try { await olvidar() } catch { /* si no se borra en el servidor, caduca solo */ }
+    await olvidar()
     setBorrando(false)
   }
 
@@ -176,7 +156,9 @@ export default function Copiloto() {
       )}
 
       <div className="cop-hilo">
-        {mensajes.length === 0 && <Bienvenida yo={yo} alElegir={preguntar} />}
+        {cargando && <p role="status">Recuperando tu conversación…</p>}
+        {!cargando && mensajes.length === 0 && <Bienvenida yo={yo} alElegir={preguntar} desactivado={modoLocal} />}
+        {errorGuardado && <div role="alert" className="cop-fallo">{errorGuardado}<button type="button" className="cop-limpiar" onClick={reintentar}>Reintentar guardado</button></div>}
 
         {mensajes.map((m, i) => (
           <Mensaje
@@ -187,6 +169,7 @@ export default function Copiloto() {
             alAgregar={(plan) => anadirRecibo(i, plan)}
             alQuitar={(id) => borrarRecibo(i, id)}
             alSoltar={(lista, j) => soltarBorrador(i, lista, j)}
+            alCambiar={(cambios) => setMensajes((ms) => ms.map((m, k) => k === i ? { ...m, ...cambios } : m))}
           />
         ))}
 
@@ -207,9 +190,10 @@ export default function Copiloto() {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder={modoLocal ? 'Modo local: sin copiloto' : 'Pregunta lo que sea del viaje…'}
-          disabled={modoLocal || pensando}
+          aria-label="Pregunta al copiloto"
+          disabled={modoLocal || pensando || cargando}
         />
-        <button type="submit" className="cop-enviar" disabled={!texto.trim() || pensando || modoLocal}>
+        <button type="submit" className="cop-enviar" disabled={!texto.trim() || pensando || modoLocal || cargando}>
           Enviar
         </button>
       </form>
@@ -217,18 +201,18 @@ export default function Copiloto() {
   )
 }
 
-function Bienvenida({ yo, alElegir }) {
+function Bienvenida({ yo, alElegir, desactivado }) {
   return (
     <div className="cop-inicio">
       <p className="cop-eyebrow">Copiloto</p>
       <h1 className="cop-titulo">Hola{yo ? `, ${yo.short}` : ''}.</h1>
       <p className="cop-lede">
         Conozco la agenda, quién viaja y qué falta por decidir. Busco sitios
-        reales en Google Maps y calculo cuánto se tarda: no me invento nada.
+        en Google Maps y consulto trayectos. Te propongo opciones para que tú decidas.
       </p>
       <div className="cop-atajos">
         {ATAJOS.map((a) => (
-          <button key={a} type="button" className="cop-atajo" onClick={() => alElegir(a)}>
+          <button key={a} type="button" className="cop-atajo" disabled={desactivado} onClick={() => alElegir(a)}>
             {a}
           </button>
         ))}
@@ -239,8 +223,7 @@ function Bienvenida({ yo, alElegir }) {
 
 const MODO = { metro: 'transport', transporte: 'transport', coche: 'transport', andando: 'activity' }
 
-function Mensaje({ mensaje, tripId, alAgregar, alQuitar, alSoltar, conMapa = false }) {
-  const [elegido, setElegido] = useState(null)
+function Mensaje({ mensaje, tripId, alAgregar, alQuitar, alSoltar, alCambiar, conMapa = false }) {
   const mio = mensaje.rol === 'yo'
   return (
     <div className={`cop-msg ${mio ? 'cop-de-mi' : 'cop-de-copiloto'}`}>
@@ -263,47 +246,39 @@ function Mensaje({ mensaje, tripId, alAgregar, alQuitar, alSoltar, conMapa = fal
         </div>
       )}
 
-      {mensaje.tarjetas?.length > 0 && (
-        <>
-          {/* Donde caen, antes de decidir. Solo en el ultimo mensaje con
-              sitios: lo decide quien pinta el hilo, por la cuota. */}
-          {conMapa && (
-            <MiniMapa lugares={mensaje.tarjetas} elegido={elegido} alElegir={setElegido} />
-          )}
-          <ul className={`cop-lugares ${mensaje.tarjetas.length > 1 ? 'es-carrusel' : ''}`}>
-            {mensaje.tarjetas.map((l) => (
-              <Lugar key={l.placeId} lugar={l} tripId={tripId} alAgregar={alAgregar}
-                elegido={elegido === l.placeId} alElegir={setElegido} />
-            ))}
-          </ul>
-        </>
-      )}
+      {mensaje.tarjetas?.length > 0 && <SitiosCopiloto
+        tarjetas={mensaje.tarjetas} busquedas={mensaje.busquedas ?? []}
+        tripId={tripId} conMapa={conMapa} alAgregar={alAgregar} alCambiar={alCambiar}
+      />}
 
       {/* Lo que el copiloto PROPONE y todavia no ha escrito. Va antes que
           los recibos a proposito: lo que espera una decision pesa mas que lo
           que ya esta hecho. */}
       {mensaje.borradores?.map((b, j) => (
         <BorradorRuta
-          key={`br-${j}`}
+          key={b.id ?? `${b.titulo}-${b.fecha}`}
           ruta={b}
           tripId={tripId}
           alDescartar={() => alSoltar?.('borradores', j)}
+          alCambiar={(ruta) => alCambiar({ borradores: mensaje.borradores.map((b, k) => k === j ? ruta : b) })}
+          alGuardada={(ruta) => alCambiar({ borradores: mensaje.borradores.filter((_, k) => k !== j), itinerarios: [...(mensaje.itinerarios ?? []), ruta] })}
         />
       ))}
 
       {mensaje.borradoresPlan?.map((b, j) => (
         <BorradorPlan
-          key={`bp-${j}`}
+          key={b.id ?? `${b.titulo}-${b.placeId}`}
           plan={b}
           tripId={tripId}
           alAgregado={(plan) => { alAgregar?.(plan); alSoltar?.('borradoresPlan', j) }}
           alDescartar={() => alSoltar?.('borradoresPlan', j)}
+          alCambiar={(plan) => alCambiar({ borradoresPlan: mensaje.borradoresPlan.map((b, k) => k === j ? plan : b) })}
         />
       ))}
 
       {/* Una ruta entera: un recibo, no seis planes sueltos. */}
       {mensaje.itinerarios?.map((r) => (
-        <ReciboRuta key={r.id} ruta={r} tripId={tripId} />
+        <ReciboRuta key={r.id} ruta={r} tripId={tripId} alQuitar={(id) => alCambiar({ itinerarios: mensaje.itinerarios.filter((r) => r.id !== id) })} />
       ))}
 
       {/* Lo que el copiloto HIZO no puede parecer una viñeta mas: es lo unico

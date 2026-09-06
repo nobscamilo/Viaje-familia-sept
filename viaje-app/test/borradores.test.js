@@ -114,14 +114,13 @@ test('al modelo se le quita el borrador entero, no solo las fotos', () => {
   assert.match(src, /delete salida\.borradorPlan\b/)
 })
 
-test('proponer un borrador cuenta como haber llamado a la herramienta', () => {
-  // Si no, el guardia contra la mentira dispara en CADA ruta bien hecha:
-  // «te dejo propuesto el plan» ya casa con el patron de «lo agendé».
-  const src = lee('../functions/lib/copiloto.js')
-  const desde = src.indexOf('export function queMintio')
-  const cuerpo = src.slice(desde, src.indexOf('export function corregirSiMiente'))
-  assert.match(cuerpo, /borradores/)
-  assert.match(cuerpo, /borradoresPlan/)
+test('un borrador no acredita haberlo agregado a la agenda', async () => {
+  const { queMintio, corregirSiMiente } = await import('../functions/lib/copiloto.js')
+  const datos = { planes: [], propuestas: [], borradores: [{ titulo: 'Ruta' }] }
+  assert.equal(queMintio('Ya te lo agregué a la agenda', datos), 'agregarlo a la agenda')
+  assert.equal(queMintio('Te dejo propuesto el plan. Si te cuadra, dale al botón.', datos), null)
+  assert.doesNotMatch(corregirSiMiente('Ya te lo agregué a la agenda', datos), /Ya te lo agregué/)
+  assert.match(corregirSiMiente('Ya te lo agregué a la agenda', datos), /Todavía no está/)
 })
 
 test('al modelo se le dice que ya no escribe, no solo se le cambia la herramienta', () => {

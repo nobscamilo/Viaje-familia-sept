@@ -38,7 +38,7 @@ export const DECLARACIONES = [
         cuantos: {
           type: 'integer',
           description:
-            'Cuantos resultados, de 5 a 8. Por defecto 5. Enseña SIEMPRE cinco o mas ' +
+            'Cuantos resultados, de 5 a 20. Por defecto 5. Enseña SIEMPRE cinco o mas ' +
             'aunque en el texto recomiendes uno: la familia son nueve personas con ' +
             'gustos distintos y el carrusel no cuesta nada. Menos de 5 se ignora.',
         },

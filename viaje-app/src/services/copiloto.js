@@ -24,6 +24,8 @@ export async function preguntarCopiloto(tripId, mensajes) {
     tarjetas: data?.tarjetas ?? [],
     rutas: data?.rutas ?? [],
     propuestas: data?.propuestas ?? [],
+    busquedas: data?.busquedas ?? [],
+    itinerarios: data?.itinerarios ?? [],
     planes: data?.planes ?? [],
     // Lo que el copiloto PROPONE y todavia no ha escrito. Van aparte de
     // `planes` a proposito: `planes` son recibos de algo que ya esta en la
@@ -31,4 +33,13 @@ export async function preguntarCopiloto(tripId, mensajes) {
     borradores: data?.borradores ?? [],
     borradoresPlan: data?.borradoresPlan ?? [],
   }
+}
+
+export async function pedirMasLugares(tripId, busqueda) {
+  const fb = await getFb()
+  if (!fb) throw new Error('En modo local no se puede buscar en Google.')
+  const funciones = await import('firebase/functions')
+  const instancia = funciones.getFunctions(fb.app, 'europe-west1')
+  const { data } = await funciones.httpsCallable(instancia, 'masLugares', { timeout: 30000 })({ tripId, ...busqueda })
+  return data
 }

@@ -69,3 +69,31 @@ export function sesionActual(mensajes = [], ahora = new Date()) {
   }
   return mensajes.slice(desde)
 }
+
+
+/** Los borradores pendientes sobreviven al cambio de sesión; no son contexto. */
+export function pendientes(mensajes = []) {
+  return mensajes.filter((m) => m.borradores?.length || m.borradoresPlan?.length).map((m) => ({
+    ...m, texto: 'Borrador pendiente de revisar', soloBorrador: true,
+    tarjetas: [], busquedas: [], rutas: [], planes: [], itinerarios: [], propuestas: [],
+  }))
+}
+
+export function restaurarConversacion(mensajes = [], ahora = new Date()) {
+  const conversacion = mensajes.filter((m) => !m.soloBorrador)
+  const vivos = sesionActual(conversacion, ahora)
+  return [...pendientes(mensajes.filter((m) => !vivos.includes(m))), ...vivos]
+}
+
+/** El modelo solo recibe la conversación viva, nunca las tarjetas ni los fallos. */
+export function contextoVivo(mensajes, ahora = new Date()) {
+  return sesionActual(mensajes.filter((m) => !m.soloBorrador && !m.fallo), ahora)
+    .slice(-12).map(({ rol, texto }) => ({ rol, texto }))
+}
+
+export function estadoSerializable(mensajes) {
+  return JSON.parse(JSON.stringify(mensajes.slice(-60), (k, v) => {
+    if (k === 'photoUri' || k === 'photoUris' || k === 'photoNames' || k === 'photoName' || k === 'photos' || k === 'createdAt') return undefined
+    return v
+  }))
+}

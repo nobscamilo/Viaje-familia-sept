@@ -10,6 +10,7 @@
 }
 
 .cop-hilo {
+  grid-row: 2;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-4);
@@ -127,6 +128,7 @@
 /* ---------- barra ---------- */
 
 .cop-barra {
+  grid-row: 3;
   display: flex;
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);

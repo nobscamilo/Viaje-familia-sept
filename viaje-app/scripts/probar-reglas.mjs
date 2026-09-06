@@ -178,6 +178,33 @@ function enLaAgenda() {
       ahora: { authorUid: 'uid-camilo', text: 'Recordar reservar' },
     }),
 
+    // --- La instantánea privada del copiloto ---
+    enAgenda('cada viajero guarda su conversación y borradores', 'ALLOW', {
+      uid: 'uid-julian', method: 'create', path: 'hilos/julian-padre/estado/actual',
+      ahora: { mensajes: [], revision: 1, updatedAt: 'ahora' },
+    }),
+    enAgenda('cada viajero actualiza su conversación', 'ALLOW', {
+      uid: 'uid-julian', method: 'update', path: 'hilos/julian-padre/estado/actual',
+      antes: { mensajes: [], revision: 1 }, ahora: { mensajes: [{ texto: 'hola' }], revision: 2 },
+    }),
+    enAgenda('cada viajero recupera sus borradores', 'ALLOW', {
+      uid: 'uid-julian', method: 'get', path: 'hilos/julian-padre/estado/actual',
+    }),
+    enAgenda('ni el owner lee una conversación ajena', 'DENY', {
+      uid: 'uid-camilo', method: 'get', path: 'hilos/julian-padre/estado/actual',
+    }),
+    enAgenda('ni el owner sobrescribe borradores ajenos', 'DENY', {
+      uid: 'uid-camilo', method: 'update', path: 'hilos/julian-padre/estado/actual',
+      antes: { mensajes: [], revision: 1 }, ahora: { mensajes: [], revision: 2 },
+    }),
+    enAgenda('un extraño no lee la conversación', 'DENY', {
+      uid: 'uid-extraño', method: 'get', path: 'hilos/julian-padre/estado/actual',
+    }),
+    enAgenda('no se admiten instantáneas sin límite', 'DENY', {
+      uid: 'uid-julian', method: 'create', path: 'hilos/julian-padre/estado/actual',
+      ahora: { mensajes: Array(61).fill({ texto: 'x' }), revision: 1 },
+    }),
+
     // --- Las cuentas ---
     enAgenda('un adulto anota un gasto', 'ALLOW', {
       uid: 'uid-julian', method: 'create', path: 'gastos/g1',

@@ -59,7 +59,7 @@ function horarioDeHoy(horario) {
   return Array.isArray(d) && d.length ? d.join(' | ').slice(0, 300) : null
 }
 
-async function buscarLugares({ consulta, cuantos, ciudad }, contexto) {
+export async function buscarLugares({ consulta, cuantos, ciudad, excluir = [] }, contexto, servicios = { searchPlaces, withPlacePhotos }) {
   const texto = cleanText(consulta)
   if (!texto) return { error: 'Sin consulta.' }
 
@@ -67,31 +67,17 @@ async function buscarLugares({ consulta, cuantos, ciudad }, contexto) {
   // da el modelo desde la agenda; si no, la del dia que se este mirando.
   const donde = cleanText(ciudad) || contexto?.ciudadPorDefecto || null
 
-  /**
-   * Se piden mas de los que se ensenan, y luego se ordenan por nota.
-   *
-   * Google devuelve por relevancia: el primero es el que mas se parece al
-   * texto y cae mas cerca, no el mejor. Pedir 12 y quedarse con los 5 mejor
-   * valorados cuesta lo mismo —Places cobra por peticion, no por resultado—
-   * y cambia por completo lo que sale para «donde cenamos».
-   */
-  /**
-   * CINCO como suelo, no como valor por defecto (peticion de Camilo, 1 sept).
-   *
-   * Antes era `Math.max(cuantos || 5, 1)`: si el modelo pedia dos, salian
-   * dos. Ahora el suelo esta en el codigo y no en una suplica al modelo, que
-   * es la diferencia entre una regla y una intencion. El tope sigue en 8:
-   * mas tarjetas en un carrusel no se miran, se pasan.
-   *
-   * Sale gratis pedir de mas: Places cobra por peticion, no por resultado.
-   */
-  const cuantosEnsenar = Math.min(Math.max(cuantos || 5, 5), 8)
-  const crudos = await searchPlaces(texto, Math.max(cuantosEnsenar * 2, 12), donde)
-  const todos = ordenarPorNota(crudos.map(normalizePlace))
-  // El minimo de nota es una preferencia, no una condicion: si deja la lista
-  // corta, se completa con lo mejor de lo descartado en vez de enseñar dos.
+  if (!donde) return { error: 'Dime en qué ciudad quieres buscar.' }
+  const cantidad = Number(cuantos)
+  const cuantosEnsenar = Number.isFinite(cantidad) ? Math.min(Math.max(Math.floor(cantidad), 5), 20) : 5
+  const vistos = new Set(Array.isArray(excluir) ? excluir.filter((x) => typeof x === 'string').slice(0, 100) : [])
+  // Un lote amplio y estable. El botón pide otros cinco sin volver a Gemini
+  // y solo resuelve fotos de los sitios que se van a mostrar.
+  const crudos = await servicios.searchPlaces(texto, 20, donde)
+  const unicos = [...new Map(crudos.map(normalizePlace).map((p) => [p.placeId, p])).values()]
+  const todos = ordenarPorNota(unicos).filter((p) => !vistos.has(p.placeId))
   const mejores = completarHasta(quitarLosFlojos(todos), todos, cuantosEnsenar).slice(0, cuantosEnsenar)
-  const lugares = await Promise.all(mejores.map((p) => withPlacePhotos(p)))
+  const lugares = await Promise.all(mejores.map((p) => servicios.withPlacePhotos({ ...p, photoNames: p.photoNames.slice(0, 1) })))
 
   return {
     // Al modelo le damos lo justo para redactar. Las fotos y los enlaces van
@@ -110,6 +96,11 @@ async function buscarLugares({ consulta, cuantos, ciudad }, contexto) {
       horario: horarioDeHoy(l.horario),
     })),
     tarjetas: lugares,
+    busqueda: {
+      consulta: texto, ciudad: donde,
+      excluir: [...vistos, ...lugares.map((p) => p.placeId)],
+      agotada: todos.length <= lugares.length,
+    },
   }
 }
 

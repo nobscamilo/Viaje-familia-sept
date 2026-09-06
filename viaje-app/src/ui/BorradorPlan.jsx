@@ -17,7 +17,7 @@ import './borrador-plan.css'
  * servidor: aqui no se toca ningun pin. Si esta pantalla pudiera escribir
  * unas coordenadas, un dedo torpe podria mover el Camp Nou.
  */
-export default function BorradorPlan({ plan, tripId, alAgregado, alDescartar }) {
+export default function BorradorPlan({ plan, tripId, alAgregado, alDescartar, alCambiar }) {
   const [dia, setDia] = useState(plan.fecha ?? '')
   const [hora, setHora] = useState(plan.hora ?? '')
   const [estado, setEstado] = useState(null)
@@ -62,7 +62,8 @@ export default function BorradorPlan({ plan, tripId, alAgregado, alDescartar }) 
             key={d}
             type="button"
             className={`bp-dia ${dia === d ? 'es-activo' : ''}`}
-            onClick={() => setDia(d)}
+            disabled={estado === 'guardando'}
+            onClick={() => { setDia(d); alCambiar?.({ ...plan, fecha: d, hora }) }}
           >
             {formatDay(d)}
           </button>
@@ -75,12 +76,13 @@ export default function BorradorPlan({ plan, tripId, alAgregado, alDescartar }) 
           type="time"
           value={hora}
           aria-label="Hora, si la hay"
-          onChange={(e) => setHora(e.target.value)}
+          disabled={estado === 'guardando'}
+          onChange={(e) => { setHora(e.target.value); alCambiar?.({ ...plan, fecha: dia, hora: e.target.value }) }}
         />
         <button type="button" className="bp-agregar" disabled={estado === 'guardando'} onClick={agregar}>
           {estado === 'guardando' ? 'Agregando…' : 'Agregar a la agenda'}
         </button>
-        <button type="button" className="bp-descartar" onClick={() => alDescartar?.()}>
+        <button type="button" className="bp-descartar" disabled={estado === 'guardando'} onClick={() => alDescartar?.()}>
           Descartar
         </button>
       </div>

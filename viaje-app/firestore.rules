@@ -209,6 +209,18 @@ service cloud.firestore {
         allow update: if false;   // un mensaje dicho no se reescribe
       }
 
+      // Instantánea privada y editable: conversación y borradores pendientes.
+      match /hilos/{travelerId}/estado/{estadoId} {
+        function esMio() {
+          return isMember(tripId) && trip(tripId).uidToTraveler[request.auth.uid] == travelerId;
+        }
+        allow read, delete: if esMio();
+        allow create, update: if esMio() && estadoId == 'actual' &&
+          request.resource.data.keys().hasOnly(['mensajes', 'updatedAt', 'revision']) &&
+          request.resource.data.mensajes is list && request.resource.data.mensajes.size() <= 60 &&
+          request.resource.data.revision is int && request.resource.data.revision > 0;
+      }
+
       // --- Las cuentas.
       //
       // Un gasto lo puede anotar cualquier adulto y lo ve todo el mundo: unas

@@ -68,7 +68,7 @@ test('«Empezar de cero» tiene boton de verdad, no solo funcion', () => {
   assert.match(src, /cop-limpiar/)
   assert.match(src, /await olvidar\(\)/)
   // Y el hilo solo devuelve lo vivo, no el historial entero.
-  assert.match(lee('../src/hooks/useHilo.js'), /sesionActual\(todos/)
+  assert.match(lee('../src/hooks/useHilo.js'), /restaurarConversacion\(todos/)
 })
 
 // ------------------------------------------------- cinco sitios, no dos
@@ -94,13 +94,11 @@ test('completarHasta no toca una lista que ya llega', () => {
   assert.deepEqual(completarHasta([], todos, 3), [1, 2, 3])
 })
 
-test('cinco es un suelo en el codigo, no una suplica al modelo', () => {
-  // «Enséñale cinco» en el prompt es una intencion; el suelo en el servidor
-  // es una regla. El proyecto ya aprendio esa diferencia con las mentiras
-  // del copiloto en agosto.
-  const src = lee('../functions/lib/herramientas.js')
-  assert.match(src, /Math\.max\(cuantos \|\| 5, 5\)/)
-  assert.match(src, /completarHasta\(/)
-  // Y ademas se le dice al modelo, que no sobra.
-  assert.match(lee('../functions/lib/declaraciones.js'), /de 5 a 8/)
+test('la búsqueda conserva al menos cinco opciones aunque el modelo pida dos', async () => {
+  const { buscarLugares } = await import('../functions/lib/herramientas.js')
+  const lugares = Array.from({ length: 8 }, (_, i) => ({ id: String(i), displayName: { text: `Sitio ${i}` }, rating: 4 }))
+  const r = await buscarLugares({ consulta: 'cena', ciudad: 'Madrid', cuantos: 2 }, {}, {
+    searchPlaces: async () => lugares, withPlacePhotos: async (p) => p,
+  })
+  assert.equal(r.tarjetas.length, 5)
 })

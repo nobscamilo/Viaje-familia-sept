@@ -165,7 +165,7 @@ test('la tarjeta de un sitio lleva el boton de agregar, con su viaje', () => {
   // El 1 de septiembre `Lugar` se mudo a su propio fichero (Copiloto.jsx
   // llego a 397 de las 400 lineas permitidas). Esta prueba lo cazo: se mira
   // el paso del viaje donde se monta, y el boton donde ahora se pinta.
-  const jsx = readFileSync(new URL('../src/app/surfaces/Copiloto.jsx', import.meta.url), 'utf8')
+  const jsx = readFileSync(new URL('../src/ui/SitiosCopiloto.jsx', import.meta.url), 'utf8')
   assert.match(jsx, /<Lugar[^>]*tripId=\{tripId\}/s, 'Lugar necesita el viaje para poder escribir')
   const tarjeta = readFileSync(new URL('../src/ui/LugarTarjeta.jsx', import.meta.url), 'utf8')
   assert.match(tarjeta, /<AgregarPlan/, 'y la tarjeta tiene que pintar el boton')

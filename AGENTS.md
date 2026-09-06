@@ -167,8 +167,9 @@ que se pinta en el chat con sus botones; la escritura la dispara una persona.
 - **Cambiar la herramienta sin cambiar las instrucciones produce un copiloto
   mentiroso.** Si el prompt sigue diciendo «entra como PROPUESTO en la agenda»,
   el modelo promete algo que no ha pasado. Y al revés con el guardia
-  anti-mentiras: un borrador **cuenta** como haber llamado a la herramienta, o
-  el aviso «⚠️ en realidad no llegué a…» salta en cada ruta bien hecha.
+  anti-mentiras: una propuesta válida no debe provocar un falso aviso, pero
+  **un borrador no acredita una escritura**. Si afirma haberlo agregado, se
+  corrige el texto; solo el recibo de guardado acredita que está en la agenda.
 
 ---
 
@@ -304,3 +305,12 @@ Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
 Hallazgos y validación en [viaje-app/README.md](viaje-app/README.md), sección «Revisión del copiloto —
 6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
 esta revisión no acredita el servicio autenticado ni un nuevo despliegue.
+
+
+### Implementación del copiloto — 6 de septiembre de 2026
+
+Implementados más sitios de cinco en cinco, conservación privada de borradores,
+corrección de caducidad y formulario, y contexto con identidad y notas. Gemini
+2.5 Flash se mantiene. Pasan 220 pruebas y 47 casos de reglas; pendiente de
+publicar reglas, funciones y web, sin siembra. Detalles, límites y evaluación
+de modelos en [viaje-app/README.md](viaje-app/README.md), sección «Mejoras del copiloto».

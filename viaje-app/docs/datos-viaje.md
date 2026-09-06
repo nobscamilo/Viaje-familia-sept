@@ -219,3 +219,12 @@ Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
 Hallazgos y validación en [../README.md](../README.md), sección «Revisión del copiloto —
 6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
 esta revisión no acredita el servicio autenticado ni un nuevo despliegue.
+
+
+### Implementación del copiloto — 6 de septiembre de 2026
+
+Implementados más sitios de cinco en cinco, conservación privada de borradores,
+corrección de caducidad y formulario, y contexto con identidad y notas. Gemini
+2.5 Flash se mantiene. Pasan 220 pruebas y 47 casos de reglas; pendiente de
+publicar reglas, funciones y web, sin siembra. Detalles, límites y evaluación
+de modelos en [../README.md](../README.md), sección «Mejoras del copiloto».

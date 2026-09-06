@@ -11,7 +11,7 @@ import { db } from './admin.js'
 import { HOGARES, saldos } from './hogares.js'
 
 /** El contexto que ve el modelo. Texto plano: es lo que mejor entiende. */
-export async function construirContexto(tripId) {
+export async function construirContexto(tripId, travelerId) {
   const [viajeros, agenda, decisiones, gastos, liquidaciones] = await Promise.all([
     db.collection(`trips/${tripId}/travelers`).get(),
     db.collection(`trips/${tripId}/timeline`).orderBy('start').get(),
@@ -20,7 +20,7 @@ export async function construirContexto(tripId) {
     db.collection(`trips/${tripId}/liquidaciones`).get(),
   ])
 
-  const gente = viajeros.docs.map((d) => d.data())
+  const gente = viajeros.docs.map((d) => ({ ...d.data(), id: d.id }))
   const adultos = gente.filter((t) => t.age >= 18)
   const ninos = gente.filter((t) => t.age < 18)
 
@@ -43,10 +43,21 @@ export async function construirContexto(tripId) {
   }
 
   const dias = Object.keys(porDia).sort()
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date())
   const diaPorDefecto = dias.find((d) => d >= hoy) ?? dias[dias.length - 1] ?? null
 
+  const persona = gente.find((p) => p.id === travelerId)
+  // Solo los diez próximos eventos y sus tres últimas notas, acotado por coste.
+  const proximos = agenda.docs.filter((d) => String(d.get('start') ?? '').slice(0, 10) >= diaPorDefecto).slice(0, 10)
+  const notas = await Promise.all(proximos.map(async (d) => {
+    const comentarios = await d.ref.collection('comments').orderBy('createdAt', 'desc').limit(3).get()
+    return comentarios.docs.map((c) => JSON.stringify({ evento: d.get('title'), comentario: String(c.get('text') ?? '').slice(0, 500) }))
+  }))
+
   return {
+    hoy,
+    interlocutor: persona ? `${persona.short ?? persona.name} (viajero ${travelerId}). No supongas parentescos que no estén explícitos.` : 'Identidad no disponible: pregunta quién es antes de interpretar «yo».',
+    notas: notas.flat().join('\n') || '(ninguna en los próximos eventos)',
     porDia,
     diaPorDefecto,
     ciudadPorDefecto: porDia[diaPorDefecto]?.ciudad ?? 'Madrid',

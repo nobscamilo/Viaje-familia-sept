@@ -1,0 +1,13 @@
+.cop-opciones { font: var(--t-small); color: var(--ink-muted); }
+.cop-mas-opciones { display: grid; gap: var(--sp-2); justify-items: start; }
+.cop-mas-opciones button {
+  min-height: var(--touch);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-mid);
+  color: var(--ink);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+}
+.cop-mas-opciones button:disabled { opacity: .6; cursor: wait; }
