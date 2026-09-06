@@ -150,15 +150,35 @@ Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorr
 - ✅ **Esto cierra el que era el hueco más urgente del viaje.** La salida desde las 05:00 encaja con estar en T4 a las 07:40 para el AV027 de las 09:40.
 - El 5 de septiembre llegó un correo de reserva modificada y otro de pago realizado: **queda por verificar qué cambió exactamente.**
 
-### Coches
-- **Dos**: el de Camilo, aparcado en el Parking Bajo Coste de Aena Bilbao desde el 10 de septiembre, y **uno de alquiler**.
-- ⚠️ **Nueve personas caben en dos turismos de cinco plazas; nueve maletas de catorce días, no.** El de alquiler tiene que ser de siete plazas, o hacen falta tres coches.
-- ⚠️ Si se recoge en Bilbao y se devuelve en Madrid, contar el **recargo por devolución en otra provincia**.
+### Coches — RESERVA ENCONTRADA EL 6 SEPT 2026 EN BOOKING
+Esta reserva **no estaba en ningún documento del proyecto**. Apareció al abrir «Mis viajes» en Booking: el viaje tiene **7 reservas**, no 6.
+
+- **Avis · Renault Austral o similar · ref. 786766762 · 186,00 €** (alquiler 145,78 € + extras)
+- Categoría *Intermediate Elite SUV*: automática, 4 puertas, aire acondicionado, kilometraje ilimitado.
+- **Recogida sáb 19 sep 08:30 en Bilbao Aeropuerto** (mostrador en terminal) · **devolución mié 23 sep 06:00 en Madrid Aeropuerto.** 4 días. El recargo por devolución en otra provincia ya va incluido.
+- **Conductor principal: Guillermo Julián Sarmiento Ramírez** (el padre, 65 años). Teléfono de contacto +34 634254325.
+- Cobertura Premium de Booking incluida.
+- El otro coche es el de Camilo, en el Parking Bajo Coste de Aena Bilbao desde el 10 de septiembre.
+
+🔴 **Son CINCO plazas.** Este mismo documento avisaba de que hacían falta siete: *«Nueve personas caben en dos turismos de cinco plazas; nueve maletas de catorce días, no.»* Con los dos coches hay 10 asientos para 9 personas, pero **dos maleteros de turismo para nueve equipajes de catorce días**. Sigue sin resolverse.
+
+🔴 **El conductor lleva permiso colombiano.** Avis suele exigir **Permiso Internacional de Conducción** para permisos no comunitarios, y el propio vale avisa: *«Si no tienes todo lo que necesitas, el personal del mostrador no podrá entregarte el coche»*, con la lista de comprobación en **0 de 4**. El PIC se tramita en Colombia antes de volar. Sin él, el 19 a las 08:30 no hay coche.
+
+🟠 **No consta silla infantil.** Juan Guillermo tiene 4 años y en España el sistema de retención es obligatorio.
+
+🟠 **El coche de Camilo se queda sin plan.** Sale de Bilbao el 19 y el grupo termina en Madrid el 23. Nadie ha decidido cómo vuelve al norte.
 
 ### Vuelo · 23 sep — vuelta a Bogotá
 - **Avianca AV027**, Madrid **T4 → Bogotá**, salida **09:40** — verificado contra la reserva el 26 de agosto de 2026.
 - Los **7** viajeros que llegaron en el AV182. Camilo y Juliana se quedan.
 - En T4 a las **07:40**: vuelo internacional y siete personas con maletas.
+
+### Titulares de las reservas de alojamiento (verificado 6 sept 2026)
+Las reservas de Booking están **todas a nombre de Juan Camilo Sarmiento Castillo**, salvo dos que se cambiaron a propósito para que en frontera figure un viajero de los siete:
+- **Madrid Sol (6263542356)**, cambiada el 26 ago: huéspedes *Juan Camilo Sarmiento castillo, Julián Sarmiento Ramírez, Juliana Sarmiento Castillo*.
+- **Aparment Almudena (6520187782)**, cambiada el 5 sept: titular *Guillermo Julián Sarmiento, Juliana Isabel Sarmiento Castillo*; huéspedes 8 → 9.
+
+Las otras cuatro (Sweett, ibis Saint-Maurice, ibis Styles Santander, The Park Derio) siguen solo a nombre de Camilo.
 
 ### Modificaciones del 26 de agosto
 Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de Madrid, verificada: **solo se añadieron nombres de huéspedes** (Julián Sarmiento Ramírez y Juliana Sarmiento Castillo). **Las fechas y el precio no cambiaron.** Las otras dos, sin verificar en detalle.
@@ -195,7 +215,7 @@ Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de M
 
 **Este repositorio tiene remoto en `github.com/nobscamilo/Viaje-familia-sept` y publica GitHub Pages desde él.** Trátalo como público.
 
-**Añadido el 6 sept 2026:** existe `../docs-privados/` en la raíz del proyecto (fuera de `viaje-app/`), **ya en `.gitignore`**. Ahí vive `Dosier-reservas-migracion-sept-2026.pdf`: nombres completos de los nueve, direcciones de los seis alojamientos, y el número de reserva del ibis Saint-Maurice, **que es el código del portal**. Ese PDF no se sube nunca. Si se añade cualquier otro documento familiar, va ahí.
+**Añadido el 6 sept 2026:** existe `../docs-privados/` en la raíz del proyecto (fuera de `viaje-app/`), **ya en `.gitignore`**. Contiene el dosier de migración, los siete justificantes en PDF (`reserva-01` a `reserva-07`) y `fuentes-html/` con los originales de los que salieron. Ahí vive `Dosier-reservas-migracion-sept-2026.pdf`: nombres completos de los nueve, direcciones de los seis alojamientos, y el número de reserva del ibis Saint-Maurice, **que es el código del portal**. Ese PDF no se sube nunca. Si se añade cualquier otro documento familiar, va ahí.
 
 Por eso, de este documento se han quitado deliberadamente:
 - Los **PIN de Booking** (sirven para modificar o cancelar una reserva: son credenciales, no datos).
