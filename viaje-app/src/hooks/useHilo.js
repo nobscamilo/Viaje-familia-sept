@@ -17,6 +17,8 @@ export function useHilo(ahora = new Date()) {
   const cola = useRef(Promise.resolve())
   const destino = useRef(null)
   const ultimoSerializado = useRef(null)
+  const ahoraRef = useRef(ahora)
+  ahoraRef.current = ahora
 
   useEffect(() => {
     let vivo = true
@@ -40,7 +42,7 @@ export function useHilo(ahora = new Date()) {
         }
         if (!vivo) return
         destino.current = { fb, ref, revision: estado.data()?.revision ?? 0 }
-        const inicial = restaurarConversacion(todos, ahora)
+        const inicial = restaurarConversacion(todos, ahoraRef.current)
         ultimoSerializado.current = JSON.stringify(estadoSerializable(inicial))
         setMensajes(inicial)
       } catch {
@@ -51,7 +53,7 @@ export function useHilo(ahora = new Date()) {
       if (vivo) { setErrorGuardado('No pude conectar con tu conversación. Recarga para intentarlo de nuevo.'); setCargando(false) }
     })
     return () => { vivo = false }
-  }, [tripId, yo?.id, ahora])
+  }, [tripId, yo?.id])
 
   useEffect(() => {
     if (cargando || !destino.current) return

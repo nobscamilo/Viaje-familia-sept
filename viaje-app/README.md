@@ -1680,3 +1680,11 @@ hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
 - **Code Splitting**: Carga bajo demanda en `App.jsx` (`React.lazy` y `<Suspense>`) de las superficies secundarias (`Decisiones`, `Mapa`, `Cuentas`, `Copiloto`, `Ajustes`), reduciendo el CSS inicial un 62% (de 73.6 kB a 27.6 kB) y el bundle JS principal en más de 100 kB.
 - **Alineación con directrices**: Confirmado `gestureHandling: 'cooperative'` en `Mapa.jsx`.
 - **Validación**: 220 tests unitarios, 47 reglas de seguridad en Firestore, build de Vite exitoso y comprobación de responsive con `npm run medir` a 1280, 430, 390 y 375 px.
+
+
+## Corrección de estabilidad y reloj en copiloto — 6 de septiembre de 2026
+
+- **Desacople del reloj en `useHilo.js`**: Se desvinculó el efecto de lectura inicial de Firestore de la instancia de `ahora` generada cada 30 s por `useAhora()`, usando `ahoraRef`.
+- **Solución al refresco y pérdida de opciones**: Previene que cada 30 segundos se reinicie la conversación a `[]`, se fuerce el scroll al fondo y se sustituyan las tarjetas en memoria (con sus fotos) por la instantánea de Firestore (sin `photoUri`).
+- **Pruebas y validación**: 221 tests pasan limpiamente, incluyendo prueba específica en `test/hilo.test.js` para asegurar que las dependencias del efecto de carga sean estrictamente `[tripId, yo?.id]`.
+

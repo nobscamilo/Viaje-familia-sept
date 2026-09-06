@@ -336,3 +336,11 @@ corrección de caducidad y formulario, y contexto con identidad y notas. Pasan
 - **Gestos de Mapa**: `gestureHandling: 'cooperative'` en `Mapa.jsx`.
 - **Validación completa**: 220 tests unitarios/dominio, 47 reglas de Firestore,
   medición en 4 resoluciones (1280, 430, 390, 375 px) y build de producción limpios.
+
+
+### Corrección de estabilidad y reloj en copiloto — 6 de septiembre de 2026
+
+- **Desacople del reloj en `useHilo.js`**: Se desvinculó el efecto de lectura inicial de Firestore de la instancia de `ahora` generada cada 30 s por `useAhora()`, usando `ahoraRef`.
+- **Eliminación del parpadeo y pérdida de opciones**: Previene que cada 30 segundos se limpie el estado (`setMensajes([])`), se fuerce el scroll al fondo y se sustituyan las tarjetas en memoria (con sus fotos) por la instantánea de Firestore (sin `photoUri`).
+- **Prueba añadida**: Cobertura en `test/hilo.test.js` asegurando que las dependencias del efecto de carga sean estrictamente `[tripId, yo?.id]`.
+

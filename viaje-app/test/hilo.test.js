@@ -71,6 +71,12 @@ test('«Empezar de cero» tiene boton de verdad, no solo funcion', () => {
   assert.match(lee('../src/hooks/useHilo.js'), /restaurarConversacion\(todos/)
 })
 
+test('useHilo no recarga desde Firestore en cada tic del reloj', () => {
+  const src = lee('../src/hooks/useHilo.js')
+  assert.match(src, /\[tripId,\s*yo\?\.id\]/)
+  assert.doesNotMatch(src, /\[tripId,\s*yo\?\.id,\s*ahora\]/)
+})
+
 // ------------------------------------------------- cinco sitios, no dos
 
 test('el minimo de nota no puede dejar la lista corta', () => {
