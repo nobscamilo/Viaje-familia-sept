@@ -7,7 +7,6 @@ import { formatDayLong } from '../../domain/dates.js'
 import NuevoGasto from '../../ui/NuevoGasto.jsx'
 import Saldo from '../../ui/Saldo.jsx'
 import Saldado from '../../ui/Saldado.jsx'
-import ResumenCuentasStitch from '../../ui/ResumenCuentasStitch.jsx'
 import './cuentas.css'
 
 const CAT_LABEL = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c.label]))
@@ -56,15 +55,6 @@ export default function Cuentas() {
 
   return (
     <div className="ctas">
-      <ResumenCuentasStitch
-        totalCent={totalCent}
-        gastosCount={gastos.length}
-        cuenta={cuenta}
-        miHogar={miHogar}
-        onAnotar={() => setAnotando(true)}
-        puedeAnotar={Boolean(miHogar)}
-      />
-
       <Saldo cuenta={cuenta} pagos={pagos} miHogar={miHogar} />
 
       <Saldado

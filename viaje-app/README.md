@@ -1713,13 +1713,14 @@ hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
   - Cápsula interactiva con cuenta regresiva dinámica hasta el viaje (`daysUntil(TRIP.startDate, ahora)`).
   - Campo de código PIN en caja de cristal líquido centrado y botón terracota con brillo especular.
   - Botón de asistencia directa de emergencia / WhatsApp.
-- **Dashboard Diario (`Ahora.jsx`, `StatusHeroStitch.jsx`, `BannerCopilotoAhora.jsx`, `ahora.css`)**:
-  - Rediseñado en base a la pantalla de Stitch *Dashboard Diario Liquid Glass con Copiloto IA Thinking Glow*.
-  - Hero editorial con badge `Expedición Planificada`, título y subtítulo, acompañado por la cápsula minimalista de estado (`14 Días • 3 Ciudades • 9 Viajeros • 10 — 23 Sep 2026 • Faltan X días`).
-  - Banner interactivo de Copiloto IA con borde degradado rotatorio *Thinking Glow*, estado en tiempo real y enlace directo a `/copiloto`.
-  - Carrusel de días táctil con píldoras de cristal líquido y punto de aviso.
-  - Tarjetas de momento (`ev-card`) refinadas con lomos de color por tipo adaptados a la paleta Stitch, bordes de cristal líquido con relieve y sombras suaves.
-  - Modularización limpia en componentes dedicados y hojas de estilo separadas (`status-hero-stitch.css`, `banner-copiloto-ahora.css`), manteniendo todos los archivos estrictamente bajo 400 líneas.
+- **Dashboard Diario (`Ahora.jsx`, `ahora.css`)**:
+  - Eliminado el texto publicitario y títulos innecesarios ("Madrid Barcelona París", "Cuaderno Diario", etc.): se restaura la cabecera limpia y directa de una línea (`Hero.jsx`) para que los eventos del día se vean inmediatamente sin scroll.
+  - **Copiloto IA Flotante (`copiloto-fab`)**: Se reemplazó el banner estático por un botón flotante (FAB) en la esquina inferior derecha con acabado Liquid Glass, resplandor ámbar/terracota y animación de pulso, que permite acceder al copiloto sin ocupar espacio del itinerario ni bloquear la pantalla.
+  - **Direcciones con enlace a Google Maps (`ev-addr-link`)**: Todas las direcciones y recintos (`event.address ?? event.venue`) son enlaces directos e interactivos que abren Google Maps con la ubicación o ruta del destino vía `enlaceDeMapa(event)`.
+- **Cuentas y Finanzas (`Cuentas.jsx`)**:
+  - Solucionado el error crítico (`Cannot read properties of undefined reading 'length'`) que impedía abrir la pantalla en web y móvil al intentar acceder a propiedades inexistentes de hogares.
+  - Retiradas las tarjetas con cifras simuladas; se preserva la lógica real y probada de saldos familiares (`Saldo.jsx`, `Saldado.jsx`, pagos por Bizum y listado completo de gastos).
+
 
 
 

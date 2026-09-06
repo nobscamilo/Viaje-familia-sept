@@ -7,53 +7,16 @@
   margin: 0 auto;
 }
 
-/* ---------- itinerario seccion ---------- */
+/* ---------- hero ---------- */
 
-.ahora-itinerario-seccion {
-  display: grid;
-  gap: var(--sp-2);
+.hero {
+  padding: var(--sp-3) 0 var(--sp-2);
+  font: var(--t-body);
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
 }
-
-.ahora-itinerario-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  padding: var(--sp-4) 0 var(--sp-2);
-  border-bottom: 1px solid var(--glass-border-soft);
-}
-
-.ahora-itinerario-titulos {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.ahora-itinerario-titulo {
-  font: var(--t-title);
-  font-size: 1.1875rem;
-  font-weight: 600;
-  color: var(--ink);
-  margin: 0;
-}
-
-.ahora-itinerario-badge {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: var(--r-sm);
-  background: var(--terracotta-soft);
-  color: var(--terracotta);
-}
-
-.ahora-itinerario-sub {
-  font: var(--t-small);
-  font-size: 0.75rem;
-  color: var(--ink-faint);
-  margin: 0;
-}
+.hero strong { color: var(--ink); font-weight: 600; }
+.hero em { font-style: italic; color: var(--warn); }
 
 /* ---------- cabecera del dia ---------- */
 
@@ -186,8 +149,17 @@
   color: var(--ink-faint);
 }
 .ev-addr { color: var(--ink-muted); }
-
-/* ---------- etiquetas ---------- */
+.ev-addr-link {
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--line-strong);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ev-addr-link:hover {
+  color: var(--terracotta);
+  border-bottom-color: var(--terracotta);
+}
 
 .ev-foot { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .ev-foot:empty { display: none; }
@@ -304,3 +276,77 @@
 .ev-mas:hover { color: var(--ink-soft); }
 .es-abierto .ev-mas::before { content: "− "; }
 .es-abierto .ev-card { background: var(--glass-strong); }
+
+/* ---------- copiloto fab (flotante) ---------- */
+
+.copiloto-fab-wrap {
+  position: fixed;
+  bottom: calc(var(--touch) + var(--sp-4));
+  right: var(--sp-4);
+  z-index: 40;
+}
+
+.copiloto-fab {
+  position: relative;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+}
+
+.copiloto-fab-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--gilded-amber), var(--terracotta), var(--gilded-amber));
+  opacity: 0.65;
+  filter: blur(8px);
+  animation: pulseFabGlow 3s ease-in-out infinite;
+}
+
+@keyframes pulseFabGlow {
+  0%, 100% { opacity: 0.5; transform: scale(0.98); }
+  50% { opacity: 0.9; transform: scale(1.04); }
+}
+
+.copiloto-fab-inner {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--med-night) 92%, var(--terracotta-dark));
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: var(--shadow-card), 0 8px 24px rgba(0, 0, 0, 0.35);
+  font: var(--t-small);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.copiloto-fab:hover .copiloto-fab-inner {
+  transform: translateY(-2px) scale(1.02);
+  background: color-mix(in srgb, var(--med-night) 85%, var(--terracotta));
+}
+
+.copiloto-fab-icon {
+  color: var(--gilded-amber);
+}
+
+.copiloto-fab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--gilded-amber);
+  box-shadow: 0 0 6px var(--gilded-amber);
+  animation: pulseFabDot 1.6s ease-in-out infinite;
+}
+
+@keyframes pulseFabDot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

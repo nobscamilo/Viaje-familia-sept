@@ -1,20 +1,19 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { TRIP } from '../../data/trip-madrid-2026.js'
 import { useTrip } from '../../hooks/useTrip.js'
 import { useAhora } from '../../hooks/useAhora.js'
 import {
   diasConAviso, diasDelViaje, eventosDelDia, estadoDeEvento, FASES, faseDelViaje, loQueSigue,
 } from '../../domain/agenda.js'
-import { formatDayLong, formatTime, mismoDia, noches } from '../../domain/dates.js'
-import { diaDelViaje } from '../../domain/dates.js'
+import { daysUntil, formatDayLong, formatTime, mismoDia, noches, diaDelViaje } from '../../domain/dates.js'
+import { enlaceDeMapa } from '../../domain/acciones.js'
 import Icon from '../../ui/Icon.jsx'
 import Avatars from '../../ui/Avatars.jsx'
 import Proximo from '../../ui/Proximo.jsx'
 import Acciones from '../../ui/Acciones.jsx'
 import Notas from '../../ui/Notas.jsx'
 import DiasCarrusel from '../../ui/DiasCarrusel.jsx'
-import StatusHeroStitch from '../../ui/StatusHeroStitch.jsx'
-import BannerCopilotoAhora from '../../ui/BannerCopilotoAhora.jsx'
 import './ahora.css'
 
 const KIND = {
@@ -27,19 +26,15 @@ const KIND = {
 }
 
 /**
- * «Ahora», dia a dia (rediseño del 1 de septiembre de 2026).
+ * «Ahora», dia a dia.
  *
- * Hasta hoy esta pantalla era la lista entera: catorce dias de scroll, y el
- * 11 en Madrid habia que pasar el 10 para llegar a lo tuyo. La maqueta que
- * trajo Camilo la convierte en UN dia con un carrusel encima, y de paso
- * resuelve un pendiente que estaba apuntado desde agosto: durante el viaje
- * arranca anclada en hoy.
- *
- * `?hoy=` sigue mandando: el ancla sale de `useAhora`, nunca del reloj.
+ * Máxima prioridad al contenido del día: sin párrafos introductorios ni
+ * adornos que empujen la agenda fuera del primer pantallazo móvil.
  */
 export default function Ahora() {
   const { timeline } = useTrip()
   const { ahora, simulado } = useAhora()
+  const navegar = useNavigate()
 
   const fase = faseDelViaje(TRIP, ahora)
   const enViaje = fase === FASES.DURANTE
@@ -63,65 +58,82 @@ export default function Ahora() {
         </p>
       )}
 
-      <StatusHeroStitch timeline={timeline} fase={fase} ahora={ahora} />
-
-      {enViaje && dia === hoy && (
+      {enViaje && dia === hoy ? (
         <Proximo {...loQueSigue(timeline, ahora)} ahora={ahora} />
+      ) : (
+        <Hero timeline={timeline} fase={fase} ahora={ahora} />
       )}
 
-      <div className="ahora-itinerario-seccion">
-        <div className="ahora-itinerario-head">
-          <div className="ahora-itinerario-titulos">
-            <h2 className="ahora-itinerario-titulo">Cuaderno Diario</h2>
-            <span className="ahora-itinerario-badge">
-              {i >= 0 ? `Día ${String(i + 1).padStart(2, '0')} de ${dias.length}` : `${dias.length} Etapas`}
-            </span>
-          </div>
-          <p className="ahora-itinerario-sub">
-            Secuencia pausada y coordinada para toda la familia
-          </p>
-        </div>
+      <DiasCarrusel dias={dias} dia={dia} alElegir={setDia} avisos={avisos} hoy={enViaje ? hoy : null} />
 
-        <DiasCarrusel dias={dias} dia={dia} alElegir={setDia} avisos={avisos} hoy={enViaje ? hoy : null} />
+      <div className="ahora-cabecera-dia">
+        <button
+          type="button" className="ahora-flecha" aria-label="Día anterior"
+          disabled={i <= 0} onClick={() => setDia(dias[i - 1])}
+        >
+          <Icon name="chevron-left" size={16} />
+        </button>
+        <h2 className="ahora-dia-titulo">
+          {dia === hoy && enViaje ? 'Hoy · ' : ''}{formatDayLong(dia)}
+        </h2>
+        <button
+          type="button" className="ahora-flecha" aria-label="Día siguiente"
+          disabled={i >= dias.length - 1} onClick={() => setDia(dias[i + 1])}
+        >
+          <Icon name="chevron-right" size={16} />
+        </button>
+      </div>
 
-        <div className="ahora-cabecera-dia">
-          <button
-            type="button" className="ahora-flecha" aria-label="Día anterior"
-            disabled={i <= 0} onClick={() => setDia(dias[i - 1])}
-          >
-            <Icon name="chevron-left" size={16} />
-          </button>
-          <h3 className="ahora-dia-titulo">
-            {dia === hoy && enViaje ? 'Hoy · ' : ''}{formatDayLong(dia)}
-          </h3>
-          <button
-            type="button" className="ahora-flecha" aria-label="Día siguiente"
-            disabled={i >= dias.length - 1} onClick={() => setDia(dias[i + 1])}
-          >
-            <Icon name="chevron-right" size={16} />
-          </button>
-        </div>
+      {eventos.length === 0 ? (
+        <p className="ahora-vacio">Este día no tiene nada en la agenda. El copiloto sabe proponer.</p>
+      ) : (
+        <ol className="tl-events">
+          {eventos.map((ev) => (
+            <EventRow
+              key={ev.id}
+              event={ev}
+              dia={dia}
+              ahora={ahora}
+              enViaje={enViaje}
+              hoy={enViaje ? hoy : null}
+            />
+          ))}
+        </ol>
+      )}
 
-        <BannerCopilotoAhora />
-
-        {eventos.length === 0 ? (
-          <p className="ahora-vacio">Este día no tiene nada en la agenda. El copiloto sabe proponer.</p>
-        ) : (
-          <ol className="tl-events">
-            {eventos.map((ev) => (
-              <EventRow
-                key={ev.id}
-                event={ev}
-                dia={dia}
-                ahora={ahora}
-                enViaje={enViaje}
-                hoy={enViaje ? hoy : null}
-              />
-            ))}
-          </ol>
-        )}
+      {/* Botón flotante para el Copiloto IA (FAB) */}
+      <div className="copiloto-fab-wrap">
+        <button
+          type="button"
+          className="copiloto-fab"
+          onClick={() => navegar('/copiloto')}
+          aria-label="Abrir Copiloto IA"
+        >
+          <span className="copiloto-fab-glow" aria-hidden="true" />
+          <span className="copiloto-fab-inner">
+            <Icon name="sparkles" size={16} className="copiloto-fab-icon" />
+            <span className="copiloto-fab-txt">Copiloto IA</span>
+            <span className="copiloto-fab-dot" />
+          </span>
+        </button>
       </div>
     </div>
+  )
+}
+
+function Hero({ timeline, fase, ahora }) {
+  const faltan = daysUntil(TRIP.startDate, ahora)
+  const pendientes = timeline.filter((e) => e.status !== 'confirmado').length
+
+  if (fase === FASES.DESPUES) {
+    return <p className="hero"><strong>Se acabó.</strong> Catorce días, {timeline.length} momentos.</p>
+  }
+
+  return (
+    <p className="hero">
+      <strong>Faltan {faltan} {faltan === 1 ? 'día' : 'días'}.</strong> {timeline.length} momentos
+      {pendientes > 0 && <> · <em>{pendientes} sin cerrar</em></>}
+    </p>
   )
 }
 
@@ -179,7 +191,22 @@ function EventRow({ event, dia, ahora, enViaje, hoy }) {
         </header>
 
         {(event.address || event.venue) && (
-          <p className="ev-sub"><span className="ev-addr">{event.address ?? event.venue}</span></p>
+          <p className="ev-sub">
+            {enlaceDeMapa(event) ? (
+              <a
+                className="ev-addr ev-addr-link"
+                href={enlaceDeMapa(event)}
+                target="_blank"
+                rel="noreferrer"
+                title="Abrir ubicación en Google Maps"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>{event.address ?? event.venue}</span>
+              </a>
+            ) : (
+              <span className="ev-addr">{event.address ?? event.venue}</span>
+            )}
+          </p>
         )}
 
         <footer className="ev-foot">
