@@ -1,0 +1,132 @@
+/* BannerCopilotoAhora: Banner interactivo con borde Thinking Glow degradado */
+
+.ahora-copilot-banner-wrapper {
+  position: relative;
+  padding: 1.5px;
+  border-radius: calc(var(--r-lg) + 1px);
+  background: var(--glow-thinking);
+  box-shadow: 0 0 20px -4px color-mix(in srgb, var(--gilded-amber) 30%, transparent);
+  margin: var(--sp-1) 0 var(--sp-3);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.ahora-copilot-banner-wrapper:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px -2px color-mix(in srgb, var(--terracotta) 35%, transparent);
+}
+
+.ahora-copilot-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--parchment-surface) 92%, var(--glass-strong));
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+}
+
+.ahora-copilot-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.ahora-copilot-icon-box {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--terracotta), var(--gilded-amber));
+  color: #fff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--terracotta) 40%, transparent);
+}
+
+.ahora-copilot-spin-icon {
+  animation: copilotSpin 8s linear infinite;
+}
+
+@keyframes copilotSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ahora-copilot-txt { min-width: 0; }
+
+.ahora-copilot-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ahora-copilot-title {
+  font: var(--t-body);
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.8125rem;
+}
+
+.ahora-copilot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--terracotta-soft);
+  color: var(--terracotta);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ahora-copilot-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--terracotta);
+  box-shadow: 0 0 6px var(--terracotta);
+  animation: pulseCopilotDot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseCopilotDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.ahora-copilot-sub {
+  font: var(--t-small);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ahora-copilot-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  background: var(--glass-mid);
+  border: 1px solid var(--glass-border);
+  font: var(--t-small);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.ahora-copilot-banner-wrapper:hover .ahora-copilot-action-btn {
+  background: var(--glass-strong);
+  color: var(--terracotta);
+}

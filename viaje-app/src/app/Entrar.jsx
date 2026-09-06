@@ -1,21 +1,17 @@
 import { useState } from 'react'
 import { useTrip } from '../hooks/useTrip.js'
 import { TRAVELERS } from '../data/travelers.js'
+import { TRIP } from '../data/trip-madrid-2026.js'
+import { daysUntil } from '../domain/dates.js'
 import { motivo } from '../services/unirse.js'
-
+import Icon from '../ui/Icon.jsx'
 import './entrar.css'
 
 /**
  * Puerta de entrada: el código y nada más.
  *
- * Antes había que pasar por Google primero. Eso era pedirle a siete personas
- * que hicieran dos cosas para entrar a mirar un itinerario, y la mitad no
- * volvió. Ahora el código personal ES la sesión: la Cloud Function comprueba
- * de quién es y devuelve un token a nombre de ese viajero.
- *
- * Google se queda como salida de emergencia, escondida, para las cuentas que
- * ya estaban enlazadas antes del cambio. Un cambio de identidad sin puerta
- * trasera deja a alguien fuera, siempre.
+ * Rediseño Stitch Liquid Glass: portal privado con ambient glow,
+ * tarjeta de cristal reflectivo, cuenta atrás dinámica y botón terracota.
  */
 export default function Entrar() {
   const { user, cargando, sinAcceso, enlazado } = useTrip()
@@ -28,7 +24,30 @@ export default function Entrar() {
 function Marco({ children }) {
   return (
     <div className="entrar">
-      <div className="entrar-caja">{children}</div>
+      <header className="entrar-top">
+        <div className="entrar-badge">
+          <span className="entrar-dot-wrap">
+            <span className="entrar-dot-ping" />
+            <span className="entrar-dot" />
+          </span>
+          <span>Portal Privado · Septiembre 2026</span>
+        </div>
+      </header>
+
+      <main className="entrar-main">
+        <div className="entrar-caja">
+          <div className="entrar-glow-1" />
+          <div className="entrar-glow-2" />
+          {children}
+        </div>
+      </main>
+
+      <footer className="entrar-pie">
+        <div className="entrar-pie-pill">
+          <span className="entrar-pie-dot" />
+          <span>Bitácora de viaje confidencial · Familia 2026</span>
+        </div>
+      </footer>
     </div>
   )
 }
@@ -84,51 +103,81 @@ function Unirse() {
     )
   }
 
+  const faltan = Math.max(0, daysUntil(TRIP.startDate, new Date()))
+
   return (
     <Marco>
-      <p className="entrar-eyebrow">Septiembre 2026</p>
-      <h1 className="entrar-titulo">Madrid, Barcelona y París</h1>
+      <div className="entrar-head-stitch">
+        <h1 className="entrar-titulo">Viaje Familiar 2026</h1>
+        <p className="entrar-sub-italic">Madrid • Barcelona • París</p>
+        <div className="entrar-countdown-pill">
+          <Icon name="calendar" size={13} />
+          <span>Faltan <strong>{faltan}</strong> días para la partida</span>
+        </div>
+      </div>
+
       <p className="entrar-lede">
-        Nueve personas, catorce días. Entra con tu código: cada uno tiene el
-        suyo, y con él ya sabemos quién eres.
+        Nueve personas, catorce días. Ingresa tu código personal para acceder a la bitácora familiar.
       </p>
 
-      <form onSubmit={unirse}>
-        <input
-          className="entrar-campo entrar-codigo"
-          type="text"
-          inputMode="text"
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck="false"
-          autoComplete="one-time-code"
-          maxLength={12}
-          placeholder="ABCD1234"
-          aria-label="Tu código personal"
-          value={codigo}
-          onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-        />
+      <form onSubmit={unirse} className="entrar-form">
+        <div className="entrar-input-grupo">
+          <label htmlFor="codigo-pin" className="entrar-label-code">
+            Código de Invitación (8 Caracteres)
+          </label>
+          <input
+            id="codigo-pin"
+            className="entrar-campo entrar-codigo"
+            type="text"
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck="false"
+            autoComplete="one-time-code"
+            maxLength={12}
+            placeholder="ABCD1234"
+            aria-label="Tu código personal"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+          />
+          <span className="entrar-input-hint">Ingresa la clave personal compartida para el grupo</span>
+        </div>
+
         <button
           type="submit"
           className="entrar-btn"
           disabled={codigo.trim().length < 6 || ocupado}
         >
-          {ocupado ? 'Un momento…' : 'Entrar'}
+          {ocupado ? (
+            <span>Verificando credenciales…</span>
+          ) : (
+            <span className="entrar-btn-inner">
+              <span>Ingresar al portal</span>
+              <span aria-hidden="true">→</span>
+            </span>
+          )}
         </button>
       </form>
 
       {estado && !ocupado && <p className="entrar-fallo">{estado}</p>}
       {falloArranque && <p className="entrar-fallo">{falloArranque}</p>}
 
-      <p className="entrar-nota">
-        ¿No tienes código? Pídeselo a Camilo. El tuyo solo sirve para ti.
-      </p>
+      <div className="entrar-links-stitch">
+        <a
+          className="entrar-pill-link"
+          href="https://wa.me/?text=Hola%20Camilo,%20por%20favor%20envíame%20el%20código%20del%20portal%20familiar"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Pedir código a Camilo
+        </a>
+        {!user && (
+          <button type="button" className="entrar-pill-link" onClick={entrar}>
+            Entrar con Google
+          </button>
+        )}
+      </div>
 
-      {!user && (
-        <button type="button" className="entrar-link" onClick={entrar}>
-          Entrar con Google (solo si ya entrabas así antes)
-        </button>
-      )}
       <button type="button" className="entrar-link" onClick={() => setPrimeraVez(true)}>
         Nadie ha creado el viaje todavía
       </button>

@@ -14,11 +14,11 @@
 
 .dc-dia {
   flex: 0 0 auto;
-  min-width: 48px;
+  min-width: 52px;
   min-height: var(--touch);
   padding: var(--sp-2) var(--sp-1);
-  border-radius: var(--r-md);
-  border: 1px solid var(--glass-border-soft);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--glass-border);
   background: var(--glass-soft);
   backdrop-filter: var(--blur-glass-soft);
   -webkit-backdrop-filter: var(--blur-glass-soft);
@@ -48,7 +48,7 @@
   background: var(--accent-grad);
   border-color: transparent;
   color: var(--on-accent);
-  box-shadow: var(--shadow-chip);
+  box-shadow: var(--shadow-chip), 0 4px 14px -2px rgba(200, 90, 50, 0.35);
 }
 .dc-dia.es-activo .dc-dow { color: var(--on-accent); opacity: .75; }
 

@@ -1699,4 +1699,28 @@ hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
 - **Validación total**: 221 tests unitarios y de dominio, 47 pruebas de reglas Firestore, medición en 4 anchos móviles/escritorio sin desbordes, y despliegue web en producción.
 
 
+## Rediseño Stitch: Portal de Acceso y Dashboard Diario (Ahora) con Paleta Terracota y Liquid Glass — 6 de septiembre de 2026
+
+- **Solución al refresco y caché de Firebase Hosting (`firebase.json`)**:
+  - Se configuró la cabecera `Cache-Control: no-cache, no-store, must-revalidate` para evitar que el navegador guarde en caché `index.html` con la directiva por defecto de 3600 segundos, garantizando que cualquier actualización se refleje al instante.
+- **Tokens de color Stitch (`src/styles/tokens.css`)**:
+  - Incorporada la paleta oficial de Stitch: Terracotta Sun (`#c85a32`), Terracotta Dark (`#9f3c16`), Gilded Amber (`#d4a359`), Amber Soft y Mediterranean Night (`#1e3246`).
+  - Actualizado `--accent` a terracota vivo, con degradados de acento y sombras líquidas con resplandor cálido.
+- **Portal de Acceso (`Entrar.jsx`, `entrar.css`)**:
+  - Rediseñado en base a la pantalla de Stitch *Portal de Acceso - Liquid Glass*.
+  - Badge superior `Portal Privado · Septiembre 2026` con ping animado.
+  - Título editorial `Viaje Familiar 2026` y subtítulo con las tres ciudades (`Madrid • Barcelona • París`).
+  - Cápsula interactiva con cuenta regresiva dinámica hasta el viaje (`daysUntil(TRIP.startDate, ahora)`).
+  - Campo de código PIN en caja de cristal líquido centrado y botón terracota con brillo especular.
+  - Botón de asistencia directa de emergencia / WhatsApp.
+- **Dashboard Diario (`Ahora.jsx`, `StatusHeroStitch.jsx`, `BannerCopilotoAhora.jsx`, `ahora.css`)**:
+  - Rediseñado en base a la pantalla de Stitch *Dashboard Diario Liquid Glass con Copiloto IA Thinking Glow*.
+  - Hero editorial con badge `Expedición Planificada`, título y subtítulo, acompañado por la cápsula minimalista de estado (`14 Días • 3 Ciudades • 9 Viajeros • 10 — 23 Sep 2026 • Faltan X días`).
+  - Banner interactivo de Copiloto IA con borde degradado rotatorio *Thinking Glow*, estado en tiempo real y enlace directo a `/copiloto`.
+  - Carrusel de días táctil con píldoras de cristal líquido y punto de aviso.
+  - Tarjetas de momento (`ev-card`) refinadas con lomos de color por tipo adaptados a la paleta Stitch, bordes de cristal líquido con relieve y sombras suaves.
+  - Modularización limpia en componentes dedicados y hojas de estilo separadas (`status-hero-stitch.css`, `banner-copiloto-ahora.css`), manteniendo todos los archivos estrictamente bajo 400 líneas.
+
+
+
 

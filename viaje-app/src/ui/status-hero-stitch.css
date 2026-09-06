@@ -1,0 +1,127 @@
+/* StatusHeroStitch: Hero y Cápsula de Estado Liquid Glass (Stitch Design) */
+
+.ahora-hero-stitch {
+  text-align: center;
+  padding: var(--sp-5) 0 var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ahora-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: var(--terracotta-soft);
+  color: var(--terracotta);
+  font: var(--t-label);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--terracotta) 22%, transparent);
+}
+
+.ahora-hero-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--terracotta);
+  box-shadow: 0 0 8px var(--terracotta);
+  animation: pulseHeroDot 2s ease-in-out infinite;
+}
+
+@keyframes pulseHeroDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.ahora-hero-title {
+  font: var(--t-title);
+  font-size: clamp(1.625rem, 4vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--ink);
+  margin: var(--sp-1) 0 0;
+  text-wrap: balance;
+}
+
+.ahora-hero-sub {
+  font: var(--t-body);
+  font-size: clamp(0.8125rem, 2vw, 0.9375rem);
+  color: var(--ink-muted);
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.45;
+}
+
+.ahora-status-capsule-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-2);
+  width: 100%;
+}
+
+.ahora-status-capsule {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  padding: 7px 18px;
+  border-radius: var(--r-pill);
+  background: var(--glass-mid);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: var(--shadow-liquid);
+  font-size: 0.75rem;
+}
+
+.ahora-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ahora-status-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ahora-status-lbl {
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+}
+
+.ahora-status-dates {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--terracotta);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ahora-status-highlight {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--gilded-amber);
+}
+
+.ahora-status-sep {
+  color: var(--line-strong);
+  user-select: none;
+  font-size: 0.625rem;
+}
+
+.ahora-hero-pendientes {
+  font: var(--t-small);
+  font-size: 0.75rem;
+  color: var(--warn);
+}

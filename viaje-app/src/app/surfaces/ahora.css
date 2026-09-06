@@ -1,20 +1,59 @@
-/* «Ahora», dia a dia. Rediseño del 1 de septiembre de 2026: tarjetas de
-   vidrio con la burbuja del tipo dentro, carrusel de dias encima (vive en
-   ui/dias-carrusel.css) y flechas anterior/siguiente. El rail lateral de la
-   version-lista murio con la lista. */
+/* «Ahora», dia a dia. Rediseño Stitch Liquid Glass:
+   Itinerario y tarjetas de evento con acentos terracota y ámbar. */
 
-.ahora { padding: 0 var(--sp-4) var(--sp-7); }
-
-/* ---------- hero ---------- */
-
-/* El heroe, una linea. Ver el comentario de Hero() en Ahora.jsx. */
-.hero {
-  padding: var(--sp-4) 0 var(--sp-3);
-  font: var(--t-body);
-  color: var(--ink-muted);
+.ahora {
+  padding: 0 var(--sp-4) var(--sp-7);
+  max-width: 900px;
+  margin: 0 auto;
 }
-.hero strong { color: var(--ink); font-weight: 600; }
-.hero em { font-style: italic; color: var(--warn); }
+
+/* ---------- itinerario seccion ---------- */
+
+.ahora-itinerario-seccion {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.ahora-itinerario-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-2);
+  border-bottom: 1px solid var(--glass-border-soft);
+}
+
+.ahora-itinerario-titulos {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ahora-itinerario-titulo {
+  font: var(--t-title);
+  font-size: 1.1875rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.ahora-itinerario-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
+  background: var(--terracotta-soft);
+  color: var(--terracotta);
+}
+
+.ahora-itinerario-sub {
+  font: var(--t-small);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  margin: 0;
+}
 
 /* ---------- cabecera del dia ---------- */
 
@@ -23,7 +62,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-2);
-  margin-bottom: var(--sp-3);
+  margin: var(--sp-2) 0;
 }
 
 .ahora-dia-titulo {
@@ -31,6 +70,7 @@
   font-size: 1.0625rem;
   text-align: center;
   color: var(--ink-soft);
+  margin: 0;
 }
 .ahora-dia-titulo::first-letter { text-transform: uppercase; }
 
@@ -39,16 +79,17 @@
   min-height: var(--touch);
   display: grid;
   place-items: center;
-  border: 0;
-  background: none;
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-soft);
   color: var(--accent);
   cursor: pointer;
   border-radius: var(--r-md);
+  transition: background var(--dur-fast) var(--ease);
 }
-.ahora-flecha:hover { background: var(--glass-soft); }
-.ahora-flecha:disabled { color: var(--ink-faint); opacity: .4; cursor: default; }
+.ahora-flecha:hover { background: var(--glass-mid); }
+.ahora-flecha:disabled { color: var(--ink-faint); opacity: .35; cursor: default; }
 
-.ahora-vacio { font: var(--t-small); color: var(--ink-faint); padding: var(--sp-4) 0; }
+.ahora-vacio { font: var(--t-small); color: var(--ink-faint); padding: var(--sp-4) 0; text-align: center; }
 
 /* ---------- eventos del dia ---------- */
 
@@ -57,51 +98,51 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
 }
 
-/* En pantallas anchas el texto de la tarjeta no debe pasar de una medida
-   comoda de lectura. */
 .ev-title, .ev-note, .ev-warn span { max-width: 62ch; }
 
-/* La tarjeta: vidrio esmerilado con luz arriba. El lomo de color por tipo se
-   queda — es lo que hace legible la agenda de un vistazo — pero fino. */
 .ev-card {
   display: grid;
   gap: var(--sp-2);
   padding: var(--sp-4);
   border: 1px solid var(--glass-border);
-  border-left: 3px solid var(--ev-color);
+  border-left: 3.5px solid var(--ev-color);
   border-radius: var(--r-lg);
   background: var(--glass-mid);
   backdrop-filter: var(--blur-glass);
   -webkit-backdrop-filter: var(--blur-glass);
   box-shadow: var(--shadow-card);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 
-/* Un color por tipo de cosa, declarado UNA vez. El valor por defecto va
-   PRIMERO: `.ev` y `.ev-kind-flight` tienen la misma especificidad y con
-   cascada invertida el defecto pisaria a todos. */
-.ev { --ev-color: var(--ink-muted); }
-.ev-kind-flight    { --ev-color: var(--info); }
-.ev-kind-lodging   { --ev-color: var(--ok); }
-.ev-kind-f1        { --ev-color: var(--accent); }
-.ev-kind-transport { --ev-color: #7dd3fc; }
-.ev-kind-activity  { --ev-color: #f0a05a; }
-.ev-kind-food      { --ev-color: #f0a05a; }
+.ev-card:hover {
+  box-shadow: var(--shadow-liquid);
+}
 
-/* Lo propuesto se ve que no esta cerrado, sin gritar: trazo discontinuo y
-   vidrio mas tenue. */
+.ev { --ev-color: var(--ink-muted); }
+.ev-kind-flight    { --ev-color: #38bdf8; }
+.ev-kind-lodging   { --ev-color: #34d399; }
+.ev-kind-f1        { --ev-color: var(--terracotta); }
+.ev-kind-transport { --ev-color: #60a5fa; }
+.ev-kind-activity  { --ev-color: var(--gilded-amber); }
+.ev-kind-food      { --ev-color: #fb923c; }
+
 .ev-pendiente .ev-card,
-.ev-propuesto .ev-card { border-style: dashed; border-left-style: solid; background: var(--glass-faint); }
+.ev-propuesto .ev-card {
+  border-style: dashed;
+  border-left-style: solid;
+  background: var(--glass-faint);
+}
 
 /* ---------- cabecera de la tarjeta ---------- */
 
 .ev-head { display: flex; gap: var(--sp-3); align-items: flex-start; }
 
 .ev-burbuja {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   border-radius: var(--r-pill);
   display: grid;
@@ -123,13 +164,27 @@
 }
 
 .ev-hasta {
-  font: var(--t-label); font-family: var(--font-mono);
-  color: var(--ink-faint); letter-spacing: 0;
+  font: var(--t-label);
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  letter-spacing: 0;
 }
 
-.ev-title { font: var(--t-title); font-size: 1.0625rem; line-height: 1.25; margin-top: 3px; }
+.ev-title {
+  font: var(--t-title);
+  font-size: 1.0625rem;
+  line-height: 1.25;
+  margin-top: 3px;
+  color: var(--ink);
+}
 
-.ev-sub { display: flex; flex-wrap: wrap; gap: 0 var(--sp-2); font: var(--t-small); color: var(--ink-faint); }
+.ev-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-2);
+  font: var(--t-small);
+  color: var(--ink-faint);
+}
 .ev-addr { color: var(--ink-muted); }
 
 /* ---------- etiquetas ---------- */
@@ -153,9 +208,9 @@
 .tag-pendiente { color: var(--warn); background: var(--warn-wash); border-color: transparent; }
 .tag-propuesto { color: var(--ink-soft); border-color: var(--line-strong); background: transparent; }
 .tag-danger { color: var(--danger); background: var(--danger-wash); border-color: transparent; }
-.tag-curso { color: var(--accent); background: var(--nav-pill); border-color: transparent; }
+.tag-curso { color: var(--terracotta); background: var(--terracotta-soft); border-color: transparent; }
 
-/* ---------- aviso: banda de vidrio tintado, nunca plegada ---------- */
+/* ---------- aviso: banda de vidrio tintado ---------- */
 
 .ev-warn {
   display: flex;
@@ -165,7 +220,7 @@
   border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent);
   border-radius: var(--r-md);
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--danger) 20%, transparent),
+    color-mix(in srgb, var(--danger) 18%, transparent),
     color-mix(in srgb, var(--danger) 8%, transparent));
   color: var(--danger);
   font: var(--t-small);
@@ -191,7 +246,6 @@
   color: var(--ink-muted);
 }
 .ev-todos li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-2); }
-/* Casillas dibujadas con CSS: son recordatorios, todavia no interactivas. */
 .ev-todos li::before {
   content: "";
   width: 13px; height: 13px;
@@ -222,10 +276,8 @@
 }
 
 .ses-time { font-family: var(--font-mono); font-size: .75rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-
-/* La carrera es a lo que van: tiene que verse distinta del resto. */
 .ses-key { color: var(--ink); font-weight: 600; }
-.ses-key .ses-time { color: var(--accent); }
+.ses-key .ses-time { color: var(--terracotta); }
 
 /* ---------- durante el viaje ---------- */
 
@@ -239,11 +291,9 @@
 }
 .ahora-simulado code { font-family: var(--font-mono); font-size: .75rem; }
 
-.ev-t-enCurso .ev-card { border-color: var(--accent); border-left-color: var(--accent); }
+.ev-t-enCurso .ev-card { border-color: var(--terracotta); border-left-color: var(--terracotta); }
 .ev-t-pasado .ev-card { opacity: .55; }
 
-/* Abrir la tarjeta. Dice lo que hay dentro («3 por hacer · detalle») en vez
-   de un «ver mas» a ciegas: abrir para descubrir que no habia nada cansa. */
 .ev-mas {
   min-height: 32px; padding: 0;
   background: none; border: 0;
@@ -253,6 +303,4 @@
 .ev-mas::before { content: "+ "; color: var(--ev-color); font-weight: 700; }
 .ev-mas:hover { color: var(--ink-soft); }
 .es-abierto .ev-mas::before { content: "− "; }
-
-/* Al abrirla, la tarjeta sube un punto de opacidad: se despega sin saltar. */
 .es-abierto .ev-card { background: var(--glass-strong); }

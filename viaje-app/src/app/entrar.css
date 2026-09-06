@@ -1,57 +1,180 @@
 .entrar {
-  min-height: 100%;
-  display: grid;
-  place-items: center;
-  padding: var(--sp-5);
-  /* Dos lavados que se cruzan: da profundidad sin poner una foto de stock,
-     que es lo que hace toda app de viajes. */
-  background:
-    radial-gradient(90% 60% at 15% 0%, var(--accent-wash) 0%, transparent 60%),
-    radial-gradient(70% 50% at 100% 100%, var(--info-wash) 0%, transparent 60%),
-    var(--s-base);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-4);
+  background: var(--fondo-app);
+}
+
+.entrar-top {
+  padding: var(--sp-4) 0 var(--sp-2);
+  text-align: center;
+}
+
+.entrar-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--glass-soft);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-glass-soft);
+  -webkit-backdrop-filter: var(--blur-glass-soft);
+  font: var(--t-mono);
+  font-size: .6875rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.entrar-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+}
+
+.entrar-dot-ping {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  opacity: .6;
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.entrar-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+}
+
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+.entrar-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 440px;
+  padding: var(--sp-2) 0;
 }
 
 .entrar-caja {
+  position: relative;
   width: 100%;
-  max-width: 380px;
-  display: grid;
-  gap: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-6) var(--sp-5);
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
+  box-shadow: var(--shadow-liquid);
+  text-align: center;
+  overflow: hidden;
 }
 
-.entrar-eyebrow {
-  font: var(--t-label);
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--accent);
+.entrar-glow-1 {
+  position: absolute;
+  top: -40px; left: -40px;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 90, 50, 0.28), transparent 70%);
+  pointer-events: none;
+}
+
+.entrar-glow-2 {
+  position: absolute;
+  bottom: -40px; right: -40px;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 163, 89, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+.entrar-head-stitch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .entrar-titulo {
-  font-size: 2.1rem;
+  font: var(--t-title);
+  font-size: 1.95rem;
   font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -.035em;
+  line-height: 1.15;
+  color: var(--ink);
+  letter-spacing: -.03em;
+  margin: 0;
 }
+
+.entrar-sub-italic {
+  font-family: var(--font-ui);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--accent);
+  margin: 0;
+}
+
+.entrar-countdown-pill {
+  margin-top: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: var(--glass-soft);
+  border: 1px solid var(--glass-border-soft);
+  font: var(--t-small);
+  font-size: .8125rem;
+  color: var(--ink-muted);
+}
+.entrar-countdown-pill strong { color: var(--ink); font-weight: 600; }
 
 .entrar-lede {
   font: var(--t-small);
   color: var(--ink-muted);
-  max-width: 32ch;
-  margin-bottom: var(--sp-2);
+  line-height: 1.45;
+  margin: 0 auto;
+  max-width: 34ch;
 }
 
-.entrar-btn {
-  min-height: var(--touch);
-  border-radius: var(--r-md);
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: .9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+.entrar-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
 }
-.entrar-btn:hover:not(:disabled) { background: var(--accent-strong); }
-.entrar-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.entrar-input-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.entrar-label-code {
+  font: var(--t-mono);
+  font-size: .6875rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-muted);
+}
 
 .entrar-campo {
   min-height: var(--touch);
@@ -63,14 +186,85 @@
   font-size: .9375rem;
 }
 
-.entrar-nota { font: var(--t-small); color: var(--ink-faint); }
+.entrar-campo.entrar-codigo {
+  width: 100%;
+  min-height: 52px;
+  font-family: var(--font-mono);
+  font-size: 1.45rem;
+  letter-spacing: .2em;
+  text-align: center;
+  text-transform: uppercase;
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.entrar-campo.entrar-codigo:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
 
-.entrar-fallo {
+.entrar-input-hint {
   font: var(--t-small);
-  color: var(--warn);
-  background: var(--warn-wash);
-  border-radius: var(--r-sm);
-  padding: var(--sp-3);
+  font-size: .75rem;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.entrar-btn {
+  min-height: 48px;
+  width: 100%;
+  border-radius: var(--r-md);
+  border: 1px solid var(--accent-strong);
+  background: var(--accent-grad);
+  color: var(--on-accent);
+  font-size: .9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 22px -4px rgba(200, 90, 50, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.entrar-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px -4px rgba(200, 90, 50, 0.55);
+}
+.entrar-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.entrar-btn-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.entrar-links-stitch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: center;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--divider-soft);
+}
+
+.entrar-pill-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  background: var(--glass-soft);
+  border: 1px solid var(--glass-border-soft);
+  color: var(--ink-muted);
+  font: var(--t-small);
+  font-size: .8125rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.entrar-pill-link:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--glass-mid);
 }
 
 .entrar-link {
@@ -78,22 +272,45 @@
   background: none;
   border: 0;
   color: var(--ink-faint);
-  font-size: .8125rem;
+  font: var(--t-small);
+  font-size: .75rem;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
   padding: 0;
-  justify-self: start;
+  justify-self: center;
 }
 .entrar-link:hover { color: var(--ink-soft); }
 
-/* El campo del codigo: monoespaciado, grande y separado. Se teclea a mano
-   desde un WhatsApp, y una O y un 0 juntos en una tipografia normal se
-   confunden. (El generador ya evita ambas, pero el campo tambien ayuda.) */
-.entrar-codigo {
-  font-family: var(--font-mono);
-  font-size: 1.35rem;
-  letter-spacing: .18em;
-  text-align: center;
-  text-transform: uppercase;
+.entrar-fallo {
+  font: var(--t-small);
+  color: var(--warn);
+  background: var(--warn-wash);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+  text-align: left;
+}
+
+.entrar-pie {
+  padding: var(--sp-3) 0 var(--sp-2);
+}
+
+.entrar-pie-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: var(--glass-faint);
+  border: 1px solid var(--glass-border-soft);
+  font: var(--t-small);
+  font-size: .75rem;
+  color: var(--ink-faint);
+}
+
+.entrar-pie-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
 }

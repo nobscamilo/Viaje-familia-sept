@@ -5,7 +5,7 @@ import { useAhora } from '../../hooks/useAhora.js'
 import {
   diasConAviso, diasDelViaje, eventosDelDia, estadoDeEvento, FASES, faseDelViaje, loQueSigue,
 } from '../../domain/agenda.js'
-import { daysUntil, formatDayLong, formatTime, mismoDia, noches } from '../../domain/dates.js'
+import { formatDayLong, formatTime, mismoDia, noches } from '../../domain/dates.js'
 import { diaDelViaje } from '../../domain/dates.js'
 import Icon from '../../ui/Icon.jsx'
 import Avatars from '../../ui/Avatars.jsx'
@@ -13,6 +13,8 @@ import Proximo from '../../ui/Proximo.jsx'
 import Acciones from '../../ui/Acciones.jsx'
 import Notas from '../../ui/Notas.jsx'
 import DiasCarrusel from '../../ui/DiasCarrusel.jsx'
+import StatusHeroStitch from '../../ui/StatusHeroStitch.jsx'
+import BannerCopilotoAhora from '../../ui/BannerCopilotoAhora.jsx'
 import './ahora.css'
 
 const KIND = {
@@ -61,70 +63,65 @@ export default function Ahora() {
         </p>
       )}
 
-      {enViaje && dia === hoy
-        ? <Proximo {...loQueSigue(timeline, ahora)} ahora={ahora} />
-        : <Hero timeline={timeline} fase={fase} ahora={ahora} />}
+      <StatusHeroStitch timeline={timeline} fase={fase} ahora={ahora} />
 
-      <DiasCarrusel dias={dias} dia={dia} alElegir={setDia} avisos={avisos} hoy={enViaje ? hoy : null} />
-
-      <div className="ahora-cabecera-dia">
-        <button
-          type="button" className="ahora-flecha" aria-label="Día anterior"
-          disabled={i <= 0} onClick={() => setDia(dias[i - 1])}
-        >
-          <Icon name="chevron-left" size={16} />
-        </button>
-        <h2 className="ahora-dia-titulo">
-          {dia === hoy && enViaje ? 'Hoy · ' : ''}{formatDayLong(dia)}
-        </h2>
-        <button
-          type="button" className="ahora-flecha" aria-label="Día siguiente"
-          disabled={i >= dias.length - 1} onClick={() => setDia(dias[i + 1])}
-        >
-          <Icon name="chevron-right" size={16} />
-        </button>
-      </div>
-
-      {eventos.length === 0 ? (
-        <p className="ahora-vacio">Este día no tiene nada en la agenda. El copiloto sabe proponer.</p>
-      ) : (
-        <ol className="tl-events">
-          {eventos.map((ev) => (
-            <EventRow
-              key={ev.id}
-              event={ev}
-              dia={dia}
-              ahora={ahora}
-              enViaje={enViaje}
-              hoy={enViaje ? hoy : null}
-            />
-          ))}
-        </ol>
+      {enViaje && dia === hoy && (
+        <Proximo {...loQueSigue(timeline, ahora)} ahora={ahora} />
       )}
+
+      <div className="ahora-itinerario-seccion">
+        <div className="ahora-itinerario-head">
+          <div className="ahora-itinerario-titulos">
+            <h2 className="ahora-itinerario-titulo">Cuaderno Diario</h2>
+            <span className="ahora-itinerario-badge">
+              {i >= 0 ? `Día ${String(i + 1).padStart(2, '0')} de ${dias.length}` : `${dias.length} Etapas`}
+            </span>
+          </div>
+          <p className="ahora-itinerario-sub">
+            Secuencia pausada y coordinada para toda la familia
+          </p>
+        </div>
+
+        <DiasCarrusel dias={dias} dia={dia} alElegir={setDia} avisos={avisos} hoy={enViaje ? hoy : null} />
+
+        <div className="ahora-cabecera-dia">
+          <button
+            type="button" className="ahora-flecha" aria-label="Día anterior"
+            disabled={i <= 0} onClick={() => setDia(dias[i - 1])}
+          >
+            <Icon name="chevron-left" size={16} />
+          </button>
+          <h3 className="ahora-dia-titulo">
+            {dia === hoy && enViaje ? 'Hoy · ' : ''}{formatDayLong(dia)}
+          </h3>
+          <button
+            type="button" className="ahora-flecha" aria-label="Día siguiente"
+            disabled={i >= dias.length - 1} onClick={() => setDia(dias[i + 1])}
+          >
+            <Icon name="chevron-right" size={16} />
+          </button>
+        </div>
+
+        <BannerCopilotoAhora />
+
+        {eventos.length === 0 ? (
+          <p className="ahora-vacio">Este día no tiene nada en la agenda. El copiloto sabe proponer.</p>
+        ) : (
+          <ol className="tl-events">
+            {eventos.map((ev) => (
+              <EventRow
+                key={ev.id}
+                event={ev}
+                dia={dia}
+                ahora={ahora}
+                enViaje={enViaje}
+                hoy={enViaje ? hoy : null}
+              />
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
-  )
-}
-
-/**
- * Antes del viaje, una sola linea.
- *
- * Aqui habia un «14» de dos centimetros que ocupaba un sexto de la pantalla y
- * no cambiaba ninguna decision. El espacio de arriba es el mas caro de la app:
- * lo gana la agenda, no un contador.
- */
-function Hero({ timeline, fase, ahora }) {
-  const faltan = daysUntil(TRIP.startDate, ahora)
-  const pendientes = timeline.filter((e) => e.status !== 'confirmado').length
-
-  if (fase === FASES.DESPUES) {
-    return <p className="hero"><strong>Se acabó.</strong> Catorce días, {timeline.length} momentos.</p>
-  }
-
-  return (
-    <p className="hero">
-      <strong>Faltan {faltan} días.</strong> {timeline.length} momentos
-      {pendientes > 0 && <> · <em>{pendientes} sin cerrar</em></>}
-    </p>
   )
 }
 
