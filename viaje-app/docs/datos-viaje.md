@@ -160,13 +160,15 @@ Esta reserva **no estaba en ningún documento del proyecto**. Apareció al abrir
 - Cobertura Premium de Booking incluida.
 - El otro coche es el de Camilo, en el Parking Bajo Coste de Aena Bilbao desde el 10 de septiembre.
 
-🔴 **Son CINCO plazas.** Este mismo documento avisaba de que hacían falta siete: *«Nueve personas caben en dos turismos de cinco plazas; nueve maletas de catorce días, no.»* Con los dos coches hay 10 asientos para 9 personas, pero **dos maleteros de turismo para nueve equipajes de catorce días**. Sigue sin resolverse.
+🟢 **Resuelto el 6 sept, según Camilo.** Los dos coches son **Renault Austral**: el de alquiler y el suyo propio. Diez plazas para nueve personas.
 
-🔴 **El conductor lleva permiso colombiano.** Avis suele exigir **Permiso Internacional de Conducción** para permisos no comunitarios, y el propio vale avisa: *«Si no tienes todo lo que necesitas, el personal del mostrador no podrá entregarte el coche»*, con la lista de comprobación en **0 de 4**. El PIC se tramita en Colombia antes de volar. Sin él, el 19 a las 08:30 no hay coche.
+🟢 **El equipaje no es el problema que este documento decía.** Los siete viajan con **maleta de cabina de 10 kg y mochila**, no con maletas de catorce días. Nueve trolleys de cabina y nueve mochilas reparten bien en dos maleteros de Austral. La advertencia anterior partía de un supuesto equivocado.
 
-🟠 **No consta silla infantil.** Juan Guillermo tiene 4 años y en España el sistema de retención es obligatorio.
+🟠 **El conductor: hay plan B, pero faltan dos conductores, no uno.** Si el permiso colombiano del padre no le vale a Avis, **Camilo alquila el coche a su nombre** (tiene permiso español). Pero entonces **alguien tiene que conducir el otro Austral**: dos coches necesitan dos conductores legales. Si Camilo se pone al volante del alquilado, el suyo se queda parado salvo que otra persona del grupo pueda conducir en España.
+- **Acción concreta antes del 19:** cambiar el conductor principal en la reserva **desde la web de Booking**, no en el mostrador. Añadir o sustituir conductor sobre la marcha suele llevar recargo y no siempre se puede.
+- El vale sigue con la lista de comprobación en **0 de 4**: merece la pena repasarla antes de viajar.
 
-🟠 **El coche de Camilo se queda sin plan.** Sale de Bilbao el 19 y el grupo termina en Madrid el 23. Nadie ha decidido cómo vuelve al norte.
+🟠 **Sigue sin constar silla infantil.** Juan Guillermo tiene 4 años y en España el sistema de retención es obligatorio **en los dos coches**, no solo en el alquilado.
 
 ### Vuelo · 23 sep — vuelta a Bogotá
 - **Avianca AV027**, Madrid **T4 → Bogotá**, salida **09:40** — verificado contra la reserva el 26 de agosto de 2026.
@@ -203,13 +205,12 @@ Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de M
 1. 🟠 **Noches del 20 y 21 de septiembre: Guardo, casa de Camilo.** Siguen siendo las dos únicas noches de las trece sin reserva comercial, pero **ya no van desnudas**: el 6 de septiembre se añadió al dosier el **volante de empadronamiento individual del Ayuntamiento de Guardo** (expedido el 8 jun 2026, hoja padronal 936), que acredita el domicilio de Camilo ante el padrón municipal. Está en `docs-privados/anexo-01-empadronamiento-Guardo.pdf` y el dosier lo cita.
    **Lo que sigue sin haber es la carta de invitación** ante la Policía Nacional, que es el instrumento que la normativa prevé específicamente para alojamiento en vivienda particular y tarda semanas. El empadronamiento acredita *dónde vive el anfitrión*, no una invitación formalizada. El dosier lo dice con esas palabras: no conviene venderlo como algo que no es.
    ⚠️ El volante lleva fecha de **8 de junio**: tres meses. Si algún trámite lo quiere reciente, se saca uno nuevo en la sede electrónica del Ayuntamiento antes del día 10.
-2. 🔴 **La confirmación de Avianca (AV182 ida, AV027 vuelta) NO está en el correo de Camilo.** La tiene quien hizo la reserva en Colombia. **Es el documento que con más frecuencia pide el control de fronteras** y sin él los siete llegan a Barajas sin poder acreditar el billete de vuelta. Hay que pedirlo YA y que cada viajero lo lleve encima.
-3. **Quién de los nueve usa las dos entradas de F1** y qué hacen los otros siete el 11, 12 y 13.
-4. **Qué cambió en la reserva del Aparment Almudena el 5 de septiembre.**
-5. **Coche de alquiler de siete plazas**: sin reservar. Nueve personas y nueve maletas no caben en dos turismos.
-6. **Hora de llegada al apartamento de Sol** — el check-in tardío cuesta 30–50 €.
-7. **Contrato de alquiler de Sol firmado** antes del 10 sep.
-8. Comidas, actividades y reparto de gastos: sin decidir.
+2. 🟢 **Avianca: resuelto.** La confirmación del AV182 y del AV027 **la tienen los propios viajeros** (confirmado por Camilo el 6 sept). No está en el correo de Camilo y no hace falta que esté. Que cada uno la lleve encima, impresa o en el móvil.
+3. **Segundo conductor para el segundo Austral.** Ver la sección de Coches: dos coches, dos conductores legales.
+4. **Quién de los nueve usa las dos entradas de F1** y qué hacen los otros siete el 11, 12 y 13.
+5. **Hora de llegada al apartamento de Sol** — el check-in tardío cuesta 30–50 €.
+6. **Contrato de alquiler de Sol firmado** antes del 10 sep.
+7. Comidas, actividades y reparto de gastos: sin decidir.
 
 ---
 
