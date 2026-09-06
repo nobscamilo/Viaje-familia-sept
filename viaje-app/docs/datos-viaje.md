@@ -200,7 +200,9 @@ Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de M
 
 **Lo que sigue abierto:**
 
-1. 🔴 **Noches del 20 y 21 de septiembre: Guardo, casa propia, sin justificante.** Son las dos únicas noches de las trece sin reserva comercial que enseñar en frontera. La vía prevista por la normativa española es la **carta de invitación** ante la Policía Nacional, que tarda semanas: **a 4 días de la llegada ya no llega**. Se va con el resto del itinerario y con la acreditación de residencia de Camilo. Ver `docs-privados/Dosier-reservas-migracion-sept-2026.pdf`.
+1. 🟠 **Noches del 20 y 21 de septiembre: Guardo, casa de Camilo.** Siguen siendo las dos únicas noches de las trece sin reserva comercial, pero **ya no van desnudas**: el 6 de septiembre se añadió al dosier el **volante de empadronamiento individual del Ayuntamiento de Guardo** (expedido el 8 jun 2026, hoja padronal 936), que acredita el domicilio de Camilo ante el padrón municipal. Está en `docs-privados/anexo-01-empadronamiento-Guardo.pdf` y el dosier lo cita.
+   **Lo que sigue sin haber es la carta de invitación** ante la Policía Nacional, que es el instrumento que la normativa prevé específicamente para alojamiento en vivienda particular y tarda semanas. El empadronamiento acredita *dónde vive el anfitrión*, no una invitación formalizada. El dosier lo dice con esas palabras: no conviene venderlo como algo que no es.
+   ⚠️ El volante lleva fecha de **8 de junio**: tres meses. Si algún trámite lo quiere reciente, se saca uno nuevo en la sede electrónica del Ayuntamiento antes del día 10.
 2. 🔴 **La confirmación de Avianca (AV182 ida, AV027 vuelta) NO está en el correo de Camilo.** La tiene quien hizo la reserva en Colombia. **Es el documento que con más frecuencia pide el control de fronteras** y sin él los siete llegan a Barajas sin poder acreditar el billete de vuelta. Hay que pedirlo YA y que cada viajero lo lleve encima.
 3. **Quién de los nueve usa las dos entradas de F1** y qué hacen los otros siete el 11, 12 y 13.
 4. **Qué cambió en la reserva del Aparment Almudena el 5 de septiembre.**
@@ -215,7 +217,9 @@ Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de M
 
 **Este repositorio tiene remoto en `github.com/nobscamilo/Viaje-familia-sept` y publica GitHub Pages desde él.** Trátalo como público.
 
-**Añadido el 6 sept 2026:** existe `../docs-privados/` en la raíz del proyecto (fuera de `viaje-app/`), **ya en `.gitignore`**. Contiene el dosier de migración, los siete justificantes en PDF (`reserva-01` a `reserva-07`) y `fuentes-html/` con los originales de los que salieron. Ahí vive `Dosier-reservas-migracion-sept-2026.pdf`: nombres completos de los nueve, direcciones de los seis alojamientos, y el número de reserva del ibis Saint-Maurice, **que es el código del portal**. Ese PDF no se sube nunca. Si se añade cualquier otro documento familiar, va ahí.
+**Añadido el 6 sept 2026:** existe `../docs-privados/` en la raíz del proyecto (fuera de `viaje-app/`), **ya en `.gitignore`**. Contiene el dosier de migración, los siete justificantes en PDF (`reserva-01` a `reserva-07`), el `anexo-01` con el empadronamiento y `fuentes-html/` con los originales de los que salieron.
+
+🔴 **El dosier lleva ahora el NIE, el teléfono y el domicilio de Camilo**, porque el agente de fronteras los va a pedir al ser el anfitrión de las dos noches en Guardo. **Nada de eso se escribe en este repositorio**, que es público: vive solo en `docs-privados/`, que está en `.gitignore`. Ahí vive `Dosier-reservas-migracion-sept-2026.pdf`: nombres completos de los nueve, direcciones de los seis alojamientos, y el número de reserva del ibis Saint-Maurice, **que es el código del portal**. Ese PDF no se sube nunca. Si se añade cualquier otro documento familiar, va ahí.
 
 Por eso, de este documento se han quitado deliberadamente:
 - Los **PIN de Booking** (sirven para modificar o cancelar una reserva: son credenciales, no datos).
