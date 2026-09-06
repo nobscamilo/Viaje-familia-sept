@@ -121,7 +121,7 @@ export function pasaHoy(evento, hoy) {
  */
 export function accionesDe(
   evento,
-  { decisiones = [], uid = null, esOwner = false, esAdulto = true, hoy = null } = {},
+  { decisiones = [], _uid = null, esOwner = false, esAdulto = true, hoy = null } = {},
 ) {
   if (!evento) return []
   const acciones = []

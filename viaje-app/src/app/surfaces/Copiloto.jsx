@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTrip } from '../../hooks/useTrip.js'
 import { useHilo } from '../../hooks/useHilo.js'
+import { useAhora } from '../../hooks/useAhora.js'
 import { formatDay } from '../../domain/dates.js'
 import SitiosCopiloto from '../../ui/SitiosCopiloto.jsx'
 import { contextoVivo, restaurarConversacion } from '../../domain/hilo.js'
@@ -31,7 +32,8 @@ const demoPedida = () =>
 
 export default function Copiloto() {
   const { tripId, yo, modoLocal } = useTrip()
-  const { mensajes, setMensajes, cargando, errorGuardado, guardar, olvidar, reintentar } = useHilo()
+  const { ahora } = useAhora()
+  const { mensajes, setMensajes, cargando, errorGuardado, guardar, olvidar, reintentar } = useHilo(ahora)
   const [texto, setTexto] = useState('')
   const [pensando, setPensando] = useState(false)
   const [borrando, setBorrando] = useState(false)
@@ -71,8 +73,8 @@ export default function Copiloto() {
     const limpio = (pregunta ?? texto).trim()
     if (!limpio || pensando || cargando || modoLocal) return
 
-    const ahora = new Date()
-    const mio = { rol: 'yo', texto: limpio, en: ahora.getTime() }
+    const t = ahora.getTime()
+    const mio = { rol: 'yo', texto: limpio, en: t }
     const nuevos = [...restaurarConversacion(mensajes, ahora), mio]
     setMensajes(nuevos)
     setTexto('')
@@ -82,7 +84,7 @@ export default function Copiloto() {
     try {
       const r = await preguntarCopiloto(tripId, contextoVivo(nuevos, ahora))
       const suyo = {
-        rol: 'copiloto', en: Date.now(),
+        rol: 'copiloto', en: ahora.getTime(),
         texto: r.texto,
         busquedas: r.busquedas,
         tarjetas: r.tarjetas,
@@ -99,7 +101,7 @@ export default function Copiloto() {
       setMensajes((ms) => [...ms, {
         rol: 'copiloto',
         texto: `No pude responder: ${e?.message ?? 'error desconocido'}`,
-        fallo: true, en: Date.now(),
+        fallo: true, en: ahora.getTime(),
       }])
     }
     setPensando(false)
@@ -162,7 +164,7 @@ export default function Copiloto() {
 
         {mensajes.map((m, i) => (
           <Mensaje
-            key={i}
+            key={m.id ?? (m.en ? `${m.rol}-${m.en}` : i)}
             mensaje={m}
             conMapa={i === ultimoConSitios}
             tripId={tripId}

@@ -157,7 +157,6 @@ function Formulario({ texto, setTexto, enviando, alGuardar, alCancelar, etiqueta
       <input
         className="nts-campo"
         type="text"
-        /* eslint-disable-next-line jsx-a11y/no-autofocus */
         autoFocus
         placeholder="Recordar reservar, llevar el contrato…"
         value={texto}

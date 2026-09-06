@@ -82,10 +82,10 @@ export const DECLARACIONES = [
   {
     name: 'agregarAlPlan',
     description:
-      'Mete un plan en la agenda del viaje: una comida, una visita, un traslado. ' +
-      'Entra como PROPUESTO, nunca como confirmado: aparece en la linea de tiempo ' +
-      'marcado como sin cerrar hasta que quien organiza lo confirme. ' +
-      'Usala cuando te pidan "agrega esto al plan" o "metelo el viernes por la tarde".',
+      'Genera un BORRADOR de plan para la agenda (comida, visita, traslado) y lo ' +
+      'muestra en el chat para que la familia lo revise y agregue con un boton. ' +
+      'NO escribe directamente en la agenda. Usala cuando pidan "agrega esto al plan" o ' +
+      '"metelo el viernes": proponlo en el chat, no digas que ya lo agregaste.',
     parameters: {
       type: 'object',
       properties: {
@@ -113,13 +113,14 @@ export const DECLARACIONES = [
   {
     name: 'armarRuta',
     description:
-      'Arma una RUTA DE TURISMO de varias paradas en un mismo dia y la deja en la agenda ' +
-      'como propuesta, con la hora de cada parada ya calculada. Usala cuando pidan ' +
-      '"armanos una ruta", "que hacemos el domingo en Barcelona", "un plan para la manana". ' +
-      'Tu pones los NOMBRES y el ORDEN; el servidor busca cada sitio, mira si abre a esa ' +
-      'hora, calcula cuanto se tarda de uno a otro EN ESE DIA y encadena el reloj. ' +
-      'NO inventes horas de llegada ni tiempos de trayecto: los devuelve la herramienta. ' +
-      'Para una sola parada usa agregarAlPlan; esto es para dos o mas.',
+      'Arma un BORRADOR DE RUTA de varias paradas en un mismo dia y lo deja en el chat ' +
+      'con las horas calculadas, listo para que la familia lo revise y lo agregue con un boton. ' +
+      'NO escribe directamente en la agenda. Usala cuando pidan "armanos una ruta", ' +
+      '"que hacemos el domingo en Barcelona", "un plan para la manana". Tu pones los NOMBRES ' +
+      'y el ORDEN; el servidor busca cada sitio, mira si abre a esa hora, calcula cuanto se ' +
+      'tarda de uno a otro EN ESE DIA y encadena el reloj. NO inventes horas de llegada ni ' +
+      'tiempos de trayecto: los devuelve la herramienta. Para una sola parada usa agregarAlPlan; ' +
+      'esto es para dos o mas.',
     parameters: {
       type: 'object',
       properties: {

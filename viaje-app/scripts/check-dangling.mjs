@@ -166,7 +166,7 @@ function analizar(ruta) {
 
 let problemas = 0
 for (const carpeta of CARPETAS) {
-  let archivos = []
+  let archivos
   try {
     archivos = readdirSync(join(RAIZ, carpeta))
       .map((f) => join(RAIZ, carpeta, f))

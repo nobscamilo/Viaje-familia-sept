@@ -106,7 +106,7 @@ function Lienzo({ puntos, elegido, alElegir }) {
           styles: ESTILO_OSCURO,
           disableDefaultUI: true,
           zoomControl: true,
-          gestureHandling: 'greedy',
+          gestureHandling: 'cooperative',
         })
         setListo(true)
       })

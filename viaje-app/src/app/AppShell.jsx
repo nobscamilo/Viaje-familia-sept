@@ -19,7 +19,7 @@ const NAV = [
 ]
 
 export default function AppShell() {
-  const { yo, modoLocal } = useTrip()
+  const { yo } = useTrip()
   const navegar = useNavigate()
   const { ahora } = useAhora(60_000)
   const enViaje = diaDeViaje(TRIP, ahora)

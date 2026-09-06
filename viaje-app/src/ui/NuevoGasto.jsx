@@ -3,6 +3,7 @@ import { CATEGORIAS, HOGARES } from '../data/hogares.js'
 import { GROUPS, TRIP } from '../data/trip-madrid-2026.js'
 import { useTrip } from '../hooks/useTrip.js'
 import { aCentimos, euros, pesos, tienePagadores } from '../domain/cuentas.js'
+import { diaDelViaje } from '../domain/dates.js'
 import { copAEur, eurACop, tasaCop, tasaLegible } from '../services/cambio.js'
 import { anotarGasto, borrarGasto, editarGasto } from '../services/cuentas.js'
 import './nuevo-gasto.css'
@@ -15,7 +16,7 @@ const QUIENES = [
 ]
 
 const hoy = () => {
-  const d = new Date().toISOString().slice(0, 10)
+  const d = diaDelViaje()
   return d < TRIP.startDate ? TRIP.startDate : d > TRIP.endDate ? TRIP.endDate : d
 }
 

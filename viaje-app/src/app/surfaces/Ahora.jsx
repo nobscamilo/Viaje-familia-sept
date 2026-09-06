@@ -63,7 +63,7 @@ export default function Ahora() {
 
       {enViaje && dia === hoy
         ? <Proximo {...loQueSigue(timeline, ahora)} ahora={ahora} />
-        : <Hero timeline={timeline} fase={fase} />}
+        : <Hero timeline={timeline} fase={fase} ahora={ahora} />}
 
       <DiasCarrusel dias={dias} dia={dia} alElegir={setDia} avisos={avisos} hoy={enViaje ? hoy : null} />
 
@@ -112,8 +112,8 @@ export default function Ahora() {
  * no cambiaba ninguna decision. El espacio de arriba es el mas caro de la app:
  * lo gana la agenda, no un contador.
  */
-function Hero({ timeline, fase }) {
-  const faltan = daysUntil(TRIP.startDate)
+function Hero({ timeline, fase, ahora }) {
+  const faltan = daysUntil(TRIP.startDate, ahora)
   const pendientes = timeline.filter((e) => e.status !== 'confirmado').length
 
   if (fase === FASES.DESPUES) {

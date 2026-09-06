@@ -9,17 +9,19 @@ import { useTrip } from './useTrip.js'
  * La instantánea conserva borradores y cambios; no almacena fotos efímeras de Places.
  * Las escrituras se serializan para que una respuesta lenta no reponga un borrador descartado.
  */
-export function useHilo() {
+export function useHilo(ahora = new Date()) {
   const { tripId, yo } = useTrip()
   const [mensajes, setMensajes] = useState([])
   const [cargando, setCargando] = useState(true)
   const [errorGuardado, setErrorGuardado] = useState(null)
   const cola = useRef(Promise.resolve())
   const destino = useRef(null)
+  const ultimoSerializado = useRef(null)
 
   useEffect(() => {
     let vivo = true
     destino.current = null
+    ultimoSerializado.current = null
     setMensajes([])
     setCargando(true)
     setErrorGuardado(null)
@@ -38,7 +40,9 @@ export function useHilo() {
         }
         if (!vivo) return
         destino.current = { fb, ref, revision: estado.data()?.revision ?? 0 }
-        setMensajes(restaurarConversacion(todos, new Date()))
+        const inicial = restaurarConversacion(todos, ahora)
+        ultimoSerializado.current = JSON.stringify(estadoSerializable(inicial))
+        setMensajes(inicial)
       } catch {
         if (vivo) setErrorGuardado('No pude recuperar la conversación. Recarga antes de seguir para conservar tus borradores.')
       }
@@ -47,13 +51,17 @@ export function useHilo() {
       if (vivo) { setErrorGuardado('No pude conectar con tu conversación. Recarga para intentarlo de nuevo.'); setCargando(false) }
     })
     return () => { vivo = false }
-  }, [tripId, yo?.id])
+  }, [tripId, yo?.id, ahora])
 
   useEffect(() => {
     if (cargando || !destino.current) return
     const destinoActual = destino.current
     const { fb, ref } = destinoActual
     const datos = estadoSerializable(mensajes)
+    const json = JSON.stringify(datos)
+    if (ultimoSerializado.current === json) return
+    ultimoSerializado.current = json
+
     cola.current = cola.current.catch(() => {}).then(async () => {
       try {
         if (destino.current !== destinoActual) return

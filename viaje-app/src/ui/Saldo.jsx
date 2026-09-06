@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { HOGARES, etiquetaHogar } from '../data/hogares.js'
 import { euros } from '../domain/cuentas.js'
+import { diaDelViaje } from '../domain/dates.js'
 import { anotarLiquidacion } from '../services/cuentas.js'
 import { useTrip } from '../hooks/useTrip.js'
 import './saldo.css'
@@ -76,7 +77,7 @@ function Pago({ pago, miHogar }) {
         de: pago.de,
         a: pago.a,
         importeCent: pago.importeCent,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: diaDelViaje(),
       }, user?.uid)
       // No hace falta tocar nada más: el `onSnapshot` de las liquidaciones
       // recalcula el saldo y esta fila desaparece sola.

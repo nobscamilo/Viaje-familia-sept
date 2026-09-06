@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATEGORIAS, HOGARES, hogarDe } from '../../data/hogares.js'
+import { CATEGORIAS, hogarDe } from '../../data/hogares.js'
 import { useTrip } from '../../hooks/useTrip.js'
 import { useCuentas } from '../../hooks/useCuentas.js'
 import { euros, plural } from '../../domain/cuentas.js'
@@ -130,7 +130,7 @@ function Gasto({ gasto, miHogar, alTocar }) {
       <span className="ctas-g-barra" style={hogar ? { background: hogar.color } : undefined} />
       <button type="button" className="ctas-g-abrir" onClick={alTocar}
         aria-label={`Abrir ${gasto.concepto}`}>
-      <div className="ctas-g-txt">
+      <span className="ctas-g-txt">
         <span className="ctas-g-concepto">{gasto.concepto}</span>
         <span className="ctas-g-meta">
           {pagador?.short ?? '—'} · {quienes}
@@ -150,7 +150,7 @@ function Gasto({ gasto, miHogar, alTocar }) {
             de procedencia en naranja convertían la lista en una alarma. */}
         {gasto.nota && <span className="ctas-g-nota">{gasto.nota}</span>}
         {gasto.aviso && <span className="ctas-g-aviso">{gasto.aviso}</span>}
-      </div>
+      </span>
       <span className="ctas-g-importe">{euros(gasto.importeCent)}</span>
       </button>
     </li>

@@ -66,6 +66,14 @@ for (const ancho of ANCHOS) {
     for (const el of document.querySelectorAll('*')) {
       const c = el.getBoundingClientRect()
       if (c.width === 0) continue
+      let p = el.parentElement
+      let enScroll = false
+      while (p && p !== document.body) {
+        const sx = window.getComputedStyle(p).overflowX
+        if (sx === 'auto' || sx === 'scroll') { enScroll = true; break }
+        p = p.parentElement
+      }
+      if (enScroll) continue
       if (c.right > limite + 1 || c.left < -1) {
         fuera.push({
           que: `${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]}`,

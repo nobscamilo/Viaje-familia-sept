@@ -16,7 +16,7 @@ import { moverEstadoPlan, motivoPlan, quitarPlan, quitarRuta } from '../services
  * ejecutarse. Quien decide cuales lo son es `accionesDe`, que es puro y esta
  * probado — aqui no se vuelve a razonar sobre reservas.
  */
-export default function Cierre({ evento, acciones, tripId, uid, editando, alEditar }) {
+export default function Cierre({ evento, acciones, tripId, _uid, editando, alEditar }) {
   const [trabajando, setTrabajando] = useState(null)
   const [pidiendo, setPidiendo] = useState(null)
   const [fallo, setFallo] = useState(null)

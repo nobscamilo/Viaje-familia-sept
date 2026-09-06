@@ -310,7 +310,29 @@ esta revisión no acredita el servicio autenticado ni un nuevo despliegue.
 ### Implementación del copiloto — 6 de septiembre de 2026
 
 Implementados más sitios de cinco en cinco, conservación privada de borradores,
-corrección de caducidad y formulario, y contexto con identidad y notas. Gemini
-2.5 Flash se mantiene. Pasan 220 pruebas y 47 casos de reglas; pendiente de
-publicar reglas, funciones y web, sin siembra. Detalles, límites y evaluación
-de modelos en [viaje-app/README.md](viaje-app/README.md), sección «Mejoras del copiloto».
+corrección de caducidad y formulario, y contexto con identidad y notas. Pasan
+220 pruebas y 47 casos de reglas.
+
+
+### Actualización técnica, linting y optimización — 6 de septiembre de 2026
+
+- **Modelo**: Actualizado a `gemini-3.8-flash` en `functions/lib/secrets.js`
+  (Google AI Studio, `@google/genai`). Clarificadas las descripciones de
+  `agregarAlPlan` y `armarRuta` en `declaraciones.js` para indicar que devuelven
+  borradores interactivos en chat sin tocar Firestore directo.
+- **Linting**: Migrado a ESLint 10 flat config (`eslint.config.js`) con soporte
+  JSX y React Hooks v7 (`rules-of-hooks: error`, `exhaustive-deps: warn`).
+  0 errores y 0 avisos en todo el proyecto.
+- **Sincronización de relojes y fechas**:
+  - `Hero.jsx` en `Ahora` recibe `ahora` de `useAhora()` y calcula `daysUntil`
+    con él, quedando 100% coordinado con la cabecera al simular `?hoy=`.
+  - `Copiloto.jsx` y `useHilo.js` usan `ahora`, evitando transacciones
+    redundantes en montaje inicial.
+  - `NuevoGasto.jsx` y `Saldo.jsx` usan `diaDelViaje()` en lugar de
+    `toISOString().slice(0, 10)` para evitar el desfase por UTC con Madrid.
+- **Code Splitting**: `App.jsx` carga con `React.lazy()` y `<Suspense>` las
+  superficies `Decisiones`, `Mapa`, `Cuentas`, `Copiloto` y `Ajustes`. Redujo el
+  CSS inicial de 73.6 kB a 27.6 kB (-62%) y el bundle JS principal en más de 100 kB.
+- **Gestos de Mapa**: `gestureHandling: 'cooperative'` en `Mapa.jsx`.
+- **Validación completa**: 220 tests unitarios/dominio, 47 reglas de Firestore,
+  medición en 4 resoluciones (1280, 430, 390, 375 px) y build de producción limpios.

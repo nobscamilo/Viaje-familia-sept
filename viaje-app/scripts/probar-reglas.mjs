@@ -306,7 +306,7 @@ function enLaAgenda() {
 const cuerpo = {
   source: { files: [{ name: 'firestore.rules', content: fuente }] },
   testSuite: {
-    testCases: CASOS.map(({ nombre, ...c }) => c),
+    testCases: CASOS.map(({ nombre: _nombre, ...c }) => c),
   },
 }
 

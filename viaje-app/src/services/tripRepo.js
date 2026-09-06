@@ -11,7 +11,7 @@
  */
 import { firebaseListo, getFb } from './firebase.js'
 import {
-  commentsRef, decisionRef, decisionsRef, eventRef, timelineRef, travelersRef, tripRef,
+  commentsRef, decisionRef, decisionsRef, timelineRef, travelersRef, tripRef,
   voteRef, votesRef,
 } from './paths.js'
 

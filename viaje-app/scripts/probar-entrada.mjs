@@ -41,7 +41,6 @@ const trip = (await tripRef.get()).data()
 const tomados = new Set(Object.values(trip.uidToTraveler ?? {}))
 const codigos = await db.collection(`trips/${TRIP}/codes`).get()
 const libre = codigos.docs.find((d) => d.get('joinCode') && !tomados.has(d.id))
-const pillado = codigos.docs.find((d) => d.get('joinCode') && tomados.has(d.id))
 if (!libre) { console.error('No queda ningun viajero libre con codigo: no se puede probar.'); process.exit(1) }
 
 const URL_FN = `https://europe-west1-${P}.cloudfunctions.net/unirse`

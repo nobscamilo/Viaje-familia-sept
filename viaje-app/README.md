@@ -1660,16 +1660,23 @@ excepciones JavaScript ni desbordamiento horizontal en los cuatro anchos.
 Places real devuelve dos lotes de cinco, diez IDs distintos y fotos en el
 primer lote. No se escribieron pruebas en el viaje de la familia.
 
-**Modelo:** la API del proyecto también lista `gemini-3.8-flash`. Es candidato
-para una evaluación con preguntas reales del viaje, no un cambio automático.
-[Catálogo oficial](https://ai.google.dev/gemini-api/docs/models) y
-[precios oficiales](https://ai.google.dev/gemini-api/docs/pricing), consultados
-el 6 de septiembre: 2.5 Flash cuesta $0,30/$2,50 por millón de tokens de
-entrada/salida de texto; 3.8 Flash figura a $0,75/$3,75 hasta el 31 de diciembre
-de 2026. No se ha realizado un benchmark comparativo del copiloto. Revisar
-compatibilidad de configuración y herramientas antes de cambiar la variable.
+**Modelo:** la API del proyecto se actualizó a `gemini-3.8-flash` en `functions/lib/secrets.js`
+(Google AI Studio con `@google/genai`). Ofrece mejor razonamiento en llamada
+a herramientas y cumplimiento de formato sin la penalización de latencia de Pro.
 
 **Publicación:** desplegar primero las reglas de la instantánea y las funciones
 `copiloto` y `masLugares`; después, hosting. `npm run publicar` solo despliega
 hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
 `src/data/` y no requiere siembra. No publicar solo la web con reglas antiguas.
+
+
+## Actualización técnica, linting y optimización — 6 de septiembre de 2026
+
+- **ESLint 10 Flat Config**: Configuración moderna en `eslint.config.js` con React Hooks v7 (`rules-of-hooks: error`, `exhaustive-deps: warn`). Se limpiaron variables y módulos huérfanos. 0 errores y 0 warnings.
+- **Sincronización temporal**:
+  - `Hero.jsx` en `Ahora` utiliza `daysUntil(TRIP.startDate, ahora)` provisto por `useAhora()`, sincronizándose con la cabecera en navegación con fecha simulada (`?hoy=...`).
+  - `Copiloto.jsx` y `useHilo.js` adoptan `ahora`, previniendo escrituras redundantes al inicializar el hilo.
+  - `NuevoGasto.jsx` y `Saldo.jsx` usan `diaDelViaje()` en vez de UTC ISO strings para registrar gastos y transferencias con la fecha correcta en la zona horaria del viaje.
+- **Code Splitting**: Carga bajo demanda en `App.jsx` (`React.lazy` y `<Suspense>`) de las superficies secundarias (`Decisiones`, `Mapa`, `Cuentas`, `Copiloto`, `Ajustes`), reduciendo el CSS inicial un 62% (de 73.6 kB a 27.6 kB) y el bundle JS principal en más de 100 kB.
+- **Alineación con directrices**: Confirmado `gestureHandling: 'cooperative'` en `Mapa.jsx`.
+- **Validación**: 220 tests unitarios, 47 reglas de seguridad en Firestore, build de Vite exitoso y comprobación de responsive con `npm run medir` a 1280, 430, 390 y 375 px.

@@ -6,4 +6,4 @@ export const mapsApiKey = defineSecret('GOOGLE_MAPS_API_KEY')
 export const geminiApiKey = defineSecret('GEMINI_API_KEY')
 
 /** Modelo de Gemini. AGENTS.md prohibe Vertex AI: esto va contra AI Studio. */
-export const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+export const geminiModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash'
