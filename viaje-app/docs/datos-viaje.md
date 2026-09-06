@@ -1,6 +1,6 @@
 # Datos reales del viaje — septiembre 2026
 
-**Verificado el 2026-08-25** contra confirmaciones en Gmail. Esta es la fuente de verdad para el seed de la app nueva.
+**Verificado el 2026-09-06** contra confirmaciones en Gmail (revisión previa: 2026-08-25). Esta es la fuente de verdad para el seed de la app nueva.
 Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorrectos: reemplazarlos por esto.
 
 ---
@@ -13,13 +13,15 @@ Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorr
 |---|---|---|---|---|---|
 | 1 | Juan Camilo Sarmiento Castillo | 37 | — | `owner` | ✅ |
 | 2 | Juliana Andrea Bueno Díaz | 32 | pareja de Camilo | `adult` | ✅ |
-| 3 | Julián Sarmiento | 65 | padre | `adult` | ✅ |
-| 4 | Cielo Castillo | 63 | madre | `adult` | ✅ |
-| 5 | Juliana Sarmiento | 44 | hermana | `adult` | ✅ |
-| 6 | Fernando Muñoz | 42 | cuñado | `adult` | ✅ |
-| 7 | Julián David Salazar | 18 | sobrino | `adult` | ✅ |
+| 3 | Guillermo Julián Sarmiento Ramírez | 65 | padre | `adult` | ✅ |
+| 4 | Cielo del Socorro Castillo Calvache | 63 | madre | `adult` | ✅ |
+| 5 | Juliana Isabel Sarmiento Castillo | 44 | hermana | `adult` | ✅ |
+| 6 | Fernando Felipe Muñoz Muñoz | 42 | cuñado | `adult` | ✅ |
+| 7 | Julián David Salazar Sarmiento | 18 | sobrino | `adult` | ✅ |
 | 8 | Juan Felipe Muñoz Sarmiento | 9 | sobrino | `child` | ❌ |
 | 9 | Juan Guillermo Muñoz Sarmiento | 4 | sobrino | `child` | ❌ |
+
+**Los nombres de arriba son los que figuran en la reserva de Vueling MLD57T** (verificados el 6 sept 2026): son los del pasaporte y los que hay que usar en cualquier documento que se enseñe en frontera. Los que había antes aquí eran apodos familiares.
 
 **Notas de modelado**
 - Julián David (18) es adulto legal: cuenta como votante y como adulto en reservas.
@@ -64,9 +66,15 @@ Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorr
 - **Classic Tour Bernabéu** · compra 104867131 · Av. de Concha Espina
 - (Hay dos compras más del mismo tour para el 16 ago — esas ya pasaron, no son de este viaje.)
 
-### F1 · MADRING — Gran Premio de España 2026
-- Entradas compradas vía **Fever** (correos de mapa de acceso y elección de asientos, 10 y 18 ago).
-- ⚠️ **Falta confirmar del propio correo/PDF de Fever:** día exacto, número de entradas y a quién cubren.
+### F1 · MADRING — Gran Premio de España 2026 · VERIFICADO 6 sept 2026
+- **Solo DOS entradas**, no nueve. Compra Fever, **ID 101482511**.
+- **Alta Velocidad · Abono 3 días · Sección 3 Bronze 2nd Release.**
+- Acceso C2 · Puerta C2 · Fan Zone Barrio · **Grada GC02, fila 16, asientos 51 y 52.**
+- Primera sesión **11 sep**; el abono cubre los tres días del fin de semana.
+- La entrada está atada a **una Fan Zone concreta**: no se puede pasar a las demás.
+- No hay que imprimir nada: se enseña el QR y dan una pulsera que hay que llevar los tres días. El QR vive en la app de Fever/MADRING y **solo abre con la cuenta de correo de la compra**.
+- El 4 sept se compró además una **recarga de consumo onsite** (correo aparte de Fever).
+- ⚠️ **Dos entradas para nueve personas obliga a decidir quién va y qué hacen los otros siete el 11, 12 y 13.** El Bernabéu del 11 a las 10:30 es de la misma mañana.
 
 ### Tren · 14 sep — Madrid → Barcelona · CONFIRMADO
 - **OUIGO 06541**, localizador **J6FGQQ** (reserva del 18 de mayo de 2026).
@@ -89,12 +97,15 @@ Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorr
 
 ### Vuelo · 16 sep — Barcelona → París · CONFIRMADO
 - **Vueling VY8002**, localizador **MLD57T** · BCN **15:40** → ORY **17:30**, los **nueve**. 431,91 €.
-- 🔴 **LA MALETA DE CABINA NO ESTÁ PAGADA EN ESTE VUELO.** La reserva incluye, por persona, **solo una pieza bajo el asiento de 40×30×20 cm**. Nada en el compartimento superior.
-- Vueling avisa en la propia confirmación: *una segunda pieza de mano o un bulto fuera de medidas se factura por hasta 75 €*. **Nueve personas: hasta 675 € en la puerta de embarque.** Añadirlas por internet debería rondar los 225 € (es lo que costaron las nueve piezas en el vuelo del 19).
+- ✅ **LA MALETA DE CABINA YA ESTÁ PAGADA** (corregido el 6 sept 2026). El 28 de agosto se añadieron **9 piezas de compartimento superior** (10 kg, 55×40×20) por **405,00 € pagados con PayPal**. Total del vuelo: **836,91 €** (431,91 € el 18 may + 405,00 € el 28 ago).
+- Cada pasajero lleva ahora: 1 pieza bajo el asiento 40×30×20 **y** 1 pieza de compartimento superior. Los nueve van nominados uno a uno en la confirmación.
+- ⚠️ **Al modificarse la reserva el 28 de agosto hay que rehacer el check-in.** Igual que en el SNF23N.
+- ⚠️ Esta entrada estuvo **más de una semana en rojo diciendo lo contrario**. La lección: una reserva modificada genera un correo nuevo que sustituye al anterior; buscar por el localizador, no por la fecha de compra.
 - Encaje: salida del piso de Barcelona antes de las 11:00, vuelo a las 15:40. Margen de sobra.
 
 ### Alojamiento París · 16–19 sep
 - **ibis budget Saint-Maurice** · **252 Rue du Maréchal Leclerc, 94410 Saint-Maurice** · 16 sep → 19 sep
+- ℹ️ La reserva vigente es la **segunda**: la primera (5004230210, del 20 may) se canceló gratis el 31 jul y se rehízo el 30 jul/31 jul. La que vale es la de **julio**, modificada el 26 ago.
 - 🔴 **EL NÚMERO DE RESERVA DE ESTE HOTEL NO SE ESCRIBE AQUÍ NI EN EL CÓDIGO.** El propio Booking dice: *«Access code at the front door is your booking number without dots»*. **El código del portal ES el número de reserva.** Publicarlo en este repositorio, que es público y publica GitHub Pages, es publicar la llave de la calle. Vive solo en Firestore, detrás de las reglas de pertenencia al viaje, y en el correo.
 - Tres noches, **tres habitaciones de tres personas: nueve plazas justas** para los nueve. Entrada desde las 12:00, salida hasta las 12:00. Sin parking.
 - **836,31 € pagados.** No reembolsable. Impuesto municipal **54,60 €** aparte (2,60 € por persona y noche), a pagar allí.
@@ -109,6 +120,14 @@ Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorr
 - ⚠️ **La madrugada más dura del viaje.** Mostradores cierran a las **06:30**, embarque a las **06:50**. Desde el ibis de Saint-Maurice hay que salir sobre las **05:00** con nueve personas y dos niños. El traslado a Orly a esa hora hay que dejarlo cerrado, no improvisado.
 - ⚠️ Reserva modificada el 15 de agosto: **hay que rehacer el check-in**.
 
+### Alojamiento Bilbao/Derio · 9–10 sep — CONFIRMADO (nuevo, 31 ago) · SOLO CAMILO Y JULIANA
+- **Hotel The Park Derio** · Booking conf. **5379605297** · Habitación Doble, **2 adultos**, 1 noche
+- **Polígono Parque Tecnológico, Edificio 806, 48160 Derio** · Tel. +34 946469022
+- Entrada mié 9 sep (15:00–00:00) · Salida jue 10 sep (07:30–12:00) · **100,80 €**
+- 🔴 **Cancelación gratis solo hasta el 7 sept 23:59.** A partir del 8 se paga entero.
+- Encaja con el IB0430 de las 09:15 desde Bilbao: se duerme al lado del aeropuerto en vez de madrugar desde Guardo.
+- **No forma parte del dosier de migración**: los dos viajeros ya residen en España.
+
 ### Alojamiento Santander · 19–20 sep — CONFIRMADO (nuevo, 26 ago)
 - **ibis Styles Santander** · **Av. de Parayas 2A, 39011 Santander** · Booking conf. **5931295674** · 1 noche
 - **Entrada aprobada por el hotel entre las 19:00 y las 20:00.**
@@ -119,9 +138,17 @@ Los datos que hoy están en `src/data/trip.js` son incompletos y en parte incorr
 - Santander → Guardo: **164 km, 1 h 53 min** en coche (medido con la Routes API el 26 ago).
 - Guardo → Madrid-Barajas T4: **364 km, 3 h 35 min**. Guardo → estación de Palencia: 94 km, 1 h 10 min.
 
-### Noche del 22 sep — Madrid · SIN RESERVAR
-- **Obligatoria, no opcional.** El AV027 sale a las 09:40 de T4 y hay que estar allí a las 07:40. Desde Guardo eso significa salir a las **03:30 de la madrugada** con niños de 4 y 9 años.
-- 🔴 **No hay nada reservado.** Es el hueco más urgente del viaje.
+### Alojamiento Madrid · 22–23 sep — CONFIRMADO (nuevo, 30 ago; modificado 5 sept)
+- **Aparment Almudena** · Apartamento de 3 dormitorios · Booking conf. **6520187782**
+- **Calle de San Emilio 62, Ciudad Lineal, 28017 Madrid**
+- **Entrada mar 22 sep (15:00–22:00) · Salida mié 23 sep (05:00–11:30)** · 1 noche
+- Reservado para **7 adultos + 2 niños (4 y 9)** — cubre a los nueve
+- **261,50 €** (146,82 € + IVA 14,68 € + limpieza 100 €). **Cancelación gratis hasta el 19 sep 23:59**; a partir del 20 se paga entero.
+- Teléfono del alojamiento: +34 615313958. Licencia B87814935.
+- ⚠️ **No admiten llegadas después de las 00:00.** Recargo de 30 € (22:00–23:00) y 50 € (23:00–00:00).
+- ⚠️ Posible cargo de hasta 450 € por daños después del check-out.
+- ✅ **Esto cierra el que era el hueco más urgente del viaje.** La salida desde las 05:00 encaja con estar en T4 a las 07:40 para el AV027 de las 09:40.
+- El 5 de septiembre llegó un correo de reserva modificada y otro de pago realizado: **queda por verificar qué cambió exactamente.**
 
 ### Coches
 - **Dos**: el de Camilo, aparcado en el Parking Bajo Coste de Aena Bilbao desde el 10 de septiembre, y **uno de alquiler**.
@@ -149,14 +176,17 @@ Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de M
 
 ## 4. Huecos abiertos → van a Decisiones
 
-1. **Del 20 al 23 de septiembre no hay nada.** Después de la noche en Santander quedan tres días sin alojamiento hasta el vuelo de vuelta.
-2. **Cómo llegan los siete a coger el AV027 el día 23.** Terminan el recorrido en el norte y el vuelo sale con toda probabilidad de Madrid: 400 km y siete personas con maletas.
-2. **Detalle de las entradas de F1**: día, cantidad, titulares.
-3. **Fechas del alojamiento de Barcelona** y cómo se va de Madrid a Barcelona el 14 sep (tren AVE/Ouigo/Iryo sin reservar).
-4. **Quién viaja en el tramo post-Madrid** (Barcelona–París–Bilbao). Los vuelos Vueling encontrados no dicen cuántos pasajeros.
-5. **Hora de llegada al apartamento de Sol** — el check-in tardío cuesta 30–50 €.
-6. **Contrato de alquiler firmado** antes del 10 sep.
-7. **Check-in online de Sweett** (Barcelona) pendiente.
+**Revisado el 6 de septiembre de 2026. Cerrados desde el 25 de agosto:** el detalle de las entradas de F1 (son 2, abono 3 días), quién viaja en el tramo post-Madrid (los nueve, nominados en MLD57T y SNF23N), las fechas de Barcelona, el tren del 14, el check-in de Sweett y la noche del 22 en Madrid.
+
+**Lo que sigue abierto:**
+
+1. 🔴 **Noches del 20 y 21 de septiembre: Guardo, casa propia, sin justificante.** Son las dos únicas noches de las trece sin reserva comercial que enseñar en frontera. La vía prevista por la normativa española es la **carta de invitación** ante la Policía Nacional, que tarda semanas: **a 4 días de la llegada ya no llega**. Se va con el resto del itinerario y con la acreditación de residencia de Camilo. Ver `docs-privados/Dosier-reservas-migracion-sept-2026.pdf`.
+2. 🔴 **La confirmación de Avianca (AV182 ida, AV027 vuelta) NO está en el correo de Camilo.** La tiene quien hizo la reserva en Colombia. **Es el documento que con más frecuencia pide el control de fronteras** y sin él los siete llegan a Barajas sin poder acreditar el billete de vuelta. Hay que pedirlo YA y que cada viajero lo lleve encima.
+3. **Quién de los nueve usa las dos entradas de F1** y qué hacen los otros siete el 11, 12 y 13.
+4. **Qué cambió en la reserva del Aparment Almudena el 5 de septiembre.**
+5. **Coche de alquiler de siete plazas**: sin reservar. Nueve personas y nueve maletas no caben en dos turismos.
+6. **Hora de llegada al apartamento de Sol** — el check-in tardío cuesta 30–50 €.
+7. **Contrato de alquiler de Sol firmado** antes del 10 sep.
 8. Comidas, actividades y reparto de gastos: sin decidir.
 
 ---
@@ -164,6 +194,8 @@ Tres reservas se actualizaron esa madrugada (Madrid, Barcelona, París). La de M
 ## 5 bis. 🔒 Política de secretos — IMPORTANTE
 
 **Este repositorio tiene remoto en `github.com/nobscamilo/Viaje-familia-sept` y publica GitHub Pages desde él.** Trátalo como público.
+
+**Añadido el 6 sept 2026:** existe `../docs-privados/` en la raíz del proyecto (fuera de `viaje-app/`), **ya en `.gitignore`**. Ahí vive `Dosier-reservas-migracion-sept-2026.pdf`: nombres completos de los nueve, direcciones de los seis alojamientos, y el número de reserva del ibis Saint-Maurice, **que es el código del portal**. Ese PDF no se sube nunca. Si se añade cualquier otro documento familiar, va ahí.
 
 Por eso, de este documento se han quitado deliberadamente:
 - Los **PIN de Booking** (sirven para modificar o cancelar una reserva: son credenciales, no datos).
@@ -179,3 +211,11 @@ Los localizadores de vuelo y los números de confirmación se quedan porque, sin
 
 ## 5. Canales de notificación disponibles (confirmado por el correo)
 Camilo ya usa **Google Calendar** para eventos de viaje (recibe avisos de vuelos y del tour del Bernabéu). Un calendario compartido del viaje da notificaciones nativas y fiables en todos los móviles sin construir nada. Ver la sección de notificaciones en `reinvencion.md`.
+
+
+### Revisión del 6 de septiembre de 2026
+
+Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
+Hallazgos y validación en [../README.md](../README.md), sección «Revisión del copiloto —
+6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
+esta revisión no acredita el servicio autenticado ni un nuevo despliegue.

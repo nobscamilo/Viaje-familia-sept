@@ -21,3 +21,9 @@ npm-debug.log*
 *-key.json
 credentials.json
 diseno-import/
+
+# --- Documentos privados de la familia (anadido 2026-09-06) ---
+# Dosier de reservas: nombres completos de nueve personas (dos menores),
+# direcciones y el numero de reserva del ibis Saint-Maurice, que ES el
+# codigo del portal. El repo es publico: nada de esto se sube.
+docs-privados/
