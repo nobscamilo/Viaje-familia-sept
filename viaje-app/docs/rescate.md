@@ -406,3 +406,11 @@ Y el límite de fechas funciona: pedirle el Prado el 2 de octubre responde *«el
 Decían 10–19 sep porque el 19 era el último vuelo que encontré. El viaje llega hasta el **23**: hotel nuevo en **Santander 19–20** (Booking 5931295674) y vuelta de los siete en **Avianca AV027 el 23**.
 
 Eso destapó **dos huecos urgentes** que ya están en Decisiones: del 20 al 23 no hay dónde dormir, y falta cómo llegan del norte a Madrid para coger ese vuelo.
+
+
+### Revisión del 6 de septiembre de 2026
+
+Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
+Hallazgos y validación en [../README.md](../README.md), sección «Revisión del copiloto —
+6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
+esta revisión no acredita el servicio autenticado ni un nuevo despliegue.

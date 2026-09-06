@@ -83,3 +83,11 @@ una persona y siga sin confirmar; una ruta se quita entera de un toque.
   reservas se modificaron al añadir maletas.
 - Cerrar el traslado a Orly de madrugada el 19 (salida sobre las 05:00).
 - El tour del Bernabéu del 11 choca con el viernes de F1.
+
+
+### Revisión del 6 de septiembre de 2026
+
+Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
+Hallazgos y validación en [viaje-app/README.md](viaje-app/README.md), sección «Revisión del copiloto —
+6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
+esta revisión no acredita el servicio autenticado ni un nuevo despliegue.

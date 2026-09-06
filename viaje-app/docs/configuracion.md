@@ -223,3 +223,11 @@ sus referentes hay un `http://localhost:4317,` con una coma pegada y un
 `localhost` suelto. Las restricciones por referente se falsifican desde un
 servidor en dos líneas, así que **la que protege de verdad es la cuota diaria**.
 Recortar la clave sigue pendiente.
+
+
+### Revisión del 6 de septiembre de 2026
+
+Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
+Hallazgos y validación en [../README.md](../README.md), sección «Revisión del copiloto —
+6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
+esta revisión no acredita el servicio autenticado ni un nuevo despliegue.

@@ -1575,3 +1575,41 @@ una pérdida.
   Una ruta son seis momentos y un solo `rutaId`.
 - **Medir dentro de la app, nunca en una página de pruebas aparte.** Sin los
   padres reales la medida vale 86 donde la app da 343.
+
+
+## Revisión del copiloto — 6 de septiembre de 2026
+
+Auditoría del código en `cd3143d` y de una compilación local nueva. No se
+modificó la aplicación ni se desplegaron cambios. La web pública llega al
+acceso por código; no se evaluaron respuestas nuevas de Gemini autenticadas.
+
+Prioridades pendientes, no funcionalidades ya corregidas:
+
+- La cuadrícula de `copiloto.css` declara tres filas, pero sin conversación
+  el JSX solo monta dos hijos. La barra de escribir ocupa la fila flexible:
+  el botón Enviar se estira en la bienvenida. Asignar filas explícitas o
+  adaptar la plantilla al estado vacío.
+- La caducidad se aplica al recuperar Firestore en `useHilo`, no antes de cada
+  envío. Una pestaña abierta puede seguir mandando mensajes de ayer. Fechar
+  los mensajes en memoria y recortar la sesión antes de preguntar.
+- Solo se persiste texto: los borradores y tarjetas desaparecen al recargar.
+  Guardar el estado mínimo del trabajo pendiente, separado del historial que
+  recibe Gemini; las fotos no son necesarias para conservar un borrador.
+- `queMintio` acepta una afirmación de escritura si hay un borrador. Probado
+  con «Ya te lo agregué a la agenda»: devuelve null sin ningún plan guardado.
+  Distinguir propuesta de escritura real en el estado y en el texto mostrado.
+- El contexto del modelo no incluye la identidad del interlocutor ni las
+  nuevas notas de agenda. Los atajos siguen anclados a Sol, IFEMA y «mis
+  papás». Propuesta: contexto visible de día, ciudad y grupo, identidad
+  explícita y notas relevantes identificadas como comentarios familiares.
+- Sustituir la promesa «no me invento nada» por una descripción verificable
+  de las fuentes y sus límites. Cinco opciones pueden mantenerse, pero
+  conviene destacar una con un motivo concreto y facilitar comparar el resto.
+
+Validación: `npm run check` pasa con 213 pruebas; compilación correcta con
+aviso de chunk superior a 500 kB. Playwright en 1280, 430, 390 y 375 px:
+ningún desbordamiento horizontal de documento ni excepción JavaScript en el
+recorrido local; «Empezar de cero» devuelve la bienvenida. Browser plugin no
+está disponible y se utilizó Playwright instalado. El ejemplo local contiene
+solo dos sitios antiguos: no demuestra la búsqueda actual de cinco opciones,
+la vigencia de las fotos ni el servicio autenticado de Maps/Gemini.

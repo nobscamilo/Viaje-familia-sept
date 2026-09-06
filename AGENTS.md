@@ -296,3 +296,11 @@ que se pinta en el chat con sus botones; la escritura la dispara una persona.
   de cada número de qué correo salió. Si no se puede verificar, no se siembra:
   se deja fuera y se dice que falta. Las entradas de la F1 y los vuelos de
   Bogotá están fuera a propósito.
+
+
+### Revisión del 6 de septiembre de 2026
+
+Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
+Hallazgos y validación en [viaje-app/README.md](viaje-app/README.md), sección «Revisión del copiloto —
+6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
+esta revisión no acredita el servicio autenticado ni un nuevo despliegue.

@@ -526,3 +526,11 @@ Tres scripts de prueba leian los codigos de `travelers` y se quedaron ciegos a
 la vez: `probar-reglas` (el mock del `get()`), `probar-entrada` y
 `probar-planes`. **Mover un dato de sitio rompe todo lo que sabia donde
 estaba**, y las pruebas son lo primero que se olvida.
+
+
+### Revisión del 6 de septiembre de 2026
+
+Se revisó el copiloto sin modificar código, datos del viaje ni configuración.
+Hallazgos y validación en [../README.md](../README.md), sección «Revisión del copiloto —
+6 de septiembre de 2026». Las mejoras allí enumeradas siguen pendientes;
+esta revisión no acredita el servicio autenticado ni un nuevo despliegue.
