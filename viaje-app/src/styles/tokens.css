@@ -82,6 +82,13 @@
   --shadow-card:   0 8px 24px rgb(0 0 0 / .35), inset 0 1px 0 rgb(255 255 255 / .06);
   --shadow-pop:    0 16px 48px -8px rgb(0 0 0 / .6), 0 4px 12px -2px rgb(0 0 0 / .4);
   --shadow-chip:   0 6px 14px rgb(109 40 217 / .35), inset 0 1px 0 rgb(255 255 255 / .12);
+  --shadow-liquid: 0 12px 36px -6px rgb(0 0 0 / .45), inset 0 1px 0 rgb(255 255 255 / .12);
+  --shadow-glow:   0 0 24px -4px rgb(200 90 50 / .28), 0 8px 32px rgb(0 0 0 / .45);
+
+  /* --- Stitch Liquid Glass & Thinking Glow --- */
+  --glow-amber:       #d4a359;
+  --glow-terracotta:  #c85a32;
+  --glow-thinking:    linear-gradient(135deg, #d4a359 0%, #c85a32 50%, var(--accent-strong) 100%);
 
   /* --- Radios (subidos con el rediseno: pildoras y tarjetas blandas) --- */
   --r-sm: 8px;

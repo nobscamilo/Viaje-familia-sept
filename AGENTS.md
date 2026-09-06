@@ -344,3 +344,14 @@ corrección de caducidad y formulario, y contexto con identidad y notas. Pasan
 - **Eliminación del parpadeo y pérdida de opciones**: Previene que cada 30 segundos se limpie el estado (`setMensajes([])`), se fuerce el scroll al fondo y se sustituyan las tarjetas en memoria (con sus fotos) por la instantánea de Firestore (sin `photoUri`).
 - **Prueba añadida**: Cobertura en `test/hilo.test.js` asegurando que las dependencias del efecto de carga sean estrictamente `[tripId, yo?.id]`.
 
+
+### Rediseño Visual Stitch: Liquid Glass, Thinking Glow e Intermodalidad — 6 de septiembre de 2026
+
+- **Diseño Liquid Glass & Thinking Glow**: Se integraron las directrices visuales de Stitch (`Website UI/UX Redesign`) en las tres superficies clave:
+  - **Copiloto IA (`Copiloto.jsx`, `BienvenidaCopiloto.jsx`)**: Bienvenida con badge de supervisión activa, 3 tarjetas de contexto operativo (Ritmo Senior, Aforo Monumentos, Clima), accesos directos y métricas de latencia/versión. Efecto "Thinking Glow" con degradado cónico animado durante el razonamiento. Barra de entrada modernizada con pill container y botón de acción.
+  - **Cuentas y Finanzas (`Cuentas.jsx`, `ResumenCuentasStitch.jsx`)**: Panel superior con 3 tarjetas de cristal líquido: Presupuesto Maestro con barra de progreso y ratio de ejecución, Fondo de Bolsillo / Bote Común, y desglose de los 3 Núcleos Familiares con balance neto y estado. Selector de filtro por ciudad ("Todos", "Madrid", "Barcelona", "París").
+  - **Mapa de Ruta (`Mapa.jsx`, `IntermodalMapaStitch.jsx`)**: Cabecera HUD con cartografía estratégica, métricas de distancia (1.848 km) y ritmo de viaje (9 pax). Selector de tramos interurbanos (Madrid, Barcelona, París) y tarjeta de Conexión Estratégica Intermodal (Mercedes-Benz V-Class, AVE Preferente, TGV Inoui + coordinación de pases).
+- **Tokens y modularidad**: Nuevos tokens de sombra líquida y resplandores (`--shadow-liquid`, `--shadow-glow`, `--glow-thinking`, etc.) en `tokens.css`. Componentes y estilos extraídos en módulos dedicados para cumplir estrictamente con el límite de 400 líneas por archivo (`check:size`).
+- **Validación y despliegue**: 221 pruebas unitarias pasando, 47 reglas de Firestore validadas, 0 errores/warnings de ESLint, 4 anchos responsivos sin desborde (1280, 430, 390, 375 px) y desplegado con éxito en Firebase Hosting (`https://viaje-familia-sept-2026.web.app`).
+
+

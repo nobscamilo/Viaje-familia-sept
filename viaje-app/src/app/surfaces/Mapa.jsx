@@ -6,6 +6,7 @@ import { ESTILO_OSCURO, pinNumerado } from '../../services/estilo-mapa.js'
 import { diaPorDefecto, diasConPuntos, encuadre, puntosDelDia, puntosDelViaje, recorridos } from '../../domain/puntos.js'
 import { formatDay, formatTime } from '../../domain/dates.js'
 import Icon from '../../ui/Icon.jsx'
+import IntermodalMapaStitch from '../../ui/IntermodalMapaStitch.jsx'
 import './mapa.css'
 
 const COLOR = {
@@ -19,6 +20,7 @@ export default function Mapa() {
   const dias = useMemo(() => diasConPuntos(timeline), [timeline])
   const [dia, setDia] = useState(null)
   const [elegido, setElegido] = useState(null)
+  const [tramoActivo, setTramoActivo] = useState('todo')
 
   // El dia por defecto depende del reloj, y el reloj tarda un tick en llegar.
   useEffect(() => { if (dia === null && dias.length) setDia(diaPorDefecto(timeline, ahora)) }, [dia, dias, timeline, ahora])
@@ -30,9 +32,56 @@ export default function Mapa() {
 
   return (
     <div className="mapa">
+      {/* Cabecera HUD Stitch */}
+      <div className="mapa-hud-head">
+        <div className="mapa-hud-info">
+          <span className="mapa-hud-eyebrow">Cartografía Estratégica Intermodal</span>
+          <h2 className="mapa-hud-titulo">Mapa de Ruta & Trazado del Viaje</h2>
+          <span className="mapa-hud-sub">Madrid · Barcelona · París · Conexión terrestre y aérea</span>
+        </div>
+        <div className="mapa-hud-stats">
+          <div className="mapa-hud-stat-pill">
+            <span className="mapa-hud-stat-k">Distancia Total</span>
+            <strong className="mapa-hud-stat-v">1.848 km</strong>
+          </div>
+          <div className="mapa-hud-stat-pill">
+            <span className="mapa-hud-stat-k">Ritmo de Viaje</span>
+            <strong className="mapa-hud-stat-v">Pausado (9 pax)</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Selector de Tramos Principales */}
+      <div className="mapa-tramos-bar">
+        <div className="mapa-tramos" role="tablist" aria-label="Tramos del viaje">
+          {[
+            { id: 'todo', label: 'Todo el Recorrido (14 Días)' },
+            { id: 'madrid', label: 'Tramo 1: Madrid (Días 1–5)', diaInicio: '2026-09-10' },
+            { id: 'barcelona', label: 'Tramo 2: Barcelona (Días 6–9)', diaInicio: '2026-09-15' },
+            { id: 'paris', label: 'Tramo 3: París (Días 10–14)', diaInicio: '2026-09-20' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tramoActivo === t.id}
+              className={`mapa-tramo-pill ${tramoActivo === t.id ? 'es-activo' : ''}`}
+              onClick={() => {
+                setTramoActivo(t.id)
+                if (t.id === 'todo') setDia('todo')
+                else if (t.diaInicio) setDia(t.diaInicio)
+                setElegido(null)
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mapa-dias" role="tablist" aria-label="Días del viaje">
         <button type="button" role="tab" aria-selected={dia === 'todo'}
-          className={`mapa-dia ${dia === 'todo' ? 'es-activo' : ''}`} onClick={() => { setDia('todo'); setElegido(null) }}>
+          className={`mapa-dia ${dia === 'todo' ? 'es-activo' : ''}`} onClick={() => { setDia('todo'); setTramoActivo('todo'); setElegido(null) }}>
           Todo
         </button>
         {dias.map((d) => (
@@ -77,6 +126,8 @@ export default function Mapa() {
         ))}
         {puntos.length === 0 && <li className="mapa-vacio">Ese día no hay nada con dirección.</li>}
       </ol>
+
+      <IntermodalMapaStitch />
     </div>
   )
 }

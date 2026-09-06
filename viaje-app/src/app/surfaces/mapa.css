@@ -4,6 +4,56 @@
    un adorno: es el plan B. */
 .mapa { display: flex; flex-direction: column; gap: var(--sp-4); padding-bottom: var(--sp-6); }
 
+/* HUD Cabecera Estilo Stitch Liquid Glass */
+.mapa-hud-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  flex-wrap: wrap; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) 0;
+}
+.mapa-hud-info { display: flex; flex-direction: column; gap: 2px; }
+.mapa-hud-eyebrow {
+  font: var(--t-mono); font-size: 0.6875rem; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--accent-light);
+}
+.mapa-hud-titulo {
+  font: var(--t-h2); font-weight: 700; margin: 2px 0 4px; color: var(--ink);
+}
+.mapa-hud-sub { font: var(--t-small); color: var(--ink-muted); }
+
+.mapa-hud-stats { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.mapa-hud-stat-pill {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  background: var(--glass-soft); border: 1px solid var(--glass-border-soft);
+  backdrop-filter: var(--blur-glass-soft); -webkit-backdrop-filter: var(--blur-glass-soft);
+  box-shadow: var(--shadow-card);
+}
+.mapa-hud-stat-k {
+  font: var(--t-mono); font-size: 0.625rem; text-transform: uppercase;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.mapa-hud-stat-v { font: var(--t-small); font-weight: 600; color: var(--ink); }
+
+/* Tramos Principales */
+.mapa-tramos-bar {
+  display: flex; overflow-x: auto; scrollbar-width: none;
+  padding: 0 var(--sp-4);
+}
+.mapa-tramos-bar::-webkit-scrollbar { display: none; }
+.mapa-tramos { display: flex; gap: var(--sp-2); }
+.mapa-tramo-pill {
+  flex: 0 0 auto; min-height: 36px; padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md); background: var(--glass-soft);
+  border: 1px solid var(--glass-border-soft); color: var(--ink-muted);
+  font: var(--t-small); font-weight: 500; cursor: pointer;
+  transition: all var(--dur-fast) var(--ease); box-shadow: var(--shadow-card);
+}
+.mapa-tramo-pill:hover { color: var(--ink-soft); border-color: var(--line-strong); }
+.mapa-tramo-pill.es-activo {
+  background: var(--glass-mid); border-color: var(--accent); color: var(--ink);
+  box-shadow: 0 0 12px var(--glow-thinking);
+}
+
 .mapa-dias {
   display: flex; gap: var(--sp-2); overflow-x: auto;
   padding: var(--sp-4) var(--sp-4) 0; scrollbar-width: none;

@@ -4,6 +4,7 @@ import { useHilo } from '../../hooks/useHilo.js'
 import { useAhora } from '../../hooks/useAhora.js'
 import { formatDay } from '../../domain/dates.js'
 import SitiosCopiloto from '../../ui/SitiosCopiloto.jsx'
+import BienvenidaCopiloto from '../../ui/BienvenidaCopiloto.jsx'
 import { contextoVivo, restaurarConversacion } from '../../domain/hilo.js'
 import ReciboRuta from '../../ui/ReciboRuta.jsx'
 import BorradorRuta from '../../ui/BorradorRuta.jsx'
@@ -13,13 +14,6 @@ import { preguntarCopiloto } from '../../services/copiloto.js'
 import Icon from '../../ui/Icon.jsx'
 import Marcado from '../../ui/Marcado.jsx'
 import './copiloto.css'
-
-const ATAJOS = [
-  'Busca cinco opciones para cenar en la ciudad donde estaremos hoy',
-  '¿Cómo llegamos a la próxima actividad de la agenda?',
-  'Propón una ruta tranquila para el próximo día libre',
-  '¿Qué nos falta por decidir para el viaje?',
-]
 
 /**
  * `?demo` carga una conversacion de ejemplo con datos reales de Places y
@@ -159,7 +153,7 @@ export default function Copiloto() {
 
       <div className="cop-hilo">
         {cargando && <p role="status">Recuperando tu conversación…</p>}
-        {!cargando && mensajes.length === 0 && <Bienvenida yo={yo} alElegir={preguntar} desactivado={modoLocal} />}
+        {!cargando && mensajes.length === 0 && <BienvenidaCopiloto yo={yo} alElegir={preguntar} desactivado={modoLocal} />}
         {errorGuardado && <div role="alert" className="cop-fallo">{errorGuardado}<button type="button" className="cop-limpiar" onClick={reintentar}>Reintentar guardado</button></div>}
 
         {mensajes.map((m, i) => (
@@ -176,8 +170,25 @@ export default function Copiloto() {
         ))}
 
         {pensando && (
-          <div className="cop-msg cop-de-copiloto">
-            <span className="cop-pensando">Buscando<i /><i /><i /></span>
+          <div className="cop-thinking-wrap" role="status" aria-label="Copiloto pensando">
+            <div className="cop-thinking-glow" aria-hidden="true" />
+            <div className="cop-thinking-card">
+              <div className="cop-thinking-head">
+                <div className="cop-thinking-ico-box">
+                  <Icon name="activity" size={18} />
+                  <span className="cop-thinking-live-pulse" aria-hidden="true" />
+                </div>
+                <div className="cop-thinking-txt-col">
+                  <div className="cop-thinking-top-row">
+                    <span className="cop-thinking-titulo">Análisis de Confort Familiar</span>
+                    <span className="cop-thinking-tag">En vivo</span>
+                  </div>
+                  <span className="cop-pensando">
+                    Pensando recomendaciones y evaluando accesibilidad<i /><i /><i />
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         <div ref={finRef} />
@@ -187,38 +198,24 @@ export default function Copiloto() {
         className="cop-barra"
         onSubmit={(e) => { e.preventDefault(); preguntar() }}
       >
-        <input
-          className="cop-campo"
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder={modoLocal ? 'Modo local: sin copiloto' : 'Pregunta lo que sea del viaje…'}
-          aria-label="Pregunta al copiloto"
-          disabled={modoLocal || pensando || cargando}
-        />
+        <div className="cop-barra-campo-wrap">
+          <span className="cop-barra-search-ico" aria-hidden="true">
+            <Icon name="search" size={17} />
+          </span>
+          <input
+            className="cop-campo"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder={modoLocal ? 'Modo local: sin copiloto' : 'Pregunta al copiloto sobre traslados, reservas o ritmo…'}
+            aria-label="Pregunta al copiloto"
+            disabled={modoLocal || pensando || cargando}
+          />
+        </div>
         <button type="submit" className="cop-enviar" disabled={!texto.trim() || pensando || modoLocal || cargando}>
-          Enviar
+          <span>Consultar</span>
+          <span className="cop-enviar-flecha" aria-hidden="true">→</span>
         </button>
       </form>
-    </div>
-  )
-}
-
-function Bienvenida({ yo, alElegir, desactivado }) {
-  return (
-    <div className="cop-inicio">
-      <p className="cop-eyebrow">Copiloto</p>
-      <h1 className="cop-titulo">Hola{yo ? `, ${yo.short}` : ''}.</h1>
-      <p className="cop-lede">
-        Conozco la agenda, quién viaja y qué falta por decidir. Busco sitios
-        en Google Maps y consulto trayectos. Te propongo opciones para que tú decidas.
-      </p>
-      <div className="cop-atajos">
-        {ATAJOS.map((a) => (
-          <button key={a} type="button" className="cop-atajo" disabled={desactivado} onClick={() => alElegir(a)}>
-            {a}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

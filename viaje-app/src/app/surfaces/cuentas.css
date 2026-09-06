@@ -35,6 +35,46 @@
 }
 .ctas-nuevo:disabled { opacity: .45; cursor: not-allowed; }
 
+/* Filtros por ciudad estilo píldora Stitch */
+.ctas-filtros-bar {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: var(--sp-1) 0;
+}
+.ctas-filtros-bar::-webkit-scrollbar { display: none; }
+
+.ctas-filtros {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.ctas-filtro-pill {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--glass-border-soft);
+  background: var(--glass-faint);
+  color: var(--ink-muted);
+  font: var(--t-small);
+  font-size: .8125rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.ctas-filtro-pill:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.ctas-filtro-pill.es-activo {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: var(--on-accent);
+  box-shadow: var(--shadow-chip);
+}
+
 .ctas-list { display: grid; gap: var(--sp-1); list-style: none; margin: 0; padding: 0; }
 
 .ctas-g {

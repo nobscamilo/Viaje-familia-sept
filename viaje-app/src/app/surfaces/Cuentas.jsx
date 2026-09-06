@@ -7,6 +7,7 @@ import { formatDayLong } from '../../domain/dates.js'
 import NuevoGasto from '../../ui/NuevoGasto.jsx'
 import Saldo from '../../ui/Saldo.jsx'
 import Saldado from '../../ui/Saldado.jsx'
+import ResumenCuentasStitch from '../../ui/ResumenCuentasStitch.jsx'
 import './cuentas.css'
 
 const CAT_LABEL = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c.label]))
@@ -45,15 +46,35 @@ export default function Cuentas() {
     () => typeof window !== 'undefined' && window.location.search.includes('anotar'),
   )
   const [verTodo, setVerTodo] = useState(false)
+  const [filtroCiudad, setFiltroCiudad] = useState('todos')
 
   const miHogar = hogarDe(yo?.id)?.id ?? null
+
+  const filtrados = gastos.filter((g) => {
+    if (filtroCiudad === 'todos') return true
+    const txt = `${g.concepto} ${g.nota ?? ''} ${g.ciudad ?? ''}`.toLowerCase()
+    if (filtroCiudad === 'madrid') return txt.includes('madrid') || (g.fecha && g.fecha <= '2026-09-14')
+    if (filtroCiudad === 'barcelona') return txt.includes('barcelona') || (g.fecha && g.fecha > '2026-09-14' && g.fecha <= '2026-09-19')
+    if (filtroCiudad === 'paris') return txt.includes('paris') || txt.includes('parís') || (g.fecha && g.fecha > '2026-09-19')
+    return true
+  })
+
   // 12 y no 8: con nueve reservas sembradas, cortar en 8 escondía una sola
   // y obligaba a un toque para ver un gasto. Un botón que revela un elemento
   // es un botón que sobra.
-  const visibles = verTodo ? gastos : gastos.slice(0, 12)
+  const visibles = verTodo ? filtrados : filtrados.slice(0, 12)
 
   return (
     <div className="ctas">
+      <ResumenCuentasStitch
+        totalCent={totalCent}
+        gastosCount={gastos.length}
+        cuenta={cuenta}
+        miHogar={miHogar}
+        onAnotar={() => setAnotando(true)}
+        puedeAnotar={Boolean(miHogar)}
+      />
+
       <Saldo cuenta={cuenta} pagos={pagos} miHogar={miHogar} />
 
       <Saldado
@@ -87,6 +108,28 @@ export default function Cuentas() {
       >
         + Anotar un gasto
       </button>
+
+      <div className="ctas-filtros-bar">
+        <div className="ctas-filtros" role="tablist" aria-label="Filtrar por ciudad">
+          {[
+            { id: 'todos', label: `Todos (${gastos.length})` },
+            { id: 'madrid', label: 'Madrid' },
+            { id: 'barcelona', label: 'Barcelona' },
+            { id: 'paris', label: 'París' },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={filtroCiudad === f.id}
+              className={`ctas-filtro-pill ${filtroCiudad === f.id ? 'es-activo' : ''}`}
+              onClick={() => setFiltroCiudad(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <ul className="ctas-list">
         {visibles.map((g) => (
