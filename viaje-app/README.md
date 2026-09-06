@@ -1689,13 +1689,14 @@ hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
 - **Pruebas y validación**: 221 tests pasan limpiamente, incluyendo prueba específica en `test/hilo.test.js` para asegurar que las dependencias del efecto de carga sean estrictamente `[tripId, yo?.id]`.
 
 
-## Rediseño Visual Stitch: Liquid Glass, Thinking Glow e Intermodalidad — 6 de septiembre de 2026
+## Rediseño Visual Stitch: Liquid Glass y Thinking Glow (Organización por Días) — 6 de septiembre de 2026
 
 - **Integración de Stitch (`Website UI/UX Redesign`)**:
   - **Copiloto IA**: Pantalla inicial con métricas en tiempo real (supervisión activa, latencia de ~1.4s, versión del copiloto), 3 tarjetas de contexto (Ritmo Senior para abuelos, Aforo en monumentos con colas optimizadas, Clima mediterráneo), atajos conversacionales ("¿Cómo vamos hoy?", "Restaurantes recomendados", "Rutas sin escaleras", "Control de presupuesto") y barra de entrada estilizada con botón "Consultar →". Incluye el efecto **Thinking Glow** con conic gradient rotatorio animado que emite resplandor dinámico mientras el copiloto procesa peticiones.
-  - **Cuentas y Finanzas**: Grid de 3 tarjetas de cristal líquido en la cabecera: **Presupuesto Maestro** (con indicador de ejecución de 6.710 € y barra de progreso de cristal esmerilado), **Fondo de Bolsillo** (con aportes por adulto de 150 € para gastos rápidos e imprevistos), y desglose de los **3 Núcleos Familiares** (saldos netos, deudas saldadas y botones rápidos). Filtro por ciudad ("Todos", "Madrid", "Barcelona", "París").
-  - **Mapa de Ruta**: Cabecera HUD con métricas del viaje (1.848 km, 9 pax), selector de tramos interurbanos (Madrid, Barcelona, París) y tarjeta de **Conexión Estratégica Intermodal** destacando la flota Mercedes-Benz V-Class, el AVE Preferente Madrid–Barcelona y el TGV Inoui Barcelona–París.
-- **Tokens y arquitectura**: Tokens de diseño agregados en `tokens.css` sin vulnerar las reglas del sistema de diseño oscuro y cristal. Componentes segregados (`BienvenidaCopiloto.jsx`, `ResumenCuentasStitch.jsx`, `IntermodalMapaStitch.jsx` y sus respectivos archivos `.css`) para cumplir la regla de 400 líneas máximas por archivo.
+  - **Cuentas y Finanzas**: Grid de 3 tarjetas de cristal líquido en la cabecera: **Presupuesto Maestro** (con indicador de ejecución de 6.710 € y barra de progreso de cristal esmerilado), **Fondo de Bolsillo** (con aportes por adulto de 150 € para gastos rápidos e imprevistos), y desglose de los **3 Núcleos Familiares** (saldos netos, deudas saldadas y botones rápidos). Organización cronológica directa por fecha/día sin segregaciones artificiales por ciudades.
+  - **Mapa de Ruta**: Cabecera HUD con cartografía estratégica y métricas del itinerario (14 Días, 9 Viajeros), con navegación focalizada en la selección de días (`Todo` y días individuales con puntos de interés).
+- **Tokens y arquitectura**: Tokens de diseño agregados en `tokens.css` sin vulnerar las reglas del sistema de diseño oscuro y cristal. Componentes segregados (`BienvenidaCopiloto.jsx`, `ResumenCuentasStitch.jsx` y sus respectivos archivos `.css`) para cumplir la regla de 400 líneas máximas por archivo.
 - **Validación total**: 221 tests unitarios y de dominio, 47 pruebas de reglas Firestore, medición en 4 anchos móviles/escritorio sin desbordes, y despliegue web en producción.
+
 
 

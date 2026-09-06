@@ -34,26 +34,6 @@
 }
 .mapa-hud-stat-v { font: var(--t-small); font-weight: 600; color: var(--ink); }
 
-/* Tramos Principales */
-.mapa-tramos-bar {
-  display: flex; overflow-x: auto; scrollbar-width: none;
-  padding: 0 var(--sp-4);
-}
-.mapa-tramos-bar::-webkit-scrollbar { display: none; }
-.mapa-tramos { display: flex; gap: var(--sp-2); }
-.mapa-tramo-pill {
-  flex: 0 0 auto; min-height: 36px; padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md); background: var(--glass-soft);
-  border: 1px solid var(--glass-border-soft); color: var(--ink-muted);
-  font: var(--t-small); font-weight: 500; cursor: pointer;
-  transition: all var(--dur-fast) var(--ease); box-shadow: var(--shadow-card);
-}
-.mapa-tramo-pill:hover { color: var(--ink-soft); border-color: var(--line-strong); }
-.mapa-tramo-pill.es-activo {
-  background: var(--glass-mid); border-color: var(--accent); color: var(--ink);
-  box-shadow: 0 0 12px var(--glow-thinking);
-}
-
 .mapa-dias {
   display: flex; gap: var(--sp-2); overflow-x: auto;
   padding: var(--sp-4) var(--sp-4) 0; scrollbar-width: none;
