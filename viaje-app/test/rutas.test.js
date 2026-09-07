@@ -49,3 +49,17 @@ test('rutas.js no escribe nada fuera de la agenda del viaje', () => {
   assert.match(src, /status: 'propuesto'/)
   assert.ok(!/status: 'confirmado'/.test(src), 'una ruta no se autoconfirma')
 })
+
+test('armarRuta optimiza la proximidad geográfica y las declaraciones instruyen al modelo', () => {
+  const srcRutas = lee('../functions/rutas.js')
+  assert.match(srcRutas, /ordenarPorProximidad\(resueltas/)
+  assert.match(srcRutas, /He ajustado el orden de las paradas por cercanía geográfica/)
+
+  const srcDecl = lee('../functions/lib/declaraciones.js')
+  assert.match(srcDecl, /PROXIMIDAD GEOGRAFICA/)
+
+  const srcCopiloto = lee('../functions/lib/copiloto.js')
+  assert.match(srcCopiloto, /ORDEN ESTRICTO DE PROXIMIDAD GEOGRAFICA/)
+  assert.match(srcCopiloto, /SENTIDO ESPACIAL CONTINUO/)
+})
+

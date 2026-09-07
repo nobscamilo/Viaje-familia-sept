@@ -1722,6 +1722,20 @@ hosting y siembra datos: no publica estas funciones. Esta mejora no cambia
   - Retiradas las tarjetas con cifras simuladas; se preserva la lógica real y probada de saldos familiares (`Saldo.jsx`, `Saldado.jsx`, pagos por Bizum y listado completo de gastos).
 
 
+## Optimización Geográfica y Secuencia Lógica en Rutas del Copiloto — 7 de septiembre de 2026
+
+- **Lógica espacial y continuidad**: El Copiloto IA planifica y sugiere rutas multisitio con **estricto sentido geográfico y de proximidad** (ej: Sol → Gran Vía → Plaza Mayor → Palacio Real), eliminando saltos caóticos de ida y vuelta o zigzags por la ciudad (como el caso reportado: Palacio Real → Gran Vía → Plaza Mayor → Sol → Retiro).
+- **El servidor cuenta y optimiza (`functions/lib/itinerario.js`)**:
+  - `distanciaMetros(c1, c2)`: Cálculo de distancia sobre la superficie terrestre (fórmula de Haversine en metros).
+  - `distanciaRuta(paradas)`: Suma acumulada de distancias del itinerario.
+  - `ordenarPorProximidad(paradas, { fijarInicio: true })`: Evalúa permutaciones para encontrar el recorrido más corto y continuo manteniendo el punto de inicio/encuentro. Si la ruta inicial ya está dentro de un margen óptimo (<= 5%), se conserva; si existe un zigzag claro, la reordena minimizando la distancia y notifica en el borrador (`avisos`).
+- **Instrucciones al modelo y herramientas**:
+  - `functions/lib/copiloto.js`: Instrucción explícita a Gemini sobre diseño de itinerarios lineales continuos sin saltos entre extremos.
+  - `functions/lib/declaraciones.js`: En `armarRuta`, se especifica el requisito de orden secuencial de cercanía.
+- **Validación completa**: 227 pruebas unitarias pasando (6 tests nuevos de geometría y proximidad), 47 reglas de Firestore validadas, 0 errores y 0 warnings de ESLint, medición responsiva limpia en 4 anchos (1280, 430, 390, 375 px).
+
+
+
 
 
 

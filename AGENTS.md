@@ -365,5 +365,19 @@ corrección de caducidad y formulario, y contexto con identidad y notas. Pasan
 - **Validación total**: 221 pruebas unitarias pasando, 47 reglas de Firestore, 0 errores ESLint y medición limpia en 4 anchos (1280, 430, 390, 375 px). Desplegado en Firebase Hosting (`https://viaje-familia-sept-2026.web.app`).
 
 
+### Optimización Geográfica y Secuencia Lógica en Rutas del Copiloto — 7 de septiembre de 2026
+
+- **Lógica espacial y continuidad**: El Copiloto IA ahora planifica y sugiere rutas multsitio con **estricto sentido geográfico y de proximidad** (ej: Sol → Gran Vía → Plaza Mayor → Palacio Real), eliminando saltos caóticos de ida y vuelta o zigzags por la ciudad (como el caso reportado: Palacio Real → Gran Vía → Plaza Mayor → Sol → Retiro).
+- **El servidor cuenta y optimiza (`functions/lib/itinerario.js`)**:
+  - `distanciaMetros(c1, c2)`: Cálculo de distancia sobre la superficie terrestre (fórmula de Haversine).
+  - `distanciaRuta(paradas)`: Suma de distancias acumuladas en metros.
+  - `ordenarPorProximidad(paradas, { fijarInicio: true })`: Evalúa permutaciones para encontrar el recorrido más corto y continuo manteniendo el punto de inicio/encuentro. Si la ruta inicial ya está dentro de un margen óptimo (<= 5%), se conserva; si existe un zigzag claro, la reordena minimizando la distancia y notifica en el borrador (`avisos`).
+- **Instrucciones al modelo y herramientas**:
+  - `functions/lib/copiloto.js`: Instrucción explícita a Gemini sobre diseño de itinerarios lineales continuos sin saltos entre extremos.
+  - `functions/lib/declaraciones.js`: En `armarRuta`, se especifica el requisito de orden secuencial de cercanía.
+- **Validación completa**: 227 pruebas unitarias pasando (6 tests nuevos de geometría y proximidad), 47 reglas de Firestore validadas, 0 errores y 0 warnings de ESLint, medición responsiva limpia en 4 anchos (1280, 430, 390, 375 px).
+
+
+
 
 

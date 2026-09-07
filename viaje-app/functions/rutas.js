@@ -32,7 +32,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { db } from './lib/admin.js'
 import { cleanText } from './lib/text.js'
 import { calcularTramos, choquesCon, limpiarParadas, resolverParadas, TIPOS } from './lib/planificar.js'
-import { MAX_CON_NINOS, MAX_PARADAS } from './lib/itinerario.js'
+import { MAX_CON_NINOS, MAX_PARADAS, ordenarPorProximidad } from './lib/itinerario.js'
 import { dentroDelViaje, motivoFueraDelViaje } from './lib/ventana.js'
 
 const MODOS = ['WALK', 'TRANSIT', 'DRIVE']
@@ -160,9 +160,14 @@ export async function armarRuta(args, ctx) {
   }
 
   const ciudad = contexto?.porDia?.[dia]?.ciudad ?? contexto?.ciudadPorDefecto ?? null
-  const { paradas, avisos } = await resolverParadas(pedidas, ciudad)
-  if (paradas.length < 2) {
+  const { paradas: resueltas, avisos } = await resolverParadas(pedidas, ciudad)
+  if (resueltas.length < 2) {
     return { error: 'Solo pude situar una parada o ninguna. Dame nombres más concretos.' }
+  }
+
+  const { paradas, seReordeno } = ordenarPorProximidad(resueltas, { fijarInicio: true })
+  if (seReordeno) {
+    avisos.push('He ajustado el orden de las paradas por cercanía geográfica para un recorrido continuo sin retrocesos.')
   }
 
   const borrador = await componer({ tripId, titulo, dia, ciudad, modo, horaInicio, grupo, paradas, avisos })

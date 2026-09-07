@@ -116,11 +116,12 @@ export const DECLARACIONES = [
       'Arma un BORRADOR DE RUTA de varias paradas en un mismo dia y lo deja en el chat ' +
       'con las horas calculadas, listo para que la familia lo revise y lo agregue con un boton. ' +
       'NO escribe directamente en la agenda. Usala cuando pidan "armanos una ruta", ' +
-      '"que hacemos el domingo en Barcelona", "un plan para la manana". Tu pones los NOMBRES ' +
-      'y el ORDEN; el servidor busca cada sitio, mira si abre a esa hora, calcula cuanto se ' +
-      'tarda de uno a otro EN ESE DIA y encadena el reloj. NO inventes horas de llegada ni ' +
-      'tiempos de trayecto: los devuelve la herramienta. Para una sola parada usa agregarAlPlan; ' +
-      'esto es para dos o mas.',
+      '"que hacemos el domingo en Barcelona", "un plan para la manana". Las paradas DEBEN ' +
+      'ir en orden de PROXIMIDAD GEOGRAFICA (un paseo continuo y lineal sin zigzags ni retrocesos). ' +
+      'Tu pones los NOMBRES y el ORDEN; el servidor busca cada sitio, optimiza el trayecto por ' +
+      'cercania, mira si abre a esa hora, calcula cuanto se tarda de uno a otro EN ESE DIA y ' +
+      'encadena el reloj. NO inventes horas de llegada ni tiempos de trayecto: los devuelve ' +
+      'la herramienta. Para una sola parada usa agregarAlPlan; esto es para dos o mas.',
     parameters: {
       type: 'object',
       properties: {
@@ -142,8 +143,8 @@ export const DECLARACIONES = [
         paradas: {
           type: 'array',
           description:
-            'Entre 2 y 6 paradas, EN EL ORDEN EN QUE SE VAN A VISITAR. Ponlas cerca unas ' +
-            'de otras: la herramienta calcula el trayecto real y te avisara si no cuadra.',
+            'Entre 2 y 6 paradas, EN ORDEN SECUENCIAL DE CERCANIA. Deben formar una ruta ' +
+            'continua y logica (cada sitio cercano al siguiente), sin saltos caoticos por la ciudad.',
           items: {
             type: 'object',
             properties: {

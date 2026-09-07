@@ -108,3 +108,100 @@ export function duracionTotal(tramos = []) {
   if (tramos.length === 0) return 0
   return tramos[tramos.length - 1].salidaMin - tramos[0].llegadaMin
 }
+
+/**
+ * Distancia en linea recta sobre la superficie terrestre (Haversine) en metros.
+ */
+export function distanciaMetros(c1, c2) {
+  if (!c1 || !c2) return Infinity
+  const lat1 = Number(c1.lat)
+  const lng1 = Number(c1.lng)
+  const lat2 = Number(c2.lat)
+  const lng2 = Number(c2.lng)
+  if (!Number.isFinite(lat1) || !Number.isFinite(lng1) ||
+      !Number.isFinite(lat2) || !Number.isFinite(lng2)) {
+    return Infinity
+  }
+  const R = 6371000 // metros
+  const toRad = Math.PI / 180
+  const dLat = (lat2 - lat1) * toRad
+  const dLng = (lng2 - lng1) * toRad
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+            Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+/**
+ * Distancia acumulada de una secuencia de paradas en metros.
+ */
+export function distanciaRuta(paradas = []) {
+  if (!Array.isArray(paradas) || paradas.length < 2) return 0
+  let total = 0
+  for (let i = 0; i < paradas.length - 1; i += 1) {
+    const d = distanciaMetros(paradas[i]?.coords, paradas[i + 1]?.coords)
+    if (!Number.isFinite(d)) return Infinity
+    total += d
+  }
+  return total
+}
+
+function permutaciones(arr) {
+  if (arr.length <= 1) return [arr]
+  const res = []
+  for (let i = 0; i < arr.length; i += 1) {
+    const resto = [...arr.slice(0, i), ...arr.slice(i + 1)]
+    for (const p of permutaciones(resto)) {
+      res.push([arr[i], ...p])
+    }
+  }
+  return res
+}
+
+/**
+ * Ordena las paradas para minimizar la distancia y evitar retrocesos o zigzags.
+ *
+ * Si `fijarInicio` es true (por defecto), se mantiene la primera parada como
+ * punto de arranque (hotel, punto de encuentro, etc.) y se optimiza el resto.
+ * Si la ruta original ya está dentro de un margen razonable (<= 5% de la
+ * distancia mínima), se conserva para respetar matices menores.
+ *
+ * Devuelve `{ paradas, seReordeno }`.
+ */
+export function ordenarPorProximidad(paradas = [], { fijarInicio = true } = {}) {
+  if (!Array.isArray(paradas) || paradas.length < 3) {
+    return { paradas: [...paradas], seReordeno: false }
+  }
+
+  const todasConCoords = paradas.every((p) =>
+    Number.isFinite(Number(p?.coords?.lat)) && Number.isFinite(Number(p?.coords?.lng)),
+  )
+  if (!todasConCoords) {
+    return { paradas: [...paradas], seReordeno: false }
+  }
+
+  const dOriginal = distanciaRuta(paradas)
+  const candidatas = fijarInicio
+    ? permutaciones(paradas.slice(1)).map((p) => [paradas[0], ...p])
+    : permutaciones(paradas)
+
+  let mejor = paradas
+  let menorDistancia = dOriginal
+
+  for (const c of candidatas) {
+    const d = distanciaRuta(c)
+    if (d < menorDistancia) {
+      menorDistancia = d
+      mejor = c
+    }
+  }
+
+  // Si la ruta original es practicamente igual a la minima (margen del 5%),
+  // no alteramos el orden del usuario.
+  if (dOriginal <= menorDistancia * 1.05) {
+    return { paradas: [...paradas], seReordeno: false }
+  }
+
+  return { paradas: mejor, seReordeno: true }
+}
+

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aHora, aMinutos, choques, duracionTotal, encadenar } from '../functions/lib/itinerario.js'
+import { aHora, aMinutos, choques, distanciaMetros, distanciaRuta, duracionTotal, encadenar, ordenarPorProximidad } from '../functions/lib/itinerario.js'
 
 test('el reloj encadena parada, estancia y traslado', () => {
   const paradas = [
@@ -67,3 +67,83 @@ test('horas de ida y vuelta', () => {
   assert.equal(aHora(825), '13:45')
   assert.equal(aHora(24 * 60 + 30), '23:59')   // no existe el 24:30
 })
+
+test('distanciaMetros calcula con Haversine y tolera datos inválidos', () => {
+  // Sol a Gran Vía en Madrid (~370 m)
+  const sol = { lat: 40.4168, lng: -3.7038 }
+  const granVia = { lat: 40.4200, lng: -3.7050 }
+  const d = distanciaMetros(sol, granVia)
+  assert.ok(d > 350 && d < 400, `esperaba ~370m pero obtuve ${d}`)
+
+  assert.equal(distanciaMetros(null, granVia), Infinity)
+  assert.equal(distanciaMetros(sol, {}), Infinity)
+  assert.equal(distanciaMetros({ lat: 'x' }, granVia), Infinity)
+})
+
+test('distanciaRuta acumula los tramos correctamente', () => {
+  const sol = { coords: { lat: 40.4168, lng: -3.7038 } }
+  const granVia = { coords: { lat: 40.4200, lng: -3.7050 } }
+  const plazaMayor = { coords: { lat: 40.4154, lng: -3.7074 } }
+
+  assert.equal(distanciaRuta([]), 0)
+  assert.equal(distanciaRuta([sol]), 0)
+
+  const dTotal = distanciaRuta([sol, granVia, plazaMayor])
+  const tramo1 = distanciaMetros(sol.coords, granVia.coords)
+  const tramo2 = distanciaMetros(granVia.coords, plazaMayor.coords)
+  assert.ok(Math.abs(dTotal - (tramo1 + tramo2)) < 1e-5)
+})
+
+test('ordenarPorProximidad conserva un orden lógico que ya es óptimo', () => {
+  // Sol -> Gran Vía -> Plaza Mayor -> Palacio Real
+  const rutaLogica = [
+    { titulo: 'Puerta del Sol', coords: { lat: 40.4168, lng: -3.7038 } },
+    { titulo: 'Gran Vía', coords: { lat: 40.4200, lng: -3.7050 } },
+    { titulo: 'Plaza Mayor', coords: { lat: 40.4154, lng: -3.7074 } },
+    { titulo: 'Palacio Real', coords: { lat: 40.4180, lng: -3.7143 } },
+  ]
+
+  const { paradas, seReordeno } = ordenarPorProximidad(rutaLogica, { fijarInicio: true })
+  assert.equal(seReordeno, false, 'no debía alterar una ruta ya óptima')
+  assert.deepEqual(paradas.map((p) => p.titulo), [
+    'Puerta del Sol',
+    'Gran Vía',
+    'Plaza Mayor',
+    'Palacio Real',
+  ])
+})
+
+test('ordenarPorProximidad desenreda un zigzag caótico en Madrid', () => {
+  // Caso real mencionado por el usuario:
+  // Palacio Real -> Gran Vía -> Plaza Mayor -> Sol -> Parque del Retiro
+  // (cruza oeste a norte, vuelve al sur, luego centro este, luego extremo este)
+  const zigzag = [
+    { titulo: 'Palacio Real', coords: { lat: 40.4180, lng: -3.7143 } },
+    { titulo: 'Gran Vía', coords: { lat: 40.4200, lng: -3.7050 } },
+    { titulo: 'Plaza Mayor', coords: { lat: 40.4154, lng: -3.7074 } },
+    { titulo: 'Puerta del Sol', coords: { lat: 40.4168, lng: -3.7038 } },
+    { titulo: 'Parque del Retiro', coords: { lat: 40.4153, lng: -3.6845 } },
+  ]
+
+  const dAntes = distanciaRuta(zigzag)
+  const { paradas, seReordeno } = ordenarPorProximidad(zigzag, { fijarInicio: true })
+  const dDespues = distanciaRuta(paradas)
+
+  assert.equal(seReordeno, true, 'debía detectar el zigzag y reordenar')
+  assert.ok(dDespues < dAntes, `la distancia óptima (${dDespues}) debe ser menor que la del zigzag (${dAntes})`)
+  // El inicio se mantiene en Palacio Real y la secuencia fluye naturalmente hacia el este
+  assert.equal(paradas[0].titulo, 'Palacio Real')
+  assert.equal(paradas[1].titulo, 'Plaza Mayor')
+  assert.equal(paradas[2].titulo, 'Puerta del Sol')
+  assert.equal(paradas[3].titulo, 'Gran Vía')
+  assert.equal(paradas[4].titulo, 'Parque del Retiro')
+})
+
+test('ordenarPorProximidad no toca listas de menos de 3 paradas o sin coordenadas', () => {
+  const dos = [{ titulo: 'A', coords: { lat: 40, lng: -3 } }, { titulo: 'B', coords: { lat: 41, lng: -3 } }]
+  assert.equal(ordenarPorProximidad(dos).seReordeno, false)
+
+  const rotas = [{ titulo: 'A' }, { titulo: 'B', coords: {} }, { titulo: 'C' }]
+  assert.equal(ordenarPorProximidad(rotas).seReordeno, false)
+})
+
