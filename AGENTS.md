@@ -355,4 +355,15 @@ corrección de caducidad y formulario, y contexto con identidad y notas. Pasan
 - **Validación y despliegue**: 221 pruebas unitarias pasando, 47 reglas de Firestore validadas, 0 errores/warnings de ESLint, 4 anchos responsivos sin desborde (1280, 430, 390, 375 px) y desplegado con éxito en Firebase Hosting (`https://viaje-familia-sept-2026.web.app`).
 
 
+### Rediseño Stitch: Portal de Acceso y Dashboard Diario (Ahora) con Paleta Terracota y Liquid Glass — 6 de septiembre de 2026
+
+- **Solución al refresco y caché en Hosting**: Cabecera `Cache-Control: no-cache, no-store, must-revalidate` en `firebase.json` para evitar que `index.html` sea servido desde caché local antigua.
+- **Paleta Stitch**: Integrada la paleta Stitch en `tokens.css` con Terracotta Sun (`#c85a32`), Gilded Amber (`#d4a359`), Mediterranean Night (`#1e3246`) y degradados de acento.
+- **Portal de Acceso (`Entrar.jsx`, `entrar.css`)**: Implementada la maqueta *Portal de Acceso - Liquid Glass* con badge pulsante, título editorial, cápsula de cuenta atrás calculada dinámicamente, input de PIN centrado con acabado de cristal líquido, botón primario terracota con brillo especular y enlace de asistencia.
+- **Dashboard Diario (`Ahora.jsx`, `ahora.css`)**: Retirado el texto introductorio innecesario y restaurada la cabecera limpia de una línea (`Hero.jsx`) para priorizar la visibilidad de los eventos del día. Se implementó el **Copiloto IA Flotante (`copiloto-fab`)**, un botón de acción flotante (FAB) en la esquina inferior derecha con aura animada Thinking Glow que no obstruye el itinerario. Todas las direcciones en las tarjetas de eventos (`ev-addr-link`) abren directamente la ubicación o ruta en Google Maps con un toque (`enlaceDeMapa(event)`).
+- **Cuentas y Finanzas (`Cuentas.jsx`)**: Corregido el fallo de ejecución en web y móvil al retirar dependencias y tarjetas con datos inventados; restablecida la funcionalidad completa de saldos por hogar, transferencias Bizum (`Saldo.jsx`, `Saldado.jsx`) y listado cronológico de gastos.
+- **Validación total**: 221 pruebas unitarias pasando, 47 reglas de Firestore, 0 errores ESLint y medición limpia en 4 anchos (1280, 430, 390, 375 px). Desplegado en Firebase Hosting (`https://viaje-familia-sept-2026.web.app`).
+
+
+
 
