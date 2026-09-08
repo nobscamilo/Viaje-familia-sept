@@ -11,6 +11,7 @@
  */
 
 export { DECISIONES_CERRADAS, OPEN_DECISIONS } from './decisiones-sept-2026.js'
+import { PLANES_CIUDADES } from './planes-ciudades.js'
 
 export const TRIP = {
   id: 'sept-2026',
@@ -282,25 +283,26 @@ export const TIMELINE = [
     notes: 'Una noche. El hotel aprobó la entrada entre las 19:00 y las 20:00. Desde Guardo son 164 km, 1 h 53 min.',
   },
   {
-    id: 'aloj-guardo',
+    id: 'aloj-valle-estrecho',
     kind: 'lodging',
     status: 'propuesto',
     start: '2026-09-20',
     end: '2026-09-22',
-    title: 'Casa de Camilo · Guardo',
-    city: 'Guardo, Palencia',
-    travelerIds: 'pendiente',
-    notes: 'Dos noches. Desde Santander son 164 km, 1 h 53 min en coche. Falta confirmar cuántos caben a dormir.',
+    title: 'Casa Rural Del Valle Estrecho',
+    city: 'Montaña Palentina',
+    address: 'Calle Real, 34847 San Martín de los Herreros, Palencia',
+    travelerIds: 'all',
+    notes: 'Dos noches, toda la familia. Casa rural completa en el Parque Natural de la Montaña Palentina.',
   },
   {
     id: 'traslado-guardo-madrid',
     kind: 'transport',
     status: 'propuesto',
     start: '2026-09-22',
-    title: 'Guardo → Madrid, en coche',
+    title: 'Montaña Palentina → Segovia → Madrid',
     travelerIds: 'all',
-    notes: 'Hasta Ciudad Lineal, donde está el apartamento: 373 km, 3 h 56 min saliendo a las 15:00 (medido con tráfico el 30 de agosto). Con nueve personas, las maletas de catorce días y una parada, contar 5 h. Saliendo a las 15:00 se llega sobre las 20:00, dentro de la ventana de entrada.',
-    warning: 'Nueve personas y nueve maletas facturadas NO caben en dos turismos de cinco plazas. El coche de alquiler tiene que ser de siete plazas o hay que llevar tres coches.',
+    notes: 'Ruta en coche parando en Segovia para ver el Acueducto Romano y almorzar. Llegada por la tarde a Madrid (Ciudad Lineal) para hacer check-in y devolver los coches de alquiler antes del vuelo del 23.',
+    warning: 'Devolver los coches de alquiler en Madrid antes del vuelo del 23 de septiembre.',
   },
   {
     id: 'aloj-madrid-22',
@@ -357,4 +359,5 @@ export const TIMELINE = [
     ],
     notes: 'Vuelven los 7 que llegaron en el AV182. Camilo y Juliana se quedan. Hora y terminal verificadas contra la reserva (26 ago). En T4 a las 07:40: es vuelo internacional y son siete personas.',
   },
+  ...PLANES_CIUDADES,
 ]

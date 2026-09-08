@@ -44,8 +44,9 @@ test('el dia por defecto es hoy si hoy tiene algo', () => {
   // Antes de salir, el primer dia del viaje. Nadie quiere abrir el mapa en
   // agosto y ver el 23 de septiembre.
   assert.equal(diaPorDefecto(TIMELINE, new Date('2026-08-27T10:00:00+02:00')), '2026-09-10')
-  // Un dia sin puntos salta al siguiente que si los tenga.
-  assert.equal(diaPorDefecto(TIMELINE, new Date('2026-09-21T10:00:00+02:00')), '2026-09-22')
+  // Si un día no tuviera puntos, salta al siguiente que sí los tenga.
+  const sinDia21 = TIMELINE.filter((e) => !String(e.start).startsWith('2026-09-21'))
+  assert.equal(diaPorDefecto(sinDia21, new Date('2026-09-21T10:00:00+02:00')), '2026-09-22')
 })
 
 test('el encuadre cubre todos los puntos del viaje', () => {
